@@ -1,0 +1,495 @@
+// Auto-generated from index.html set list
+const POKEMON_SETS = [
+  {
+    "id": "me4",
+    "text": "Chaos Rising – Caos Ascendente (me4) · 2026"
+  },
+  {
+    "id": "me02.5",
+    "text": "Megaevoluzione – Ascesa Eroica (me02.5) · gen 2026"
+  },
+  {
+    "id": "me02",
+    "text": "Megaevoluzione (me02) · set 2025"
+  },
+  {
+    "id": "sv9pt5",
+    "text": "Rivali Predestinati – Destined Rivals (sv9pt5) · mag 2025"
+  },
+  {
+    "id": "sv9",
+    "text": "Avventure Insieme – Journey Together (sv9) · mar 2025"
+  },
+  {
+    "id": "sv8pt5",
+    "text": "Evoluzioni Prismatiche – Prismatic Evolutions (sv8pt5) · gen 2025"
+  },
+  {
+    "id": "sv8",
+    "text": "Scintille Folgoranti – Surging Sparks (sv8) · nov 2024"
+  },
+  {
+    "id": "sv7",
+    "text": "Corona Astrale – Stellar Crown (sv7) · set 2024"
+  },
+  {
+    "id": "sv6pt5",
+    "text": "Segreto Fiabesco – Shrouded Fable (sv6pt5) · ago 2024"
+  },
+  {
+    "id": "sv6",
+    "text": "Crepuscolo Mascherato – Twilight Masquerade (sv6) · mag 2024"
+  },
+  {
+    "id": "sv5",
+    "text": "Cronoforze – Temporal Forces (sv5) · mar 2024"
+  },
+  {
+    "id": "sv4pt5",
+    "text": "Destino di Paldea – Paldean Fates (sv4pt5) · gen 2024"
+  },
+  {
+    "id": "sv4",
+    "text": "Paradosso Temporale – Paradox Rift (sv4) · nov 2023"
+  },
+  {
+    "id": "sv3pt5",
+    "text": "151 (sv3pt5) · set 2023"
+  },
+  {
+    "id": "sv3",
+    "text": "Ossidiana Infuocata – Obsidian Flames (sv3) · ago 2023"
+  },
+  {
+    "id": "sv2",
+    "text": "Evoluzioni a Paldea – Paldea Evolved (sv2) · giu 2023"
+  },
+  {
+    "id": "sv1",
+    "text": "Scarlatto e Violetto – Base (sv1) · mar 2023"
+  },
+  {
+    "id": "swsh12pt5",
+    "text": "Zenit Regale – Crown Zenith (swsh12pt5)"
+  },
+  {
+    "id": "swsh12",
+    "text": "Tempesta Argentata – Silver Tempest (swsh12)"
+  },
+  {
+    "id": "swsh11",
+    "text": "Origine Perduta – Lost Origin (swsh11)"
+  },
+  {
+    "id": "pgo",
+    "text": "Pokémon GO (pgo)"
+  },
+  {
+    "id": "swsh10",
+    "text": "Splendore Astrale – Astral Radiance (swsh10)"
+  },
+  {
+    "id": "swsh9",
+    "text": "Astri Lucenti – Brilliant Stars (swsh9)"
+  },
+  {
+    "id": "swsh8",
+    "text": "Colpo Fusione – Fusion Strike (swsh8)"
+  },
+  {
+    "id": "cel25",
+    "text": "Celebrazioni – Celebrations (cel25)"
+  },
+  {
+    "id": "swsh7",
+    "text": "Cieli in Evoluzione – Evolving Skies (swsh7)"
+  },
+  {
+    "id": "swsh6",
+    "text": "Il Dominio del Ghiaccio – Chilling Reign (swsh6)"
+  },
+  {
+    "id": "swsh5",
+    "text": "Stili di Combattimento – Battle Styles (swsh5)"
+  },
+  {
+    "id": "swsh45",
+    "text": "Destini Brillanti – Shining Fates (swsh45)"
+  },
+  {
+    "id": "swsh4",
+    "text": "Voltaggio Vivace – Vivid Voltage (swsh4)"
+  },
+  {
+    "id": "swsh35",
+    "text": "Il Cammino del Campione – Champion's Path (swsh35)"
+  },
+  {
+    "id": "swsh3",
+    "text": "Buio Abbagliante – Darkness Ablaze (swsh3)"
+  },
+  {
+    "id": "swsh2",
+    "text": "Scontro Ribelle – Rebel Clash (swsh2)"
+  },
+  {
+    "id": "swsh1",
+    "text": "Spada e Scudo – Base (swsh1)"
+  },
+  {
+    "id": "sm12",
+    "text": "Eclissi Cosmica – Cosmic Eclipse (sm12)"
+  },
+  {
+    "id": "sm115",
+    "text": "Destini Nascosti – Hidden Fates (sm115)"
+  },
+  {
+    "id": "sm11",
+    "text": "Menti Unite – Unified Minds (sm11)"
+  },
+  {
+    "id": "sm10",
+    "text": "Legami Indistruttibili – Unbroken Bonds (sm10)"
+  },
+  {
+    "id": "det1",
+    "text": "Detective Pikachu (det1)"
+  },
+  {
+    "id": "sm9",
+    "text": "Unione dei Team – Team Up (sm9)"
+  },
+  {
+    "id": "sm8",
+    "text": "Tuono Perduto – Lost Thunder (sm8)"
+  },
+  {
+    "id": "sm75",
+    "text": "Maestà dei Draghi – Dragon Majesty (sm75)"
+  },
+  {
+    "id": "sm7",
+    "text": "Tempesta Celeste – Celestial Storm (sm7)"
+  },
+  {
+    "id": "sm6",
+    "text": "Luce Proibita – Forbidden Light (sm6)"
+  },
+  {
+    "id": "sm5",
+    "text": "Ultra Prisma – Ultra Prism (sm5)"
+  },
+  {
+    "id": "sm4",
+    "text": "Invasione Cremisi – Crimson Invasion (sm4)"
+  },
+  {
+    "id": "sm35",
+    "text": "Leggende Splendenti – Shining Legends (sm35)"
+  },
+  {
+    "id": "sm3",
+    "text": "Ombre Infuocate – Burning Shadows (sm3)"
+  },
+  {
+    "id": "sm2",
+    "text": "Guardiani Nascenti – Guardians Rising (sm2)"
+  },
+  {
+    "id": "sm1",
+    "text": "Sole e Luna – Base (sm1)"
+  },
+  {
+    "id": "xy12",
+    "text": "Evoluzioni – Evolutions (xy12)"
+  },
+  {
+    "id": "xy11",
+    "text": "Assalto Vapore – Steam Siege (xy11)"
+  },
+  {
+    "id": "xy10",
+    "text": "Destini Incrociati – Fates Collide (xy10)"
+  },
+  {
+    "id": "g1",
+    "text": "Generations (g1)"
+  },
+  {
+    "id": "xy9",
+    "text": "BREAKpoint (xy9)"
+  },
+  {
+    "id": "xy8",
+    "text": "BREAKthrough (xy8)"
+  },
+  {
+    "id": "xy7",
+    "text": "Antiche Origini – Ancient Origins (xy7)"
+  },
+  {
+    "id": "xy6",
+    "text": "Cieli Ruggenti – Roaring Skies (xy6)"
+  },
+  {
+    "id": "dc1",
+    "text": "Doppia Crisi – Double Crisis (dc1)"
+  },
+  {
+    "id": "xy5",
+    "text": "Primordial Clash – Primal Clash (xy5)"
+  },
+  {
+    "id": "xy4",
+    "text": "Forze Fantasma – Phantom Forces (xy4)"
+  },
+  {
+    "id": "xy3",
+    "text": "Pugni Furiosi – Furious Fists (xy3)"
+  },
+  {
+    "id": "xy2",
+    "text": "Vampa di Fuoco – Flashfire (xy2)"
+  },
+  {
+    "id": "xy1",
+    "text": "XY – Base (xy1)"
+  },
+  {
+    "id": "bw11",
+    "text": "Tesori Leggendari – Legendary Treasures (bw11)"
+  },
+  {
+    "id": "bw10",
+    "text": "Esplosione Plasma – Plasma Blast (bw10)"
+  },
+  {
+    "id": "bw9",
+    "text": "Congelamento Plasma – Plasma Freeze (bw9)"
+  },
+  {
+    "id": "bw8",
+    "text": "Tempesta Plasma – Plasma Storm (bw8)"
+  },
+  {
+    "id": "bw7",
+    "text": "Confini Infranti – Boundaries Crossed (bw7)"
+  },
+  {
+    "id": "dv1",
+    "text": "Dragon Vault (dv1)"
+  },
+  {
+    "id": "bw6",
+    "text": "Draghi Esaltati – Dragons Exalted (bw6)"
+  },
+  {
+    "id": "bw5",
+    "text": "Esploratori dell'Oscurità – Dark Explorers (bw5)"
+  },
+  {
+    "id": "bw4",
+    "text": "Prossimi Destini – Next Destinies (bw4)"
+  },
+  {
+    "id": "bw3",
+    "text": "Nobili Vittorie – Noble Victories (bw3)"
+  },
+  {
+    "id": "bw2",
+    "text": "Poteri Emergenti – Emerging Powers (bw2)"
+  },
+  {
+    "id": "bw1",
+    "text": "Nero e Bianco – Base (bw1)"
+  },
+  {
+    "id": "col1",
+    "text": "Richiamo delle Leggende – Call of Legends (col1)"
+  },
+  {
+    "id": "hgss4",
+    "text": "Trionfante – Triumphant (hgss4)"
+  },
+  {
+    "id": "hgss3",
+    "text": "Imperturbabile – Undaunted (hgss3)"
+  },
+  {
+    "id": "hgss2",
+    "text": "Scatenato – Unleashed (hgss2)"
+  },
+  {
+    "id": "hgss1",
+    "text": "HeartGold SoulSilver – Base (hgss1)"
+  },
+  {
+    "id": "pl4",
+    "text": "Arceus (pl4)"
+  },
+  {
+    "id": "pl3",
+    "text": "Supremi Vincitori – Supreme Victors (pl3)"
+  },
+  {
+    "id": "pl2",
+    "text": "Rivali in Ascesa – Rising Rivals (pl2)"
+  },
+  {
+    "id": "pl1",
+    "text": "Platinum – Base (pl1)"
+  },
+  {
+    "id": "dp7",
+    "text": "Tempesta Frontale – Stormfront (dp7)"
+  },
+  {
+    "id": "dp6",
+    "text": "Leggende Risvegliate – Legends Awakened (dp6)"
+  },
+  {
+    "id": "dp5",
+    "text": "Alba Suprema – Majestic Dawn (dp5)"
+  },
+  {
+    "id": "dp4",
+    "text": "Grandi Incontri – Great Encounters (dp4)"
+  },
+  {
+    "id": "dp3",
+    "text": "Segreti e Meraviglie – Secret Wonders (dp3)"
+  },
+  {
+    "id": "dp2",
+    "text": "Tesori Misteriosi – Mysterious Treasures (dp2)"
+  },
+  {
+    "id": "dp1",
+    "text": "Diamante e Perla – Base (dp1)"
+  },
+  {
+    "id": "ex16",
+    "text": "Power Keepers (ex16)"
+  },
+  {
+    "id": "ex15",
+    "text": "Dragon Frontiers (ex15)"
+  },
+  {
+    "id": "ex14",
+    "text": "Crystal Guardians (ex14)"
+  },
+  {
+    "id": "ex13",
+    "text": "Holon Phantoms (ex13)"
+  },
+  {
+    "id": "ex12",
+    "text": "Legend Maker (ex12)"
+  },
+  {
+    "id": "ex11",
+    "text": "Delta Species (ex11)"
+  },
+  {
+    "id": "ex10",
+    "text": "Unseen Forces (ex10)"
+  },
+  {
+    "id": "ex9",
+    "text": "Emerald (ex9)"
+  },
+  {
+    "id": "ex8",
+    "text": "Deoxys (ex8)"
+  },
+  {
+    "id": "ex7",
+    "text": "Team Rocket Returns (ex7)"
+  },
+  {
+    "id": "ex6",
+    "text": "FireRed & LeafGreen (ex6)"
+  },
+  {
+    "id": "ex5",
+    "text": "Hidden Legends (ex5)"
+  },
+  {
+    "id": "ex4",
+    "text": "Team Magma vs Team Aqua (ex4)"
+  },
+  {
+    "id": "ex3",
+    "text": "Dragon (ex3)"
+  },
+  {
+    "id": "ex2",
+    "text": "Sandstorm (ex2)"
+  },
+  {
+    "id": "ex1",
+    "text": "Ruby & Sapphire (ex1)"
+  },
+  {
+    "id": "ecard3",
+    "text": "Skyridge (ecard3)"
+  },
+  {
+    "id": "ecard2",
+    "text": "Aquapolis (ecard2)"
+  },
+  {
+    "id": "ecard1",
+    "text": "Expedition Base (ecard1)"
+  },
+  {
+    "id": "lc",
+    "text": "Legendary Collection (lc)"
+  },
+  {
+    "id": "neo4",
+    "text": "Neo Destino – Neo Destiny (neo4)"
+  },
+  {
+    "id": "neo3",
+    "text": "Neo Rivelazione – Neo Revelation (neo3)"
+  },
+  {
+    "id": "neo2",
+    "text": "Neo Scoperta – Neo Discovery (neo2)"
+  },
+  {
+    "id": "neo1",
+    "text": "Neo Genesi – Neo Genesis (neo1)"
+  },
+  {
+    "id": "gym2",
+    "text": "Sfida della Palestra – Gym Challenge (gym2)"
+  },
+  {
+    "id": "gym1",
+    "text": "Eroi della Palestra – Gym Heroes (gym1)"
+  },
+  {
+    "id": "rocket",
+    "text": "Team Rocket (rocket)"
+  },
+  {
+    "id": "base2",
+    "text": "Base Set 2 (base2)"
+  },
+  {
+    "id": "fossil",
+    "text": "Fossili – Fossil (fossil)"
+  },
+  {
+    "id": "jungle",
+    "text": "Giungla – Jungle (jungle)"
+  },
+  {
+    "id": "base1",
+    "text": "Set Base – Base Set (base1)"
+  }
+];
