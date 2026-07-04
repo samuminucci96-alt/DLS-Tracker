@@ -1,9 +1,9 @@
 {
-  "id": "./",
+  "id": "/?v=46",
   "name": "DLS Tracker — TCG Card Tracker",
   "short_name": "DLS Tracker",
   "description": "Tracker valore carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.",
-  "start_url": "./index.html",
+  "start_url": "./index.html?v=46",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

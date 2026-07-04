@@ -16,9 +16,28 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html">
+  <meta name="msapplication-starturl" content="./index.html?v=46">
 
   <title>DLS Tracker</title>
+  <script>
+  (function pwaBootstrap() {
+    var standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
+      || window.navigator.standalone === true;
+    if (!standalone) return;
+    document.documentElement.classList.add('is-standalone');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        return Promise.all(regs.map(function(r) { return r.unregister(); }));
+      }).catch(function() {});
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      }).catch(function() {});
+    }
+  })();
+  </script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -132,8 +151,19 @@
       background: var(--glass);
       border: 1px solid var(--glass-border);
       border-radius: 20px;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* backdrop-filter + sticky rompe i tap su PWA Android/iOS */
+    @media (max-width: 680px), (display-mode: standalone) {
+      header {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(255, 255, 255, 0.97);
+        position: relative;
+        z-index: 50;
+        animation: fadeUp 0.5s ease-out 0.05s both;
+      }
+      #bgCanvas { display: none !important; pointer-events: none !important; }
     }
 
     .header-brand {
@@ -1139,14 +1169,20 @@
 
     html.is-standalone header,
     html.is-mobile header {
-      position: sticky;
-      top: max(0px, var(--safe-top));
-      z-index: 10;
+      position: relative;
+      z-index: 50;
     }
 
     .game-tab .tab-icon,
     .game-tab img {
       pointer-events: none;
+    }
+
+    .game-tab,
+    .user-btn {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(36, 84, 169, 0.15);
+      cursor: pointer;
     }
 
     @media (max-width: 1100px) {
@@ -1361,9 +1397,13 @@
     .main-grid > .panel:first-child  { animation: fadeUp 0.5s ease-out 0.12s both; }
     .main-grid > .panel:last-child   { animation: fadeUp 0.5s ease-out 0.2s both; }
 
-    /* ─── Header animated glow ──────────────────────────────────── */
-    header {
-      animation: fadeUp 0.5s ease-out 0.05s both, headerGlow 5s ease-in-out infinite 1s;
+    /* ─── Header animated glow (solo desktop) ───────────────────── */
+    @media (min-width: 681px) {
+      header {
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        animation: fadeUp 0.5s ease-out 0.05s both, headerGlow 5s ease-in-out infinite 1s;
+      }
     }
 
     /* ─── Canvas background ─────────────────────────────────────── */
@@ -2491,6 +2531,66 @@
     </div>
   </header>
 
+  <script>
+  (function bindHeaderEarly() {
+    var GAME_LABELS = { pokemon: 'Pokémon TCG', onepiece: 'One Piece TCG', riftbound: 'Riftbound' };
+
+    function showGamePanels(game) {
+      if (!GAME_LABELS[game]) return;
+      document.querySelectorAll('.game-tab[data-game]').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.game === game);
+      });
+      ['pokemon', 'onepiece', 'riftbound'].forEach(function(g) {
+        var on = g === game;
+        var s = document.getElementById(g + 'Search');
+        var r = document.getElementById(g + 'Results');
+        if (s) s.hidden = !on;
+        if (r) r.hidden = !on;
+      });
+      var tag = document.getElementById('gameTag');
+      if (tag) tag.textContent = GAME_LABELS[game];
+    }
+
+    function openAuthEarly() {
+      if (typeof window.openAuthModal === 'function') {
+        try { window.openAuthModal(); return; } catch (err) { console.error(err); }
+      }
+      document.getElementById('profileOverlay')?.classList.add('is-closed');
+      var o = document.getElementById('authOverlay');
+      if (o) {
+        o.classList.remove('is-closed');
+        document.body.classList.add('auth-open');
+      }
+    }
+
+    function onTap(el, fn) {
+      if (!el) return;
+      var last = 0;
+      var run = function(e) {
+        if (e.type === 'touchend') e.preventDefault();
+        var now = Date.now();
+        if (now - last < 300) return;
+        last = now;
+        fn();
+      };
+      el.addEventListener('touchend', run, { passive: false });
+      el.addEventListener('click', run);
+    }
+
+    document.querySelectorAll('.game-tab[data-game]').forEach(function(btn) {
+      onTap(btn, function() {
+        var game = btn.dataset.game;
+        showGamePanels(game);
+        if (typeof window.switchActiveGame === 'function') {
+          try { window.switchActiveGame(game); } catch (err) { console.error(err); }
+        }
+      });
+    });
+    onTap(document.getElementById('userBtn'), openAuthEarly);
+    window.__dlsShowGamePanels = showGamePanels;
+  })();
+  </script>
+
   <!-- ─── Main grid ───────────────────────────────────────────────── -->
   <div class="main-grid">
 
@@ -2855,22 +2955,12 @@
   const standalone = window.matchMedia('(display-mode: standalone)').matches
     || window.matchMedia('(display-mode: fullscreen)').matches
     || window.navigator.standalone === true;
-  if (!standalone || !('serviceWorker' in navigator)) return;
-  if (sessionStorage.getItem('dls_pwa_purged')) return;
-  navigator.serviceWorker.getRegistrations().then(async regs => {
-    const hadSw = regs.length > 0;
-    let hadCache = false;
-    await Promise.all(regs.map(r => r.unregister()));
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      hadCache = keys.length > 0;
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }
-    if (hadSw || hadCache) {
-      sessionStorage.setItem('dls_pwa_purged', '1');
-      location.reload();
-    }
-  }).catch(() => {});
+  if (!standalone) return;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('authOverlay')?.classList.add('is-closed');
+    document.getElementById('profileOverlay')?.classList.add('is-closed');
+    document.body.classList.remove('auth-open', 'ios-install-open');
+  });
 })();
 // ── Constants ────────────────────────────────────────────────────────
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
@@ -6175,31 +6265,13 @@ $('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
 // Auto-refresh ogni 30 minuti se l'utente è loggato
 setInterval(() => { if (dlsUser) refreshAllPrices(); }, 30 * 60 * 1000);
 
-// ── Service Worker (PWA) — disattivato in anteprima locale/LAN ───────
-function isLocalPreviewHost() {
-  const h = location.hostname;
-  return h === 'localhost' || h === '127.0.0.1'
-    || /^192\.168\./.test(h) || /^10\./.test(h) || /\.local$/i.test(h);
-}
-
+// ── Service Worker — disattivato (causava cache JS obsoleta in PWA) ──
 if ('serviceWorker' in navigator) {
-  if (isLocalPreviewHost()) {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(r => r.unregister());
-      console.log('[SW] Anteprima locale: cache PWA disattivata');
-    });
-    if ('caches' in window) {
-      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
-    }
-  } else {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=42').then(reg => {
-        console.log('[SW] Registrato, scope:', reg.scope);
-        reg.update();
-      }).catch(err => {
-        console.warn('[SW] Registrazione fallita:', err);
-      });
-    });
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  }).catch(() => {});
+  if ('caches' in window) {
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
   }
 }
 
@@ -6383,6 +6455,7 @@ window.addEventListener('load', () => {
 
 bindHeaderUi();
 initApp();
+window.switchActiveGame = switchActiveGame;
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
 window.openProfilePanel = openProfilePanel;
