@@ -1,5 +1,10 @@
 (function () {
+  var standalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || window.navigator.standalone === true;
+
   document.documentElement.style.touchAction = 'manipulation';
+  if (standalone) document.documentElement.classList.add('is-standalone');
 
   function applyBodyTouch() {
     if (document.body) document.body.style.touchAction = 'manipulation';
@@ -11,9 +16,13 @@
       if (!el) return;
       el.hidden = true;
       el.style.display = 'none';
+      el.style.pointerEvents = 'none';
       el.classList.add('is-closed');
     });
-    document.body?.classList.remove('auth-open', 'ios-install-open');
+    if (document.body) {
+      document.body.classList.remove('auth-open', 'ios-install-open');
+      document.body.style.overflow = '';
+    }
     document.getElementById('installBanner')?.remove();
     document.getElementById('installIosSheet')?.remove();
   }
@@ -32,12 +41,12 @@
   }
 
   applyBodyTouch();
-  hideBlockingOverlays();
   purgeSwCache();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      applyBodyTouch();
-      hideBlockingOverlays();
-    });
-  }
+  hideBlockingOverlays();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyBodyTouch();
+    hideBlockingOverlays();
+  });
+  window.addEventListener('pageshow', hideBlockingOverlays);
 })();

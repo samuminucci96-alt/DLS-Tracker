@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#e8f4fc">
   <link rel="manifest" href="manifest.json">
@@ -16,11 +16,10 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=47">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="msapplication-starturl" content="./index.html?v=48">
 
   <title>DLS Tracker</title>
-  <script src="pwa-fix.js?v=47"></script>
+  <script src="pwa-fix.js?v=48"></script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -343,6 +342,12 @@
       overflow: hidden;
     }
 
+    html.is-standalone .auth-overlay,
+    html.is-standalone .auth-overlay.is-closed {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
     .install-app-btn[hidden],
     html.is-standalone .install-app-btn,
     html.is-standalone #installAppBtn {
@@ -410,6 +415,24 @@
     .game-tab[data-game="pokemon"].active { color: var(--poke); }
     .game-tab[data-game="onepiece"].active { color: var(--op); }
     .game-tab[data-game="riftbound"].active { color: var(--gold); }
+
+    /* PWA installata: menu nativo al posto dei tab (tap affidabili iOS/Android) */
+    .game-select-pwa {
+      display: none;
+      width: 100%;
+      min-width: 0;
+      font-size: 16px;
+      min-height: 44px;
+      padding: 10px 36px 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    html.is-standalone .game-tabs { display: none !important; }
+    html.is-standalone .game-select-pwa { display: block; }
 
     .tab-icon { font-size: 1rem; }
     .tab-icon-img {
@@ -517,10 +540,11 @@
       background: var(--surface-2);
       color: var(--text);
       font: inherit;
-      font-size: 0.9rem;
+      font-size: 16px;
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
       width: 100%;
+      min-height: 44px;
     }
 
     input::placeholder { color: var(--text-muted); }
@@ -2489,6 +2513,11 @@
     </div>
 
     <nav class="header-nav" aria-label="Selezione gioco">
+      <select id="gameSelect" class="game-select-pwa" aria-label="Seleziona gioco" onchange="switchActiveGame(this.value)">
+        <option value="pokemon">Pokémon TCG</option>
+        <option value="onepiece">One Piece TCG</option>
+        <option value="riftbound">Riftbound</option>
+      </select>
       <div class="game-tabs">
         <button type="button" class="game-tab active" data-game="pokemon" onclick="switchActiveGame('pokemon')">
           <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
@@ -2826,16 +2855,7 @@
   const root = document.documentElement;
   let lastLayoutWidth = window.innerWidth;
 
-  function isVirtualKeyboardOpen() {
-    const vv = window.visualViewport;
-    if (!vv) return false;
-    return vv.height < window.innerHeight * 0.82;
-  }
-
-  const sync = (opts = {}) => {
-    if (!opts.skipHeight && !isVirtualKeyboardOpen()) {
-      root.style.setProperty('--app-height', `${window.innerHeight}px`);
-    }
+  const sync = () => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.matchMedia('(display-mode: fullscreen)').matches
       || window.navigator.standalone === true;
@@ -2844,19 +2864,12 @@
     root.classList.toggle('is-mobile', mobile);
     if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
   };
-  const lockPortrait = () => {};
   sync();
   window.addEventListener('resize', () => {
     if (Math.abs(window.innerWidth - lastLayoutWidth) > 8) {
       lastLayoutWidth = window.innerWidth;
       sync();
-    } else {
-      sync({ skipHeight: isVirtualKeyboardOpen() });
     }
-  });
-  window.visualViewport?.addEventListener('resize', () => {
-    if (isVirtualKeyboardOpen()) return;
-    sync();
   });
   window.addEventListener('orientationchange', () => {
     setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); }, 120);
@@ -4050,6 +4063,9 @@ function renderSugg(names) {
   const box = $('nameSuggestions');
   if (!names.length) { hideSuggestions(); return; }
   const query = $('pokemonName').value.trim().toLowerCase();
+  const key = names.join('|');
+  if (box.dataset.suggKey === key) return;
+  box.dataset.suggKey = key;
   box.innerHTML = names.map(n => {
     // Bold-highlight matching part
     const lo = n.toLowerCase();
@@ -4085,6 +4101,7 @@ function hideSuggestions() {
   const box = $('nameSuggestions');
   box.hidden = true;
   box.innerHTML = '';
+  delete box.dataset.suggKey;
 }
 
 let setSuggTimer = null;
@@ -5299,6 +5316,11 @@ function bindHeaderUi() {
     tab.dataset.bound = '1';
     tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
   });
+  const gs = $('gameSelect');
+  if (gs && !gs.dataset.bound) {
+    gs.dataset.bound = '1';
+    gs.addEventListener('change', () => switchActiveGame(gs.value));
+  }
   const ub = $('userBtn');
   if (ub && !ub.dataset.bound) {
     ub.dataset.bound = '1';
@@ -5325,6 +5347,8 @@ function switchActiveGame(game) {
 
     activeGame = game;
     document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
+    const sel = $('gameSelect');
+    if (sel && sel.value !== game) sel.value = game;
     const panels = [
       ['pokemonSearch', game === 'pokemon'],
       ['onepieceSearch', game === 'onepiece'],
@@ -5897,6 +5921,7 @@ function openProfilePanel() {
   if (overlay) {
     overlay.hidden = false;
     overlay.style.display = 'flex';
+    overlay.style.pointerEvents = 'auto';
     overlay.classList.remove('is-closed');
   }
   document.body.classList.add('auth-open');
@@ -5915,6 +5940,7 @@ function closeProfilePanel() {
     overlay.classList.add('is-closed');
     overlay.hidden = true;
     overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
   }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
@@ -5979,6 +6005,7 @@ function openAuthModal() {
   if (!overlay) return;
   overlay.hidden = false;
   overlay.style.display = 'flex';
+  overlay.style.pointerEvents = 'auto';
   overlay.classList.remove('is-closed');
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
@@ -5989,6 +6016,7 @@ function closeAuthModal() {
     overlay.classList.add('is-closed');
     overlay.hidden = true;
     overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
   }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
