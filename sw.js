@@ -1,8 +1,8 @@
-const CACHE  = 'dls-tracker-v29';
-const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE  = 'dls-tracker-v32';
+const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './icon-192-maskable.png', './icon-512-maskable.png', './apple-touch-icon.png'];
 
 // Logo e icone: sempre rete prima (evita PWA con icona/logo vecchi in cache)
-const NETWORK_FIRST = ['logo.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+const NETWORK_FIRST = ['logo.png', 'icon-192.png', 'icon-512.png', 'icon-192-maskable.png', 'icon-512-maskable.png', 'apple-touch-icon.png'];
 
 function isNetworkFirst(url) {
   return NETWORK_FIRST.some(name => url.pathname.endsWith(name));

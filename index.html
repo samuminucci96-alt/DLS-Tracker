@@ -13,9 +13,9 @@
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DLS Tracker">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=3">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=4">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=4">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
   <meta name="msapplication-starturl" content="./index.html">
@@ -259,10 +259,13 @@
     }
     .install-ios-sheet {
       width: min(420px, 100%);
+      max-height: min(88dvh, calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 18px 16px 16px;
+      padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
       box-shadow: 0 16px 48px rgba(36, 84, 169, 0.18);
     }
     .install-ios-sheet h3 {
@@ -287,13 +290,17 @@
       gap: 10px;
       align-items: flex-start;
       font-size: 0.84rem;
-      line-height: 1.4;
+      line-height: 1.45;
       padding: 10px 12px;
       border-radius: 12px;
       background: var(--surface-2);
       border: 1px solid var(--border);
     }
-    .install-ios-steps span {
+    .install-ios-steps li > div {
+      flex: 1;
+      min-width: 0;
+    }
+    .install-ios-steps .step-num {
       width: 22px;
       height: 22px;
       border-radius: 999px;
@@ -304,9 +311,42 @@
       display: grid;
       place-items: center;
       flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .install-ios-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .install-ios-actions .btn-primary { flex: 1 1 140px; }
+    .install-ios-actions .btn:not(.btn-primary) {
+      flex: 0 0 auto;
+      padding: 9px 14px;
+      background: rgba(36, 84, 169, 0.06);
     }
 
-    /* ─── Game Tabs ───────────────────────────────────────────────── */
+    body.ios-install-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    @media (max-width: 680px) {
+      .install-banner.keyboard-open {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(120%);
+      }
+      .install-ios-overlay {
+        align-items: center;
+        padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+      }
+      .install-ios-sheet {
+        width: 100%;
+        border-radius: 16px;
+      }
+      .install-ios-sheet h3 { font-size: 1rem; }
+      .install-ios-steps li { font-size: 0.82rem; padding: 9px 10px; }
+    }
     .game-tabs {
       display: flex;
       gap: 6px;
@@ -351,8 +391,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 1.5rem;
-      height: 1.5rem;
+      width: 1.85rem;
+      height: 1.85rem;
       flex-shrink: 0;
     }
     .tab-icon-img img {
@@ -1140,8 +1180,8 @@
       }
       .game-tab .tab-icon { font-size: 0.85rem; }
       .game-tab .tab-icon-img {
-        width: 1.4rem;
-        height: 1.4rem;
+        width: 1.65rem;
+        height: 1.65rem;
       }
 
       .auth-modal,
@@ -1919,15 +1959,37 @@
     /* ─── Search loading bar ────────────────────────────────────── */
     #searchProgressBar {
       height: 2px;
+      min-height: 2px;
       background: linear-gradient(90deg, var(--accent), #a78bfa, var(--success), var(--accent));
       background-size: 300% 100%;
       border-radius: 2px;
       margin-top: 10px;
-      display: none;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      overflow: hidden;
     }
     #searchProgressBar.active {
-      display: block;
+      opacity: 1;
+      visibility: visible;
       animation: shimmer 1.4s linear infinite;
+    }
+
+    .tcg-progress-bar {
+      height: 2px;
+      min-height: 2px;
+      background-size: 200%;
+      border-radius: 2px;
+      margin-top: 4px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .tcg-progress-bar.active {
+      opacity: 1;
+      visibility: visible;
+      animation: shimmer 1.2s linear infinite;
     }
 
     /* ─── Mobile / PWA layout (must stay last — wins cascade over rules above) ─── */
@@ -2064,8 +2126,8 @@
       }
       .game-tab .tab-icon { font-size: 0.85rem; }
       .game-tab .tab-icon-img {
-        width: 1.25rem;
-        height: 1.25rem;
+        width: 1.55rem;
+        height: 1.55rem;
       }
 
       .main-grid {
@@ -2368,7 +2430,7 @@
     <nav class="header-nav" aria-label="Selezione gioco">
       <div class="game-tabs">
         <button class="game-tab active" data-game="pokemon">
-          <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=2" alt="" width="24" height="24"></span>
+          <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30"></span>
           Pokémon TCG
         </button>
         <button class="game-tab" data-game="onepiece">
@@ -2515,7 +2577,7 @@
           <button class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px">
             <span id="opSearchBtnInner">🔍 &nbsp;Cerca Carta OP</span>
           </button>
-          <div id="opProgressBar" style="height:2px;background:linear-gradient(90deg,#ef4444,#f97316,#ef4444);background-size:200%;display:none;border-radius:2px;margin-top:4px;animation:shimmer 1.2s linear infinite"></div>
+          <div id="opProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#ef4444,#f97316,#ef4444);"></div>
           <div id="opMsgBox" hidden style="margin-top:8px"></div>
         </div>
         </div>
@@ -2568,7 +2630,7 @@
           <button class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px">
             <span id="rbSearchBtnInner">🔍 &nbsp;Cerca Carta Riftbound</span>
           </button>
-          <div id="rbProgressBar" style="height:2px;background:linear-gradient(90deg,#c9920a,#2454a9,#c9920a);background-size:200%;display:none;border-radius:2px;margin-top:4px;animation:shimmer 1.2s linear infinite"></div>
+          <div id="rbProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#c9920a,#2454a9,#c9920a);"></div>
           <div id="rbMsgBox" hidden style="margin-top:8px"></div>
         </div>
         </div>
@@ -2701,12 +2763,21 @@
 <script>
 (function initViewport() {
   const root = document.documentElement;
-  const sync = () => {
-    root.style.setProperty('--app-height', `${window.innerHeight}px`);
+  let lastLayoutWidth = window.innerWidth;
+
+  function isVirtualKeyboardOpen() {
+    const vv = window.visualViewport;
+    if (!vv) return false;
+    return vv.height < window.innerHeight * 0.82;
+  }
+
+  const sync = (opts = {}) => {
+    if (!opts.skipHeight && !isVirtualKeyboardOpen()) {
+      root.style.setProperty('--app-height', `${window.innerHeight}px`);
+    }
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true;
-    const vpW = window.visualViewport?.width ?? window.innerWidth;
-    const mobile = window.matchMedia('(max-width: 680px)').matches || vpW <= 680;
+    const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
     root.classList.toggle('is-mobile', mobile);
     if (standalone && typeof markAppInstalled === 'function') markAppInstalled();
@@ -2720,10 +2791,20 @@
   };
   sync();
   lockPortrait();
-  window.addEventListener('resize', sync);
-  window.visualViewport?.addEventListener('resize', sync);
+  window.addEventListener('resize', () => {
+    if (Math.abs(window.innerWidth - lastLayoutWidth) > 8) {
+      lastLayoutWidth = window.innerWidth;
+      sync();
+    } else {
+      sync({ skipHeight: isVirtualKeyboardOpen() });
+    }
+  });
+  window.visualViewport?.addEventListener('resize', () => {
+    if (isVirtualKeyboardOpen()) return;
+    sync();
+  });
   window.addEventListener('orientationchange', () => {
-    setTimeout(() => { sync(); lockPortrait(); }, 120);
+    setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); lockPortrait(); }, 120);
   });
   window.matchMedia('(display-mode: standalone)').addEventListener('change', sync);
   window.addEventListener('load', lockPortrait);
@@ -2757,7 +2838,87 @@ const CT_SET_CODE_MAP = {
   ascesaeroica: 'asc', ascendedheroes: 'asc',
   chaosrising: 'cri', caosascendente: 'cri',
   ossidianainfuocata: 'obf', obsidianflames: 'obf', obf: 'obf',
+  sv1: 'sv1', sv2: 'pal', sv3: 'obf', sv3pt5: '151', sv4: 'par', sv4pt5: 'paf',
+  sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
+  sv9: 'jtg', sv9pt5: 'dri',
+  scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
 };
+
+const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
+
+function pokemonSetEnglishName(setId, setName) {
+  if (typeof POKEMON_SETS !== 'undefined' && setId) {
+    const row = POKEMON_SETS.find(s => norm(s.id) === norm(setId));
+    if (row?.text) {
+      const dash = row.text.indexOf(' – ');
+      if (dash >= 0) {
+        return row.text.slice(dash + 3).replace(/\s*\([^)]*\).*$/, '').trim();
+      }
+    }
+  }
+  return setName || '';
+}
+
+function resolveCtCodeForPokemonSet(setId, setName) {
+  const sid = (setId || '').toLowerCase().replace(/[\.\-\s]/g, '');
+  const sname = norm(setName).replace(/\s+/g, '');
+  if (CT_SET_CODE_MAP[sid]) return CT_SET_CODE_MAP[sid];
+  if (CT_SET_CODE_MAP[sname]) return CT_SET_CODE_MAP[sname];
+  if (CT_SET_CODE_MAP[norm(setId)]) return CT_SET_CODE_MAP[norm(setId)];
+  return null;
+}
+
+function ctBpMeta(bp) {
+  return norm([bp?.name, bp?.category_name, bp?.version, bp?.fixed_properties?.rarity].filter(Boolean).join(' '));
+}
+
+function pokemonRarityProfile(card) {
+  const r = norm(card?.rarity || '');
+  if (/special illustration|illustration rare/.test(r)) {
+    return { tokens: ['special illustration', 'illustration rare', 'sir'], avoid: ['ultra rare', 'double rare'] };
+  }
+  if (/gold secret|hyper rare/.test(r)) {
+    return { tokens: ['gold secret', 'hyper rare', 'secret rare'], avoid: ['ultra rare'] };
+  }
+  if (/special art rare|secret rare/.test(r)) {
+    return { tokens: ['special art', 'secret rare'], avoid: [] };
+  }
+  if (/ultra rare|double rare/.test(r)) {
+    return { tokens: ['ultra rare', 'double rare'], avoid: ['illustration rare', 'special illustration'] };
+  }
+  if (/full art|full-art/.test(r)) {
+    return { tokens: ['full art', 'full-art'], avoid: [] };
+  }
+  return { tokens: [], avoid: [] };
+}
+
+function scoreBlueprintForCard(card, bp) {
+  const cardName = norm(card.name || '');
+  const bn = ctBpName(bp);
+  if (!cardName || !bn) return 0;
+  if (bn !== cardName && !bn.includes(cardName) && !cardName.includes(bn)) return 0;
+
+  let score = bn === cardName ? 12 : 7;
+  const rawNum = (card.number || '').split('/')[0].replace(/^0+/, '');
+  const bpNum = ctBpNumber(bp);
+
+  if (rawNum) {
+    if (!bpNum || bpNum !== rawNum) return 0;
+    score += 30;
+  }
+
+  const meta = ctBpMeta(bp);
+  const cat = norm(bp?.category_name || '');
+  const profile = pokemonRarityProfile(card);
+  profile.tokens.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) score += 18;
+  });
+  profile.avoid.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) score -= 20;
+  });
+
+  return score;
+}
 
 const LOCAL_CATALOG = [
   {
@@ -2778,6 +2939,8 @@ let collection      = [];
 let activeGame      = 'pokemon';
 let searchCtrl      = null;   // AbortController for main search
 let suggCtrl        = null;   // AbortController for suggestions
+let priceFetchGen   = 0;
+let bgAnimPaused    = false;
 let suggTimer       = null;
 const suggCache     = new Map();
 
@@ -2851,7 +3014,18 @@ function normCardName(v) {
   return norm(v).replace(/[.\-_]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function collectionEntryId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function pushCollectionItem(item) {
+  if (!item._id) item._id = collectionEntryId();
+  collection.push(item);
+  return item;
+}
+
 function collectionItemKey(item) {
+  if (item?._id) return item._id;
   return [
     item.game || 'pokemon',
     norm(item.name),
@@ -2860,6 +3034,7 @@ function collectionItemKey(item) {
     item.quality || item.condition || 'NM',
     item.lang || item.language || '',
     item.card?.bpId || '',
+    String(item.addedAt || ''),
   ].join('|');
 }
 
@@ -3086,8 +3261,20 @@ async function ctGetExpansions(token, game = 'pokemon') {
 
 // Ricerca blueprint per nome dentro le espansioni già caricate (fallback lento)
 async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = null) {
-  const cacheKey = `${game}:${norm(name)}:${card?.set?.id || ''}:${card?.number || ''}`;
+  const cacheKey = `${game}:${norm(name)}:${card?.set?.id || ''}:${card?.number || ''}:${card?.rarity || ''}`;
   if (ctCache.bpSearch.has(cacheKey)) return ctCache.bpSearch.get(cacheKey);
+
+  if (card?.set) {
+    const exp = await ctMatchExpansion(card, token, game);
+    if (exp) {
+      const bp = await ctFindBlueprint(card, exp.id, token);
+      if (bp) {
+        const hit = [{ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }];
+        ctCache.bpSearch.set(cacheKey, hit);
+        return hit;
+      }
+    }
+  }
 
   const expansions = await ctGetExpansions(token, game);
   let candidates = expansions;
@@ -3101,19 +3288,32 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
   const rawNum = (card?.number || '').split('/')[0].replace(/^0+/, '');
   const hits = [];
 
-  for (const exp of candidates.slice(0, 12)) {
+  for (const exp of candidates.slice(0, 8)) {
     const bps = await ctGetBlueprints(exp.id, token);
     for (const bp of bps) {
-      if (!ctBpName(bp).includes(cardName) && !cardName.includes(ctBpName(bp))) continue;
-      if (rawNum && ctBpNumber(bp) && ctBpNumber(bp) !== rawNum) continue;
-      hits.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
-      if (hits.length >= 8) break;
+      const score = card ? scoreBlueprintForCard(card, bp) : 0;
+      if (card) {
+        if (score <= 0) continue;
+      } else if (!ctBpName(bp).includes(cardName) && !cardName.includes(ctBpName(bp))) {
+        continue;
+      }
+      if (!card && rawNum && ctBpNumber(bp) && ctBpNumber(bp) !== rawNum) continue;
+      hits.push({ bp, score: score || 1, expansion: exp });
+      if (hits.length >= 12) break;
     }
-    if (hits.length >= 8) break;
+    if (hits.length >= 12) break;
   }
 
-  ctCache.bpSearch.set(cacheKey, hits);
-  return hits;
+  const result = hits
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map(({ bp, expansion }) => ({
+      ...bp,
+      expansion: { id: expansion.id, name_en: ctExpName(expansion), code: expansion.code },
+    }));
+
+  ctCache.bpSearch.set(cacheKey, result);
+  return result;
 }
 
 function dedupeBlueprints(bps) {
@@ -3213,34 +3413,39 @@ async function ctSearchBlueprintsForTcg(query, token, game, opts = {}) {
   };
 
   if (prefixMode) {
-    for (let i = 0; i < candidates.length; i += 4) {
-      const batch = candidates.slice(i, i + 4);
+    for (let i = 0; i < candidates.length; i += 6) {
+      if (hits.length >= limit) break;
+      const batch = candidates.slice(i, i + 6);
       await Promise.all(batch.map(async exp => {
+        if (hits.length >= limit) return;
         const bps = await ctGetBlueprints(exp.id, token);
         for (const bp of bps) {
+          if (hits.length >= limit) break;
           if (!ctBlueprintMatchesQuery(bp, query, cardNum)) continue;
           pushHit(bp, exp);
         }
       }));
     }
   } else {
-    const maxFirst = setCtId || setId ? candidates.length : 20;
+    const maxFirst = setCtId || setId ? candidates.length : 12;
     for (let ei = 0; ei < Math.min(candidates.length, maxFirst); ei++) {
+      if (hits.length >= limit) break;
       const exp = candidates[ei];
       const bps = await ctGetBlueprints(exp.id, token);
       for (const bp of bps) {
         if (!ctBlueprintMatchesQuery(bp, query, cardNum)) continue;
         pushHit(bp, exp);
+        if (hits.length >= limit) break;
       }
-      if (hits.length >= limit * 3) break;
     }
     if (hits.length < limit && candidates.length > maxFirst) {
-      for (let ei = maxFirst; ei < candidates.length && hits.length < limit * 2; ei++) {
+      for (let ei = maxFirst; ei < candidates.length && hits.length < limit; ei++) {
         const exp = candidates[ei];
         const bps = await ctGetBlueprints(exp.id, token);
         for (const bp of bps) {
           if (!ctBlueprintMatchesQuery(bp, query, cardNum)) continue;
           pushHit(bp, exp);
+          if (hits.length >= limit) break;
         }
       }
     }
@@ -3274,32 +3479,41 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
   const expansions = await ctGetExpansions(token, game);
   if (!expansions?.length) return null;
 
-  const setId   = (card.set?.id || '').toLowerCase().replace(/[\.\-\s]/g, '');
+  const setIdRaw = (card.set?.id || '').toLowerCase();
+  const setId   = setIdRaw.replace(/[\.\-\s]/g, '');
   const setName = card.set?.name || '';
   const setNorm = norm(setName);
+  const enName  = norm(pokemonSetEnglishName(card.set?.id, setName));
 
-  console.log(`[CT] Cerco espansione per set: id="${setId}" name="${setName}"`);
+  console.log(`[CT] Cerco espansione per set: id="${setId}" name="${setName}" en="${enName}"`);
 
-  // 0. Mappa codici PokéTCG → CT (es. me02.5 → asc)
-  const mappedCode = CT_SET_CODE_MAP[setId] || CT_SET_CODE_MAP[norm(setName).replace(/\s+/g, '')];
+  const mappedCode = resolveCtCodeForPokemonSet(card.set?.id, setName)
+    || CT_SET_CODE_MAP[setId] || CT_SET_CODE_MAP[setNorm.replace(/\s+/g, '')];
   if (mappedCode) {
-    const m0 = expansions.find(e => (e.code || '').toLowerCase() === mappedCode);
+    const m0 = expansions.find(e => norm(e.code) === norm(mappedCode));
     if (m0) { console.log('[CT] Match codice mappato:', m0.code, ctExpName(m0)); return m0; }
   }
 
-  // 1. Codice esatto CT
-  let m = expansions.find(e => (e.code || '').toLowerCase().replace(/[\.\-\s]/g, '') === setId);
-  if (m) { console.log('[CT] Match codice esatto:', ctExpName(m)); return m; }
+  if (enName) {
+    const mEn = expansions.find(e => norm(ctExpName(e)) === enName)
+      || expansions.find(e => {
+        const en = norm(ctExpName(e));
+        return en.length >= 4 && (enName.includes(en) || en.includes(enName));
+      });
+    if (mEn) { console.log('[CT] Match nome EN catalogo:', ctExpName(mEn)); return mEn; }
+  }
 
-  // 2. Nome esatto (campo name usato da CT)
-  m = expansions.find(e => norm(ctExpName(e)) === setNorm);
+  let m = expansions.find(e => norm(ctExpName(e)) === setNorm);
   if (m) { console.log('[CT] Match nome esatto:', ctExpName(m)); return m; }
 
-  // 3. Nome IT/EN legacy
   m = expansions.find(e => norm(e.name_en || '') === setNorm || norm(e.name_it || '') === setNorm);
   if (m) { console.log('[CT] Match nome legacy:', ctExpName(m)); return m; }
 
-  // 4. Contains match
+  if (!CT_SET_ID_CONFLICTS.has(setId)) {
+    m = expansions.find(e => (e.code || '').toLowerCase().replace(/[\.\-\s]/g, '') === setId);
+    if (m) { console.log('[CT] Match codice esatto:', ctExpName(m)); return m; }
+  }
+
   m = expansions.find(e => {
     const en = norm(ctExpName(e));
     const shortSet = norm(setName.replace(/^[^:]+:\s*/, ''));
@@ -3307,11 +3521,10 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
   });
   if (m) { console.log('[CT] Match contains:', ctExpName(m)); return m; }
 
-  // 5. Token overlap
   let best = null, bestScore = 0;
   const withoutPrefix = setName.replace(/^[^:]+:\s*/, '');
   for (const e of expansions) {
-    for (const candidate of [setName, withoutPrefix]) {
+    for (const candidate of [setName, withoutPrefix, pokemonSetEnglishName(card.set?.id, setName)]) {
       const score = Math.max(
         ctSimilarity(candidate, ctExpName(e)),
         ctSimilarity(candidate, e.name_it || ''),
@@ -3337,33 +3550,23 @@ async function ctGetBlueprints(expansionId, token) {
 
 async function ctFindBlueprint(card, expansionId, token) {
   const bps = await ctGetBlueprints(expansionId, token);
-  const cardName = norm(card.name || '');
-  const rawNum   = (card.number || '').split('/')[0].replace(/^0+/, '');
-
-  const scoreBp = b => {
-    let score = 0;
-    const bn = ctBpName(b);
-    if (bn === cardName) score += 5;
-    else if (bn.includes(cardName) || cardName.includes(bn)) score += 3;
-    const num = ctBpNumber(b);
-    if (rawNum && num && num === rawNum) score += 4;
-    return score;
-  };
+  const rawNum = (card.number || '').split('/')[0].replace(/^0+/, '');
 
   const ranked = bps
-    .map(b => ({ b, score: scoreBp(b) }))
-    .filter(x => x.score >= 3)
+    .map(b => ({ b, score: scoreBlueprintForCard(card, b) }))
+    .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  if (ranked.length) return ranked[0].b;
-
-  const byName = bps.filter(b => ctBpName(b) === cardName);
-  if (byName.length === 1) return byName[0];
-  if (byName.length > 1 && rawNum) {
-    const byNum = byName.filter(b => ctBpNumber(b) === rawNum);
-    if (byNum.length) return byNum[0];
+  if (ranked.length) {
+    console.log('[CT] Blueprint scelto:', ranked[0].b?.name, ctBpNumber(ranked[0].b), 'score', ranked[0].score);
+    return ranked[0].b;
   }
-  return byName[0] || null;
+
+  if (rawNum) return null;
+
+  const byName = bps.filter(b => ctBpName(b) === norm(card.name || ''));
+  if (byName.length === 1) return byName[0];
+  return null;
 }
 
 // Mappa condizioni CardTrader → etichetta app
@@ -3420,6 +3623,15 @@ function resolveCtConditionPrice(ctData, qualityKey, fallbackNmPrice = 0) {
       ? `Stima ${qMeta.short} (${Math.round(qMeta.coeff * 100)}% del NM)`
       : `Nessun annuncio CT in ${qMeta.short}`,
   };
+}
+
+function ctTrimListingOutliers(listings) {
+  if (listings.length < 5) return listings;
+  const prices = listings.map(l => l.price).sort((a, b) => a - b);
+  const median = prices[Math.floor(prices.length / 2)];
+  const floor = Math.max(0.25, median * 0.12);
+  const trimmed = listings.filter(l => l.price >= floor);
+  return trimmed.length >= 2 ? trimmed : listings;
 }
 
 function ctAverageConditions(listings) {
@@ -3481,10 +3693,19 @@ function ctAverageConditions(listings) {
   }
 
   Object.values(byCondition).forEach(row => {
-    row.avgPrice = row.sum / row.count;
-    row.price = row.minPrice;
     row.listings.sort((a, b) => a.price - b.price);
-    row.listings = row.listings.slice(0, 12);
+    row.listings = ctTrimListingOutliers(row.listings).slice(0, 12);
+    row.count = row.listings.length;
+    if (row.listings.length) {
+      row.minPrice = row.listings[0].price;
+      row.maxPrice = row.listings[row.listings.length - 1].price;
+      row.avgPrice = row.listings.reduce((s, l) => s + l.price, 0) / row.listings.length;
+      row.price = row.minPrice;
+      const top = row.listings[0];
+      row.seller = top.seller;
+      row.language = top.language;
+      row.foil = top.foil;
+    }
     delete row.sum;
   });
 
@@ -3947,6 +4168,8 @@ async function doSearch() {
 
   // Reset UI
   selectedCard = null;
+  choicePriceCache.clear();
+  ctPriceData = null;
   $('resultCard').hidden = true;
   $('choicesCard').hidden = true;
   hideAllSuggestions();
@@ -3986,7 +4209,7 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   // Scegli pageSize in base alla specificità della query:
   // più campi → risultati attesi minori → pageSize ridotto → risposta più veloce
   const specificity = (name ? 1 : 0) + (number ? 1 : 0) + (cardSet ? 1 : 0);
-  const pageSize = specificity >= 3 ? 8 : specificity === 2 ? 12 : 20;
+  const pageSize = specificity >= 3 ? 6 : specificity === 2 ? 10 : 16;
 
   // Build primary query
   const parts = [];
@@ -4089,29 +4312,37 @@ function updateChoicePriceEl(el, data) {
 
 async function hydrateChoicePrices(cards) {
   if (!cards?.length) return;
+  const gen = ++priceFetchGen;
+  const batchSize = 2;
 
-  await Promise.all(cards.map(async (card, idx) => {
-    const el = document.querySelector(`.choice-price[data-idx="${idx}"]`);
-    if (!el) return;
+  for (let i = 0; i < cards.length; i += batchSize) {
+    if (gen !== priceFetchGen) return;
+    const slice = cards.slice(i, i + batchSize);
+    await Promise.all(slice.map(async (card, offset) => {
+      const idx = i + offset;
+      const el = document.querySelector(`.choice-price[data-idx="${idx}"]`);
+      if (!el || gen !== priceFetchGen) return;
 
-    const key = choiceCacheKey(card);
-    if (choicePriceCache.has(key)) {
-      updateChoicePriceEl(el, choicePriceCache.get(key));
-      return;
-    }
+      const key = choiceCacheKey(card);
+      if (choicePriceCache.has(key)) {
+        updateChoicePriceEl(el, choicePriceCache.get(key));
+        return;
+      }
 
-    el.textContent = '…';
-    el.classList.add('loading');
-    el.title = 'Caricamento prezzo CardTrader…';
+      el.textContent = '…';
+      el.classList.add('loading');
+      el.title = 'Caricamento prezzo CardTrader…';
 
-    const result = await ctGetPrice(card);
-    const data = result?.price && !result.error
-      ? { price: result.price, src: 'CardTrader', ct: result }
-      : { price: getPrice(card).price, src: result?.error || getPrice(card).src, error: result?.error, ct: result };
+      const result = await ctGetPrice(card);
+      if (gen !== priceFetchGen) return;
+      const data = result?.price && !result.error
+        ? { price: result.price, src: 'CardTrader', ct: result }
+        : { price: getPrice(card).price, src: result?.error || getPrice(card).src, error: result?.error, ct: result };
 
-    choicePriceCache.set(key, data);
-    updateChoicePriceEl(el, data);
-  }));
+      choicePriceCache.set(key, data);
+      updateChoicePriceEl(el, data);
+    }));
+  }
 }
 
 function getSelectedUnitPrice() {
@@ -4271,7 +4502,7 @@ function renderResult() {
 }
 
 // ── Collection ────────────────────────────────────────────────────────
-function addToCollection() {
+async function addToCollection() {
   if (!selectedCard) return;
   const qty   = Math.max(1, Math.min(99, parseInt($('cardQty')?.value) || 1));
   const selPrice = getSelectedUnitPrice();
@@ -4283,7 +4514,7 @@ function addToCollection() {
   const lang  = $('cardLanguage').value || 'Any';
 
   for (let i = 0; i < qty; i++) {
-    collection.push({
+    pushCollectionItem({
       name: selectedCard.name,
       set:  selectedCard.set?.name || 'Set sconosciuto',
       setId: selectedCard.set?.id || '',
@@ -4303,15 +4534,14 @@ function addToCollection() {
     });
   }
   persistLocalCollection();
-  if (dlsUser) saveCloudCollection();
+  onCollectionChanged({ scroll: true });
+  if (dlsUser) await saveCloudCollection();
   else {
-    // offline: segna come pending per sync al prossimo login
     const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
     collection.slice(-qty).forEach(it => pending.push(it));
     localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
   }
 
-  renderCollection();
   const srcNote = selPrice.fromCt || selPrice.condition ? '' : ' (stima)';
   showMsg(
     qty > 1
@@ -4331,7 +4561,7 @@ function removeItem(idx) {
   collection.splice(idx, 1);
   persistLocalCollection();
   if (dlsUser) saveCloudCollection();
-  renderCollection();
+  onCollectionChanged();
 }
 
 $('clearBtn').addEventListener('click', () => {
@@ -4340,15 +4570,26 @@ $('clearBtn').addEventListener('click', () => {
   persistLocalCollection();
   if (dlsUser) saveCloudCollection();
   if (collection.length === before) return;
-  renderCollection();
+  onCollectionChanged();
   showMsg('Lista svuotata per il gioco selezionato.', 'info');
 });
 
 function animateStat(el, newVal) {
+  if (!el) return;
   el.classList.remove('flip');
   void el.offsetWidth;
   el.textContent = newVal;
   el.classList.add('flip');
+}
+
+function onCollectionChanged(opts = {}) {
+  renderCollection();
+  requestAnimationFrame(() => {
+    renderCollection();
+    if (opts.scroll) {
+      $('collectionGrand')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4401,7 +4642,7 @@ function tcgSetLoading(gameKey, on) {
   if (!btn) return;
   btn.disabled = on;
   $(`${cfg.prefix}SearchBtnInner`).textContent = on ? '⌛ Ricerca in corso…' : cfg.searchLabel;
-  if (bar) bar.style.display = on ? 'block' : 'none';
+  if (bar) bar.classList.toggle('active', on);
 }
 
 function filterTcgSets(sets, query) {
@@ -4503,7 +4744,7 @@ async function tcgRunSearch(gameKey, name, num) {
       setId: '',
       setCtId: '',
       cardNum: prefixFromSet,
-      limit: 80,
+      limit: 45,
     });
   }
 
@@ -4513,7 +4754,7 @@ async function tcgRunSearch(gameKey, name, num) {
       setId: set.id,
       setCtId: set.ctId,
       cardNum: num || cardPrefix || '',
-      limit: setLocked ? 80 : 50,
+      limit: setLocked ? 45 : 28,
     });
   }
 
@@ -4522,7 +4763,7 @@ async function tcgRunSearch(gameKey, name, num) {
       setId: '',
       setCtId: '',
       cardNum: cardPrefix,
-      limit: 80,
+      limit: 45,
     });
   }
 
@@ -4750,7 +4991,7 @@ function tcgRenderResult(gameKey, bp, prices) {
   card.hidden = false;
 }
 
-window.tcgAddToCollection = function(gameKey) {
+window.tcgAddToCollection = async function(gameKey) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const bp = ctTcgState[gameKey].selected;
   const prices = ctTcgState[gameKey].prices;
@@ -4769,7 +5010,7 @@ window.tcgAddToCollection = function(gameKey) {
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
 
   for (let i = 0; i < qty; i++) {
-    collection.push({
+    pushCollectionItem({
       name: bp.name,
       set: bp.expansion?.name_en || '?',
       setId: bp.expansion?.code || '',
@@ -4788,13 +5029,13 @@ window.tcgAddToCollection = function(gameKey) {
     });
   }
   persistLocalCollection();
-  if (dlsUser) saveCloudCollection();
+  onCollectionChanged({ scroll: true });
+  if (dlsUser) await saveCloudCollection();
   else {
     const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
     collection.slice(-qty).forEach(it => pending.push(it));
     localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
   }
-  renderCollection();
   const srcNote = resolved.fromCt ? '' : ' (stima)';
   tcgShowMsg(gameKey, `${qty > 1 ? qty + '× ' : ''}${bp.name} · ${qKey} · ${fmt(unit)}${srcNote} aggiunta a La mia collezione!`, 'success');
 };
@@ -4866,19 +5107,27 @@ function renderCollection() {
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => (item.game || 'pokemon') === activeGame);
 
-  const total = visible.reduce((s, { item }) => s + item.price, 0);
+  const total = visible.reduce((s, { item }) => s + (Number(item.price) || 0), 0);
   const avg   = visible.length ? total / visible.length : 0;
   const sets  = new Set(visible.map(({ item }) => item.setId || item.set)).size;
 
   animateStat($('statCount'), visible.length);
   animateStat($('statSets'), visible.length ? sets : 0);
   animateStat($('statAvg'), visible.length ? fmt(avg) : '€0');
-  $('totalLabel').textContent = `Totale ${GAME_UI[activeGame]?.label || 'sezione'}: ${fmt(total)}`;
+  const totalLabel = $('totalLabel');
+  if (totalLabel) totalLabel.textContent = `Totale ${GAME_UI[activeGame]?.label || 'sezione'}: ${fmt(total)}`;
 
   const hasItems = visible.length > 0;
-  $('exportCsvBtn').disabled  = !hasItems;
-  $('exportJsonBtn').disabled = !hasItems;
-  $('clearBtn').disabled      = !hasItems;
+  const exportCsvBtn = $('exportCsvBtn');
+  const exportJsonBtn = $('exportJsonBtn');
+  const clearBtn = $('clearBtn');
+  if (exportCsvBtn) exportCsvBtn.disabled = !hasItems;
+  if (exportJsonBtn) exportJsonBtn.disabled = !hasItems;
+  if (clearBtn) clearBtn.disabled = !hasItems;
+
+  const collBody = $('collBody');
+  const priceRefreshRow = $('priceRefreshRow');
+  if (!collBody) return;
 
   if (!visible.length) {
     const emptyMsg = activeGame === 'pokemon'
@@ -4886,12 +5135,12 @@ function renderCollection() {
       : activeGame === 'onepiece'
         ? 'Nessuna carta One Piece aggiunta ancora.'
         : 'Nessuna carta Riftbound aggiunta ancora.';
-    $('collBody').innerHTML = `<tr><td colspan="6" class="tbl-empty">${emptyMsg}<small>Cerca e aggiungi dalla lista a sinistra.</small></td></tr>`;
-    $('priceRefreshRow').style.display = 'none';
+    collBody.innerHTML = `<tr><td colspan="6" class="tbl-empty">${emptyMsg}<small>Cerca e aggiungi dalla lista a sinistra.</small></td></tr>`;
+    if (priceRefreshRow) priceRefreshRow.style.display = 'none';
     return;
   }
 
-  $('collBody').innerHTML = visible.map(({ item, idx }) => {
+  collBody.innerHTML = visible.map(({ item, idx }) => {
     const ctPriceVal = item.ctPrice != null ? fmt(item.ctPrice) : (item.price ? fmt(item.price) : '—');
     const ctClass    = item.ctPrice != null ? 'ct-price-cell updated' : 'ct-price-cell';
     const lastUpd    = item.lastPriceUpdate
@@ -4924,7 +5173,7 @@ function renderCollection() {
   }).join('');
 
   // Mostra/nascondi riga aggiorna prezzi
-  $('priceRefreshRow').style.display = 'flex';
+  if (priceRefreshRow) priceRefreshRow.style.display = 'flex';
 }
 
 // ── Export ────────────────────────────────────────────────────────────
@@ -4970,6 +5219,15 @@ const GAME_UI = {
 };
 
 function switchActiveGame(game) {
+  if (game === activeGame) return;
+  priceFetchGen++;
+  choicePriceCache.clear();
+  if (searchCtrl) { searchCtrl.abort(); searchCtrl = null; }
+  if (suggCtrl) { suggCtrl.abort(); suggCtrl = null; }
+  Object.keys(ctTcgState).forEach(k => { ctTcgState[k].searchGen++; });
+  setSearchLoading(false);
+  Object.keys(CT_TCG_CONFIG).forEach(k => tcgSetLoading(k, false));
+
   activeGame = game;
   document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
   $('pokemonSearch').hidden   = game !== 'pokemon';
@@ -4983,6 +5241,7 @@ function switchActiveGame(game) {
   $('gameTag').style.background = ui.tagBg;
   $('gameTag').style.color = ui.tagColor;
   renderCollection();
+  scheduleCtPreload(game);
 }
 
 document.querySelectorAll('.game-tab').forEach(tab => {
@@ -5001,9 +5260,9 @@ function initApp() {
   if (isStandaloneApp()) markAppInstalled();
   updateInstallUi();
   restoreSessionLocal();
+  activeGame = '';
   switchActiveGame('pokemon');
   tryAutoLogin();
-  setTimeout(ctPreloadExpansions, 500);
 }
 
 initApp();
@@ -5136,8 +5395,9 @@ initApp();
 
   let t = 0;
   function frame() {
-    t++;
-    ctx.clearRect(0, 0, W, H);
+    if (!bgAnimPaused) {
+      t++;
+      ctx.clearRect(0, 0, W, H);
 
     // ── Sfondo chiaro allineato al logo
     const bgGrad = ctx.createLinearGradient(0, 0, W * 0.3, H);
@@ -5204,8 +5464,15 @@ initApp();
     });
 
     ctx.globalAlpha = 1;
+    }
     requestAnimationFrame(frame);
   }
+
+  document.addEventListener('visibilitychange', () => {
+    bgAnimPaused = document.hidden;
+  });
+  window.addEventListener('pagehide', () => { bgAnimPaused = true; });
+  window.addEventListener('pageshow', () => { bgAnimPaused = document.hidden; });
 
   frame();
 })();
@@ -5658,19 +5925,21 @@ $('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
 });
 
 // ── Pre-caricamento dati CardTrader (in background) ───────────────────
-async function ctPreloadExpansions() {
+let ctPreloadDone = { pokemon: false, onepiece: false, riftbound: false };
+let ctPreloadTimer = null;
+
+function scheduleCtPreload(game = activeGame) {
+  clearTimeout(ctPreloadTimer);
+  ctPreloadTimer = setTimeout(() => ctPreloadExpansions(game), 400);
+}
+
+async function ctPreloadExpansions(game = activeGame) {
+  if (ctPreloadDone[game]) return;
   try {
-    await Promise.all([
-      ctGetGameId(null, 'pokemon'),
-      ctGetGameId(null, 'onepiece'),
-      ctGetGameId(null, 'riftbound'),
-    ]);
-    await Promise.all([
-      ctGetExpansions(null, 'pokemon'),
-      ctGetExpansions(null, 'onepiece'),
-      ctGetExpansions(null, 'riftbound'),
-    ]);
-    console.log('[CT] Pre-caricamento espansioni completato');
+    await ctGetGameId(null, game);
+    await ctGetExpansions(null, game);
+    ctPreloadDone[game] = true;
+    console.log(`[CT] Pre-caricamento espansioni ${game} completato`);
   } catch (e) {
     console.warn('[CT] Pre-load espansioni fallito:', e.message || e);
   }
@@ -5800,7 +6069,7 @@ function markAppInstalled() {
   localStorage.setItem('dls_installed', '1');
   localStorage.setItem('dls_install_dismissed', '1');
   document.getElementById('installBanner')?.remove();
-  document.getElementById('installIosSheet')?.remove();
+  closeIosInstallSheet();
   deferredPrompt = null;
   updateInstallUi();
 }
@@ -5817,7 +6086,7 @@ function canOfferInstall() {
 function dismissInstallPrompt() {
   localStorage.setItem('dls_install_dismissed', '1');
   document.getElementById('installBanner')?.remove();
-  document.getElementById('installIosSheet')?.remove();
+  closeIosInstallSheet();
   updateInstallUi();
 }
 
@@ -5845,27 +6114,39 @@ function triggerInstallFlow() {
 
 function showIosInstallSheet() {
   if (document.getElementById('installIosSheet')) return;
+  document.getElementById('installBanner')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'installIosSheet';
   overlay.className = 'install-ios-overlay';
   overlay.innerHTML = `
     <div class="install-ios-sheet" role="dialog" aria-labelledby="installIosTitle">
-      <h3 id="installIosTitle">Installa DLS Tracker su iPhone/iPad</h3>
-      <p>Su Apple l'app si aggiunge alla Home Screen da Safari:</p>
+      <h3 id="installIosTitle">Installa DLS Tracker</h3>
+      <p>Da Safari su iPhone o iPad:</p>
       <ol class="install-ios-steps">
-        <li><span>1</span><div>Tocca <strong>Condividi</strong> <span style="opacity:.85">(icona quadrato con freccia in alto)</span> nella barra di Safari.</div></li>
-        <li><span>2</span><div>Scorri e seleziona <strong>Aggiungi a Home</strong>.</div></li>
-        <li><span>3</span><div>Tocca <strong>Aggiungi</strong> in alto a destra.</div></li>
+        <li><span class="step-num">1</span><div>Tocca <strong>Condividi</strong> (icona con la freccia in alto) nella barra di Safari.</div></li>
+        <li><span class="step-num">2</span><div>Scorri e scegli <strong>Aggiungi a Home</strong>.</div></li>
+        <li><span class="step-num">3</span><div>Conferma con <strong>Aggiungi</strong>.</div></li>
       </ol>
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="btn btn-primary" id="installIosDone" style="flex:1;">Ho capito</button>
-        <button type="button" class="btn" id="installIosDismiss" style="padding:9px 14px;background:rgba(255,255,255,.08);">Non ora</button>
+      <div class="install-ios-actions">
+        <button type="button" class="btn btn-primary" id="installIosDone">Ho capito</button>
+        <button type="button" class="btn" id="installIosDismiss">Non ora</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.getElementById('installIosDone')?.addEventListener('click', () => overlay.remove());
-  document.getElementById('installIosDismiss')?.addEventListener('click', dismissInstallPrompt);
+  document.body.classList.add('ios-install-open');
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeIosInstallSheet();
+  });
+  document.getElementById('installIosDone')?.addEventListener('click', closeIosInstallSheet);
+  document.getElementById('installIosDismiss')?.addEventListener('click', () => {
+    closeIosInstallSheet();
+    dismissInstallPrompt();
+  });
+}
+
+function closeIosInstallSheet() {
+  document.getElementById('installIosSheet')?.remove();
+  document.body.classList.remove('ios-install-open');
 }
 
 function showInstallBanner() {
@@ -5907,6 +6188,16 @@ $('installAppBtn')?.addEventListener('click', triggerInstallFlow);
 
 window.addEventListener('load', () => {
   updateInstallUi();
+  document.addEventListener('focusin', e => {
+    if (!e.target.matches('input, select, textarea')) return;
+    document.getElementById('installBanner')?.classList.add('keyboard-open');
+  });
+  document.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (document.activeElement?.matches('input, select, textarea')) return;
+      document.getElementById('installBanner')?.classList.remove('keyboard-open');
+    }, 120);
+  });
   if (canOfferInstall() && isIosSafari() && !sessionStorage.getItem('dls_install_banner_shown')) {
     sessionStorage.setItem('dls_install_banner_shown', '1');
     setTimeout(showInstallBanner, 1400);
