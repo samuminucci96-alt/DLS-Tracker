@@ -1,4 +1,4 @@
-const CACHE  = 'dls-tracker-v40';
+const CACHE  = 'dls-tracker-v41';
 // Solo asset statici per installabilità PWA — nessun fetch handler (login/API/tab non passano dal SW)
 const STATIC = [
   './manifest.json',
