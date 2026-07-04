@@ -1141,21 +1141,38 @@
     html.is-mobile header {
       position: sticky;
       top: max(0px, var(--safe-top));
-      z-index: 40;
+      z-index: 100;
+      pointer-events: auto;
+      isolation: isolate;
+    }
+
+    html.is-standalone .header-nav,
+    html.is-standalone .header-account,
+    html.is-mobile .header-nav,
+    html.is-mobile .header-account {
+      pointer-events: auto;
     }
 
     html.is-standalone .game-tabs,
     html.is-mobile .game-tabs {
       position: relative;
-      z-index: 41;
+      z-index: 101;
       touch-action: manipulation;
+      pointer-events: auto;
     }
 
     html.is-standalone .game-tab,
     html.is-mobile .game-tab {
       touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color: rgba(36, 84, 169, 0.12);
       cursor: pointer;
+      pointer-events: auto;
+    }
+
+    html.is-standalone .user-btn,
+    html.is-mobile .user-btn {
+      touch-action: manipulation;
+      pointer-events: auto;
     }
 
     @media (max-width: 1100px) {
@@ -1656,6 +1673,12 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      pointer-events: auto;
+    }
+    .auth-overlay.is-closed {
+      display: none !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
     }
     html.is-standalone .auth-overlay {
       min-height: 100dvh;
@@ -2379,7 +2402,7 @@
 <canvas id="bgCanvas"></canvas>
 
 <!-- ── Auth Modal ────────────────────────────────────────────────── -->
-<div id="authOverlay" class="auth-overlay" style="display:none" role="dialog" aria-modal="true">
+<div id="authOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true">
   <div class="auth-modal">
     <button class="auth-close" id="authClose" aria-label="Chiudi">✕</button>
     <div class="auth-title" id="authTitle">Accedi a DLS Tracker</div>
@@ -2418,7 +2441,7 @@
 </div>
 
 <!-- ── Profile Panel (utente loggato) ─────────────────────────────── -->
-<div id="profileOverlay" class="auth-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+<div id="profileOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
   <div class="auth-modal profile-modal">
     <button class="auth-close" id="profileClose" aria-label="Chiudi">✕</button>
     <div class="profile-hero">
@@ -4681,10 +4704,11 @@ function tcgShowMsg(gameKey, msg, type = 'info') {
 function tcgSetLoading(gameKey, on) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const btn = $(`${cfg.prefix}SearchBtn`);
+  const inner = $(`${cfg.prefix}SearchBtnInner`);
   const bar = $(`${cfg.prefix}ProgressBar`);
-  if (!btn) return;
+  if (!btn || !inner) return;
   btn.disabled = on;
-  $(`${cfg.prefix}SearchBtnInner`).textContent = on ? '⌛ Ricerca in corso…' : cfg.searchLabel;
+  inner.textContent = on ? '⌛ Ricerca in corso…' : cfg.searchLabel;
   if (bar) bar.classList.toggle('active', on);
 }
 
@@ -5262,11 +5286,21 @@ const GAME_UI = {
 };
 
 function resetModalLocks() {
-  const authOpen = $('authOverlay')?.style.display === 'flex';
-  const profileOpen = $('profileOverlay')?.style.display === 'flex';
-  const iosOpen = !!document.getElementById('installIosSheet');
-  if (!authOpen && !profileOpen) document.body.classList.remove('auth-open');
-  if (!iosOpen) document.body.classList.remove('ios-install-open');
+  closeAuthModal();
+  closeProfilePanel();
+  closeIosInstallSheet();
+  document.body.classList.remove('auth-open', 'ios-install-open');
+}
+
+function uiTapGuard() {
+  let last = 0;
+  return fn => e => {
+    if (e.type === 'touchend') e.preventDefault();
+    const now = Date.now();
+    if (now - last < 350) return;
+    last = now;
+    fn(e);
+  };
 }
 
 function switchActiveGame(game) {
@@ -5314,24 +5348,26 @@ function bindGameTabs() {
   const tabs = document.querySelector('.game-tabs');
   if (!tabs || tabs.dataset.bound === '1') return;
   tabs.dataset.bound = '1';
-  const activate = game => {
-    if (!game) return;
-    switchActiveGame(game);
-  };
-  tabs.addEventListener('click', e => {
+  const onTab = uiTapGuard();
+  const activate = onTab(e => {
     const tab = e.target.closest('.game-tab');
     if (!tab?.dataset.game) return;
-    e.preventDefault();
-    activate(tab.dataset.game);
+    switchActiveGame(tab.dataset.game);
   });
-  tabs.addEventListener('pointerup', e => {
-    const tab = e.target.closest('.game-tab');
-    if (!tab?.dataset.game || e.pointerType === 'mouse') return;
-    e.preventDefault();
-    activate(tab.dataset.game);
-  });
+  tabs.addEventListener('click', activate);
+  tabs.addEventListener('touchend', activate, { passive: false });
 }
 bindGameTabs();
+
+function bindAccountButton() {
+  const btn = $('userBtn');
+  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+  const onTap = uiTapGuard();
+  const open = onTap(() => openAuthModal());
+  btn.addEventListener('click', open);
+  btn.addEventListener('touchend', open, { passive: false });
+}
 
 // ── Advanced settings toggle — rimosso (token solo server-side)
 
@@ -5592,11 +5628,11 @@ function authFetch(url, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   if (token) headers['X-DLS-Session'] = token;
   const { sessionToken, ...rest } = opts;
-  return fetch(apiUrl(url), {
+  const target = apiUrl(url);
+  return fetch(target, {
     method: rest.method || 'GET',
     credentials: 'same-origin',
     cache: 'no-store',
-    mode: 'same-origin',
     redirect: 'follow',
     ...rest,
     headers,
@@ -5727,8 +5763,8 @@ document.addEventListener('visibilitychange', () => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if ($('authOverlay')?.style.display === 'flex') closeAuthModal();
-  else if ($('profileOverlay')?.style.display === 'flex') closeProfilePanel();
+  if (!$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
+  else if (!$('profileOverlay')?.classList.contains('is-closed')) closeProfilePanel();
   else closeIosInstallSheet();
 });
 
@@ -5877,7 +5913,8 @@ function openProfilePanel() {
   $('profileEmail').textContent = dlsUser.email || '';
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
-  $('profileOverlay').style.display = 'flex';
+  const overlay = $('profileOverlay');
+  if (overlay) overlay.classList.remove('is-closed');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
     $('profileName').textContent = dlsUser.displayName || 'Utente';
@@ -5888,7 +5925,7 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  $('profileOverlay').style.display = 'none';
+  $('profileOverlay')?.classList.add('is-closed');
   document.activeElement?.blur();
 }
 
@@ -5949,13 +5986,12 @@ function openAuthModal() {
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   const overlay = $('authOverlay');
   if (!overlay) return;
-  overlay.style.display = 'flex';
+  overlay.classList.remove('is-closed');
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  const overlay = $('authOverlay');
-  if (overlay) overlay.style.display = 'none';
+  $('authOverlay')?.classList.add('is-closed');
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -6028,6 +6064,7 @@ function showAuthErr(id, msg) {
 }
 
 $('userBtn')?.addEventListener('click', openAuthModal);
+bindAccountButton();
 $('authClose')?.addEventListener('click', closeAuthModal);
 $('authOverlay')?.addEventListener('click', e => { if (e.target === $('authOverlay')) closeAuthModal(); });
 $('emailLoginBtn')?.addEventListener('click', submitAuthForm);
@@ -6179,24 +6216,9 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        location.reload();
-      });
-      navigator.serviceWorker.register('./sw.js?v=37').then(reg => {
-        console.log('[SW] Registrato, scope:', reg.scope);
+      navigator.serviceWorker.register('./sw.js?v=38').then(reg => {
+        console.log('[SW] Registrato (solo install), scope:', reg.scope);
         reg.update();
-        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        reg.addEventListener('updatefound', () => {
-          const worker = reg.installing;
-          worker?.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              worker.postMessage({ type: 'SKIP_WAITING' });
-            }
-          });
-        });
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
       });
