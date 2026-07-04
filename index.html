@@ -5509,6 +5509,23 @@ const API_AUTH       = '/api/auth';
 const API_COLLECTION = '/api/collection';
 const API_PROFILE    = '/api/profile';
 
+function apiUrl(path) {
+  return new URL(path, location.origin).href;
+}
+
+function authFetch(url, opts = {}) {
+  const token = opts.sessionToken;
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['X-DLS-Session'] = token;
+  const { sessionToken, ...rest } = opts;
+  return fetch(apiUrl(url), {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    ...rest,
+    headers,
+  });
+}
+
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/BYOWCG21RiAA95KXXoZAZW';
 
 // Link community — aggiorna gli url quando disponibili
@@ -5554,12 +5571,17 @@ let syncTimer = null;
 function getToken()  { return localStorage.getItem('dls_token'); }
 function saveSession(data) {
   dlsUser = data;
-  localStorage.setItem('dls_token', data.token);
-  localStorage.setItem('dls_user', JSON.stringify({
-    email: data.email,
-    displayName: data.displayName,
-    avatar: data.avatar || null
-  }));
+  try {
+    localStorage.setItem('dls_token', data.token);
+    localStorage.setItem('dls_user', JSON.stringify({
+      email: data.email,
+      displayName: data.displayName,
+      avatar: data.avatar || null
+    }));
+  } catch (e) {
+    console.error('saveSession storage error:', e);
+    throw new Error('Impossibile salvare la sessione. Su iPhone disattiva la navigazione privata o libera spazio.');
+  }
 }
 function clearSession() {
   dlsUser = null;
@@ -5583,7 +5605,7 @@ async function refreshSessionInBackground() {
   const token = getToken();
   if (!token || !navigator.onLine) return;
   try {
-    const res = await fetch(API_PROFILE, { headers: { ...apiHeaders(), 'X-DLS-Session': token } });
+    const res = await authFetch(API_PROFILE, { headers: { 'X-DLS-Session': token } });
     if (res.status === 401) {
       clearSession();
       updateAuthUI();
@@ -5627,8 +5649,8 @@ async function loadCloudCollection(clearOnAuthFail = true) {
   const token = getToken();
   if (!token) return;
   try {
-    const res = await fetch(API_COLLECTION, {
-      headers: { ...apiHeaders(), 'X-DLS-Session': token }
+    const res = await authFetch(API_COLLECTION, {
+      headers: { 'X-DLS-Session': token }
     });
     if (res.status === 401) {
       if (clearOnAuthFail && navigator.onLine) { clearSession(); updateAuthUI(); }
@@ -5658,9 +5680,9 @@ async function saveCloudCollection() {
   const token = getToken();
   if (!token) return;
   try {
-    await fetch(API_COLLECTION, {
+    await authFetch(API_COLLECTION, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...apiHeaders(), 'X-DLS-Session': token },
+      headers: { 'Content-Type': 'application/json', 'X-DLS-Session': token },
       body: JSON.stringify(collection)
     });
   } catch(e) { console.warn('saveCloudCollection error:', e); }
@@ -5700,7 +5722,7 @@ async function loadUserProfile() {
   const token = getToken();
   if (!token) return;
   try {
-    const res = await fetch(API_PROFILE, { headers: { ...apiHeaders(), 'X-DLS-Session': token } });
+    const res = await authFetch(API_PROFILE, { headers: { 'X-DLS-Session': token } });
     if (res.status === 401) { clearSession(); updateAuthUI(); return; }
     if (!res.ok) return;
     const data = await res.json();
@@ -5719,9 +5741,9 @@ async function loadUserProfile() {
 async function saveUserProfile(patch) {
   const token = getToken();
   if (!token) return null;
-  const res = await fetch(API_PROFILE, {
+  const res = await authFetch(API_PROFILE, {
     method: 'POST',
-    headers: { ...apiHeaders(), 'Content-Type': 'application/json', 'X-DLS-Session': token },
+    headers: { 'Content-Type': 'application/json', 'X-DLS-Session': token },
     body: JSON.stringify(patch)
   });
   const data = await res.json();
@@ -5865,9 +5887,9 @@ async function submitAuthForm() {
   if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
   try {
     const action = emailIsRegister ? 'register' : 'login';
-    const res  = await fetch(API_AUTH, {
+    const res  = await authFetch(API_AUTH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, email, password: pass, displayName: dName })
     });
     let data = {};
@@ -5882,14 +5904,22 @@ async function submitAuthForm() {
       return;
     }
     setEmailMode(false);
-    saveSession(data);
+    try {
+      saveSession(data);
+    } catch (e) {
+      showAuthErr('emailErr', e.message || 'Impossibile salvare la sessione.');
+      return;
+    }
     closeAuthModal();
     updateAuthUI();
     showMsg(`✅ ${action === 'register' ? 'Account creato' : 'Accesso effettuato'}! Benvenuto, ${data.displayName || data.email}`, 'success');
     await loadUserProfile();
     await loadCloudCollection();
-  } catch {
-    showAuthErr('emailErr', 'Errore di rete. Riprova.');
+  } catch (e) {
+    console.error('submitAuthForm:', e);
+    showAuthErr('emailErr', e.message?.includes('Failed to fetch')
+      ? 'Connessione non disponibile. Controlla internet e riprova.'
+      : 'Errore di rete. Riprova.');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
@@ -6053,7 +6083,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=33').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=34').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);

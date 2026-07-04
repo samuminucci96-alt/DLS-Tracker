@@ -1,14 +1,12 @@
-const CACHE  = 'dls-tracker-v33';
+const CACHE  = 'dls-tracker-v34';
 const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './icon-192-maskable.png', './icon-512-maskable.png', './apple-touch-icon.png'];
 
-// Logo e icone: sempre rete prima (evita PWA con icona/logo vecchi in cache)
 const NETWORK_FIRST = ['logo.png', 'icon-192.png', 'icon-512.png', 'icon-192-maskable.png', 'icon-512-maskable.png', 'apple-touch-icon.png'];
 
 function isNetworkFirst(url) {
   return NETWORK_FIRST.some(name => url.pathname.endsWith(name));
 }
 
-// ── Install: cache static assets
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
@@ -17,7 +15,6 @@ self.addEventListener('install', e => {
   );
 });
 
-// ── Activate: remove old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -26,19 +23,14 @@ self.addEventListener('activate', e => {
   );
 });
 
-// ── Fetch strategy
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // API calls (PokéTCG, CardTrader, Netlify Functions) → Network only, no cache
-  if (url.hostname.includes('pokemontcg.io') ||
-      url.hostname.includes('cardtrader.com') ||
-      url.pathname.startsWith('/api/')) {
-    e.respondWith(fetch(e.request));
+  // iOS PWA: non intercettare API né richieste POST/PUT (login rotto se passa dal SW)
+  if (url.pathname.startsWith('/api/') || e.request.method !== 'GET') {
     return;
   }
 
-  // App shell / HTML → Network first, then cache.
   if (e.request.mode === 'navigate' ||
       e.request.headers.get('accept')?.includes('text/html')) {
     e.respondWith(
@@ -53,11 +45,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Logo e icone → Network first
   if (isNetworkFirst(url)) {
     e.respondWith(
       fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
+        if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
@@ -67,12 +58,11 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Altri static assets → Cache first, then network
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
+        if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
