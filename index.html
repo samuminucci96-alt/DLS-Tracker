@@ -2942,6 +2942,9 @@ let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
+let deferredPrompt  = null;
+let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
+let ctPreloadTimer  = null;
 const suggCache     = new Map();
 
 // ── DOM ──────────────────────────────────────────────────────────────
@@ -3127,6 +3130,21 @@ function setSearchLoading(on) {
   }
 }
 
+function resolveApiBaseUrl() {
+  const h = location.hostname;
+  const isLocalHost = h === 'localhost' || h === '127.0.0.1';
+  if (isLocalHost && location.port !== '8888') {
+    return 'http://localhost:8888';
+  }
+  return '';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
 // ── API calls ────────────────────────────────────────────────────────
 function apiFetchError(res, fallback) {
   return res.text().then(body => {
@@ -3141,7 +3159,7 @@ function apiFetchError(res, fallback) {
 }
 
 async function fetchCards(query, _unused, signal, pageSize = 20) {
-  const url = `/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
+  const url = apiUrl(`/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`);
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     signal,
@@ -3170,7 +3188,7 @@ async function ctFetch(path) {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const res = await fetch(`/api/cardtrader?path=${encodeURIComponent(path)}`, {
+    const res = await fetch(apiUrl(`/api/cardtrader?path=${encodeURIComponent(path)}`), {
       headers: { Accept: 'application/json' },
       signal: ctrl.signal,
     });
@@ -5493,9 +5511,9 @@ document.addEventListener('click', e => {
 // ════════════════════════════════════════════════════════════════════
 // AUTH + CLOUD SYNC via Netlify Functions
 // ════════════════════════════════════════════════════════════════════
-const API_AUTH       = '/api/auth';
-const API_COLLECTION = '/api/collection';
-const API_PROFILE    = '/api/profile';
+const API_AUTH       = apiUrl('/api/auth');
+const API_COLLECTION = apiUrl('/api/collection');
+const API_PROFILE    = apiUrl('/api/profile');
 
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/BYOWCG21RiAA95KXXoZAZW';
 
@@ -5873,7 +5891,11 @@ async function submitAuthForm() {
     await loadUserProfile();
     await loadCloudCollection();
   } catch {
-    showAuthErr('emailErr', 'Errore di rete. Riprova.');
+    if (API_BASE_URL) {
+      showAuthErr('emailErr', 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.');
+    } else {
+      showAuthErr('emailErr', 'Errore di rete. Riprova.');
+    }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
@@ -5925,8 +5947,6 @@ $('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
 });
 
 // ── Pre-caricamento dati CardTrader (in background) ───────────────────
-let ctPreloadDone = { pokemon: false, onepiece: false, riftbound: false };
-let ctPreloadTimer = null;
 
 function scheduleCtPreload(game = activeGame) {
   clearTimeout(ctPreloadTimer);
@@ -6047,7 +6067,6 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── PWA Install prompt ────────────────────────────────────────────────
-let deferredPrompt = null;
 
 function isStandaloneApp() {
   return window.matchMedia('(display-mode: standalone)').matches
@@ -6097,11 +6116,21 @@ function updateInstallUi() {
 
 function triggerInstallFlow() {
   if (deferredPrompt) {
-    deferredPrompt.prompt().then(({ outcome }) => {
-      deferredPrompt = null;
-      if (outcome === 'accepted') markAppInstalled();
-      else updateInstallUi();
-    });
+    const promptEvent = deferredPrompt;
+    deferredPrompt = null;
+    promptEvent.prompt()
+      .then(() => promptEvent.userChoice)
+      .then(choice => {
+        if (choice?.outcome === 'accepted') {
+          markAppInstalled();
+        } else {
+          updateInstallUi();
+        }
+      })
+      .catch(err => {
+        console.warn('[PWA] Install prompt failed:', err);
+        updateInstallUi();
+      });
     document.getElementById('installBanner')?.remove();
     return;
   }
