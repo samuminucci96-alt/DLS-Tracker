@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#e8f4fc">
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json?v=44">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html">
+  <meta name="msapplication-starturl" content="./index.html?v=44">
 
   <title>DLS Tracker</title>
 
@@ -2848,6 +2848,8 @@
     if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
   };
   const lockPortrait = () => {
+    if (window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true) return;
     try {
       if (screen.orientation?.lock) {
         screen.orientation.lock('portrait-primary').catch(() => {});
@@ -2996,6 +2998,7 @@ const LOCAL_CATALOG = [
 ];
 
 // ── State ────────────────────────────────────────────────────────────
+const APP_VERSION   = '44';
 let selectedCard    = null;
 let selectedQuality = 'NM';
 let basePrice       = 0;
@@ -5301,21 +5304,28 @@ const GAME_UI = {
 };
 
 function resetModalLocks() {
-  closeAuthModal();
-  closeProfilePanel();
-  closeIosInstallSheet();
   document.body.classList.remove('auth-open', 'ios-install-open');
 }
 
-function uiTapGuard() {
-  let last = 0;
-  return fn => e => {
-    if (e.type === 'touchend') e.preventDefault();
+function setupHeaderActions() {
+  if (document.documentElement.dataset.headerActions === '1') return;
+  document.documentElement.dataset.headerActions = '1';
+  let lastAt = 0;
+  let lastKey = '';
+  const handle = e => {
+    const tab = e.target.closest?.('.game-tab');
+    const userBtn = e.target.closest?.('#userBtn');
+    if (!tab && !userBtn) return;
+    const key = tab ? `tab:${tab.dataset.game}` : 'user';
     const now = Date.now();
-    if (now - last < 350) return;
-    last = now;
-    fn(e);
+    if (key === lastKey && now - lastAt < 400) return;
+    lastAt = now;
+    lastKey = key;
+    if (tab?.dataset.game) switchActiveGame(tab.dataset.game);
+    else openAuthModal();
   };
+  document.addEventListener('pointerup', handle, true);
+  document.addEventListener('click', handle, true);
 }
 
 function switchActiveGame(game) {
@@ -5359,34 +5369,36 @@ function switchActiveGame(game) {
   }
 }
 
-function bindGameTabs() {
-  const tabs = document.querySelector('.game-tabs');
-  if (!tabs || tabs.dataset.bound === '1') return;
-  tabs.dataset.bound = '1';
-  const onTab = uiTapGuard();
-  const activate = onTab(e => {
-    const tab = e.target.closest('.game-tab');
-    if (!tab?.dataset.game) return;
-    switchActiveGame(tab.dataset.game);
-  });
-  tabs.addEventListener('click', activate);
-  tabs.addEventListener('touchend', activate, { passive: false });
-}
-
-function bindAccountButton() {
-  const btn = $('userBtn');
-  if (!btn || btn.dataset.bound === '1') return;
-  btn.dataset.bound = '1';
-  btn.addEventListener('click', e => {
-    e.preventDefault();
-    openAuthModal();
-  });
-}
-
 // ── Advanced settings toggle — rimosso (token solo server-side)
 
+async function bootstrapPwaUpdate() {
+  const prev = localStorage.getItem('dls_app_version');
+  const url = new URL(location.href);
+  const urlOk = url.searchParams.get('v') === APP_VERSION;
+  if (prev === APP_VERSION && urlOk) return;
+
+  localStorage.setItem('dls_app_version', APP_VERSION);
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {
+    console.warn('[PWA] cache reset:', e);
+  }
+  if (!urlOk) {
+    url.searchParams.set('v', APP_VERSION);
+    location.replace(url.pathname + url.search + url.hash);
+  }
+}
+
 // ── Avvio app ───────────────────────────────────────────────────────
-function initApp() {
+async function initApp() {
+  await bootstrapPwaUpdate();
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
@@ -5401,7 +5413,6 @@ function initApp() {
   tryAutoLogin();
 }
 
-bindGameTabs();
 bindCollectionActions();
 
 // ── Canvas Background ─────────────────────────────────────────────────
@@ -6229,7 +6240,8 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=39').then(reg => {
+      if (isStandaloneApp()) return;
+      navigator.serviceWorker.register('./sw.js?v=40').then(reg => {
         console.log('[SW] Registrato (solo install), scope:', reg.scope);
         reg.update();
       }).catch(err => {
@@ -6417,11 +6429,12 @@ window.addEventListener('load', () => {
   }
 });
 
-bindAccountButton();
-initApp();
+setupHeaderActions();
+initApp().catch(err => console.error('initApp:', err));
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
 window.openProfilePanel = openProfilePanel;
+window.switchActiveGame = switchActiveGame;
 </script>
 </body>
 </html>
