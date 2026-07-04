@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#e8f4fc">
-  <link rel="manifest" href="manifest.json?v=45">
+  <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=45">
+  <meta name="msapplication-starturl" content="./index.html">
 
   <title>DLS Tracker</title>
 
@@ -1122,11 +1122,6 @@
     }
 
     /* PWA installata: safe-area, scroll naturale della pagina */
-    html.is-standalone body,
-    html.is-mobile body {
-      touch-action: manipulation;
-    }
-
     html.is-standalone body {
       padding:
         max(6px, var(--safe-top))
@@ -1146,51 +1141,12 @@
     html.is-mobile header {
       position: sticky;
       top: max(0px, var(--safe-top));
-      z-index: 200;
-      pointer-events: auto;
-      isolation: isolate;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
-    }
-
-    html.is-standalone .header-nav,
-    html.is-standalone .header-account,
-    html.is-mobile .header-nav,
-    html.is-mobile .header-account {
-      pointer-events: auto;
-    }
-
-    html.is-standalone .game-tabs,
-    html.is-mobile .game-tabs {
-      position: relative;
-      z-index: 101;
-      touch-action: manipulation;
-      pointer-events: auto;
-    }
-
-    html.is-standalone .game-tab,
-    html.is-mobile .game-tab {
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: rgba(36, 84, 169, 0.12);
-      cursor: pointer;
-      pointer-events: auto;
+      z-index: 10;
     }
 
     .game-tab .tab-icon,
     .game-tab img {
       pointer-events: none;
-    }
-
-    html.is-standalone #bgCanvas,
-    html.is-mobile #bgCanvas {
-      display: none !important;
-      pointer-events: none !important;
-    }
-
-    html.is-standalone .user-btn,
-    html.is-mobile .user-btn {
-      touch-action: manipulation;
-      pointer-events: auto;
     }
 
     @media (max-width: 1100px) {
@@ -2511,15 +2467,15 @@
 
     <nav class="header-nav" aria-label="Selezione gioco">
       <div class="game-tabs">
-        <button type="button" class="game-tab active" data-game="pokemon" onclick="switchActiveGame('pokemon')">
+        <button type="button" class="game-tab active" data-game="pokemon">
           <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
           Pokémon TCG
         </button>
-        <button type="button" class="game-tab" data-game="onepiece" onclick="switchActiveGame('onepiece')">
+        <button type="button" class="game-tab" data-game="onepiece">
           <span class="tab-icon">☠️</span>
           One Piece TCG
         </button>
-        <button type="button" class="game-tab" data-game="riftbound" onclick="switchActiveGame('riftbound')">
+        <button type="button" class="game-tab" data-game="riftbound">
           <span class="tab-icon">⚔️</span>
           Riftbound
         </button>
@@ -2528,7 +2484,7 @@
 
     <div class="header-account">
       <button type="button" class="btn install-app-btn" id="installAppBtn" hidden aria-label="Installa app">Installa</button>
-      <button type="button" class="user-btn" id="userBtn" onclick="openAuthModal()">
+      <button type="button" class="user-btn" id="userBtn">
         <div class="user-avatar" id="userAvatar">👤</div>
         <span id="userLabel">Accedi</span>
       </button>
@@ -2894,6 +2850,28 @@
   window.matchMedia('(display-mode: standalone)').addEventListener('change', sync);
   window.addEventListener('load', lockPortrait);
 })();
+
+(function purgeStalePwaCache() {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || window.navigator.standalone === true;
+  if (!standalone || !('serviceWorker' in navigator)) return;
+  if (sessionStorage.getItem('dls_pwa_purged')) return;
+  navigator.serviceWorker.getRegistrations().then(async regs => {
+    const hadSw = regs.length > 0;
+    let hadCache = false;
+    await Promise.all(regs.map(r => r.unregister()));
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      hadCache = keys.length > 0;
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if (hadSw || hadCache) {
+      sessionStorage.setItem('dls_pwa_purged', '1');
+      location.reload();
+    }
+  }).catch(() => {});
+})();
 // ── Constants ────────────────────────────────────────────────────────
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
 
@@ -3016,7 +2994,6 @@ const LOCAL_CATALOG = [
 ];
 
 // ── State ────────────────────────────────────────────────────────────
-const APP_VERSION   = '45';
 let selectedCard    = null;
 let selectedQuality = 'NM';
 let basePrice       = 0;
@@ -5323,9 +5300,13 @@ const GAME_UI = {
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
-  $('authOverlay')?.classList.add('is-closed');
-  $('profileOverlay')?.classList.add('is-closed');
-  document.getElementById('installIosSheet')?.remove();
+}
+
+function bindHeaderUi() {
+  document.querySelectorAll('.game-tab[data-game]').forEach(tab => {
+    tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
+  });
+  $('userBtn')?.addEventListener('click', openAuthModal);
 }
 
 function switchActiveGame(game) {
@@ -5369,44 +5350,8 @@ function switchActiveGame(game) {
   }
 }
 
-// ── Advanced settings toggle — rimosso (token solo server-side)
-
-async function ensureStandaloneFresh() {
-  if (!isStandaloneApp()) return;
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-    }
-  } catch (e) {
-    console.warn('[PWA] SW cleanup:', e);
-  }
-}
-
-async function bootstrapPwaUpdate() {
-  const prev = localStorage.getItem('dls_app_version');
-  if (prev === APP_VERSION) return;
-
-  localStorage.setItem('dls_app_version', APP_VERSION);
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-    }
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }
-  } catch (e) {
-    console.warn('[PWA] cache reset:', e);
-  }
-  if (prev) location.reload();
-}
-
 // ── Avvio app ───────────────────────────────────────────────────────
-async function initApp() {
-  await ensureStandaloneFresh();
-  await bootstrapPwaUpdate();
+function initApp() {
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
@@ -5426,7 +5371,7 @@ bindCollectionActions();
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
   const canvas = $('bgCanvas');
-  if (!canvas || getComputedStyle(canvas).display === 'none') return;
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   let W, H;
 
@@ -6248,9 +6193,8 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      if (isStandaloneApp()) return;
-      navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
-        console.log('[SW] Registrato (solo install), scope:', reg.scope);
+      navigator.serviceWorker.register('./sw.js?v=42').then(reg => {
+        console.log('[SW] Registrato, scope:', reg.scope);
         reg.update();
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6437,11 +6381,11 @@ window.addEventListener('load', () => {
   }
 });
 
-window.switchActiveGame = switchActiveGame;
+bindHeaderUi();
+initApp();
+window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
 window.openProfilePanel = openProfilePanel;
-window.removeItem = removeItem;
-initApp().catch(err => console.error('initApp:', err));
 </script>
 </body>
 </html>
