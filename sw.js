@@ -1,5 +1,12 @@
-const CACHE  = 'dls-tracker-v11';
-const STATIC = ['./index.html', './pokemon-sets.js', './logo.png', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE  = 'dls-tracker-v29';
+const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+
+// Logo e icone: sempre rete prima (evita PWA con icona/logo vecchi in cache)
+const NETWORK_FIRST = ['logo.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+
+function isNetworkFirst(url) {
+  return NETWORK_FIRST.some(name => url.pathname.endsWith(name));
+}
 
 // ── Install: cache static assets
 self.addEventListener('install', e => {
@@ -32,7 +39,6 @@ self.addEventListener('fetch', e => {
   }
 
   // App shell / HTML → Network first, then cache.
-  // Evita che PC e telefoni restino bloccati su una vecchia index.html.
   if (e.request.mode === 'navigate' ||
       e.request.headers.get('accept')?.includes('text/html')) {
     e.respondWith(
@@ -47,7 +53,21 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Static assets → Cache first, then network
+  // Logo e icone → Network first
+  if (isNetworkFirst(url)) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok && e.request.method === 'GET') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Altri static assets → Cache first, then network
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;

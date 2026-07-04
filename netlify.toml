@@ -29,4 +29,6 @@
   [headers.values]
     Access-Control-Allow-Origin  = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-DLS-Session"
+    X-Content-Type-Options         = "nosniff"
+    Cache-Control                  = "no-store"
