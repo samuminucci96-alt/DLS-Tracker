@@ -6063,10 +6063,11 @@ function showAuthErr(id, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
 
-$('userBtn')?.addEventListener('click', openAuthModal);
 bindAccountButton();
 $('authClose')?.addEventListener('click', closeAuthModal);
-$('authOverlay')?.addEventListener('click', e => { if (e.target === $('authOverlay')) closeAuthModal(); });
+$('authOverlay')?.addEventListener('click', e => {
+  if (e.target === $('authOverlay') && !$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
+});
 $('emailLoginBtn')?.addEventListener('click', submitAuthForm);
 $('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
 $('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
@@ -6077,7 +6078,9 @@ window.openAuthModal = openAuthModal;
 window.openProfilePanel = openProfilePanel;
 
 $('profileClose')?.addEventListener('click', closeProfilePanel);
-$('profileOverlay')?.addEventListener('click', e => { if (e.target === $('profileOverlay')) closeProfilePanel(); });
+$('profileOverlay')?.addEventListener('click', e => {
+  if (e.target === $('profileOverlay') && !$('profileOverlay')?.classList.contains('is-closed')) closeProfilePanel();
+});
 $('profileLogoutBtn')?.addEventListener('click', () => {
   closeProfilePanel();
   clearSession();
