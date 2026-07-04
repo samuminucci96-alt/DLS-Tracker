@@ -16,10 +16,10 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=49">
+  <meta name="msapplication-starturl" content="./index.html?v=50">
 
   <title>DLS Tracker</title>
-  <script src="pwa-fix.js?v=49"></script>
+  <script src="pwa-fix.js?v=50"></script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -2558,7 +2558,7 @@
 
         <!-- Pokémon form -->
         <div id="pokemonSearch">
-        <form class="form-grid" id="pokemonForm" action="#" method="get" onsubmit="event.preventDefault(); if(window.doSearch) window.doSearch(); else if(typeof doSearch==='function') doSearch(); return false;">
+        <form class="form-grid" id="pokemonForm" action="#" method="get" onsubmit="return window.__dlsSearch(event)">
 
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
@@ -2610,7 +2610,7 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" id="searchBtn">
+          <button type="submit" class="btn btn-primary" id="searchBtn" onclick="return window.__dlsSearch(event)">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
           <div id="searchProgressBar"></div>
@@ -6422,6 +6422,8 @@ window.switchActiveGame = switchActiveGame;
 window.openAuthModal = openAuthModal;
 window.doSearch = doSearch;
 window.tcgDoSearch = tcgDoSearch;
+window.selectCard = selectCard;
+window.renderChoices = renderChoices;
 window.removeItem = removeItem;
 window.openProfilePanel = openProfilePanel;
 </script>

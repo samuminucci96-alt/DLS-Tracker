@@ -1,5 +1,5 @@
 (function () {
-  var standalone = window.matchMedia('(display-mode: standalone)').matches
+  var isInstalled = window.matchMedia('(display-mode: standalone)').matches
     || window.matchMedia('(display-mode: fullscreen)').matches
     || window.matchMedia('(display-mode: minimal-ui)').matches
     || window.navigator.standalone === true;
@@ -40,38 +40,140 @@
     }
   }
 
-  function bindPwaActions() {
-    if (!standalone || document.documentElement.dataset.pwaActions === '1') return;
-    document.documentElement.dataset.pwaActions = '1';
+  function showPwaMsg(text, type) {
+    var box = document.getElementById('msgBox');
+    if (!box) return;
+    box.hidden = false;
+    box.className = 'msg ' + (type || 'info');
+    box.innerHTML = '<span>' + String(text).replace(/</g, '&lt;') + '</span>';
+  }
 
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (form && form.id === 'pokemonForm') {
-        e.preventDefault();
-        if (typeof window.doSearch === 'function') window.doSearch();
-      }
-    }, true);
+  function setPwaSearchLoading(on) {
+    var btn = document.getElementById('searchBtn');
+    var inner = document.getElementById('searchBtnInner');
+    if (!btn) return;
+    btn.disabled = !!on;
+    if (inner) inner.textContent = on ? 'Ricerca in corso…' : '🔍   Cerca Carta';
+  }
 
-    document.addEventListener('click', function (e) {
-      var t = e.target.closest ? e.target.closest('#searchBtn, #opSearchBtn, #rbSearchBtn, #userBtn, .game-tab') : null;
-      if (!t) return;
-      if (t.id === 'searchBtn' && typeof window.doSearch === 'function') {
-        e.preventDefault();
-        window.doSearch();
-      } else if (t.id === 'opSearchBtn' && typeof window.tcgDoSearch === 'function') {
-        e.preventDefault();
-        window.tcgDoSearch('onepiece');
-      } else if (t.id === 'rbSearchBtn' && typeof window.tcgDoSearch === 'function') {
-        e.preventDefault();
-        window.tcgDoSearch('riftbound');
-      } else if (t.id === 'userBtn' && typeof window.openAuthModal === 'function') {
-        e.preventDefault();
-        window.openAuthModal();
-      } else if (t.classList && t.classList.contains('game-tab') && t.dataset.game && typeof window.switchActiveGame === 'function') {
-        e.preventDefault();
-        window.switchActiveGame(t.dataset.game);
+  function renderPwaChoices(cards) {
+    var list = document.getElementById('choicesList');
+    var card = document.getElementById('choicesCard');
+    var count = document.getElementById('choicesCount');
+    if (!list || !card) {
+      showPwaMsg('Trovate ' + cards.length + ' carte.', 'success');
+      return;
+    }
+    list.innerHTML = cards.slice(0, 12).map(function (c, i) {
+      var label = (c.name || 'Carta') + ' · ' + ((c.set && c.set.name) || '');
+      return '<button type="button" class="choice-card" data-i="' + i + '">' +
+        label.replace(/</g, '&lt;') + '</button>';
+    }).join('');
+    if (count) count.textContent = String(cards.length);
+    card.hidden = false;
+    window.__pwaCards = cards;
+    list.querySelectorAll('button[data-i]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var c = window.__pwaCards[parseInt(btn.dataset.i, 10)];
+        if (typeof window.selectCard === 'function') window.selectCard(c);
+        else showPwaMsg('Selezionata: ' + (c.name || 'carta'), 'success');
+      });
+    });
+  }
+
+  async function pwaSearchPokemon() {
+    var name = (document.getElementById('pokemonName')?.value || '').trim();
+    var number = (document.getElementById('cardNumber')?.value || '').trim();
+    if (!name && !number) {
+      showPwaMsg('Inserisci almeno il nome del Pokémon o il numero della carta.', 'error');
+      return;
+    }
+
+    setPwaSearchLoading(true);
+    showPwaMsg('Ricerca in corso…', 'loading');
+
+    try {
+      var parts = [];
+      if (name) parts.push('name:*' + name.replace(/[*"]/g, '') + '*');
+      if (number) parts.push('number:' + number.replace(/"/g, ''));
+      var url = new URL('/api/pokemontcg', location.origin);
+      url.searchParams.set('q', parts.join(' '));
+      url.searchParams.set('pageSize', '16');
+
+      var res = await fetch(url.href, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('Ricerca non disponibile (' + res.status + '). Controlla la connessione.');
+
+      var json = await res.json();
+      var cards = (json && json.data) ? json.data : [];
+      if (!cards.length) {
+        showPwaMsg('Nessuna carta trovata. Prova un altro nome.', 'warning');
+        return;
       }
-    }, true);
+
+      showPwaMsg(cards.length === 1 ? 'Carta trovata!' : 'Trovate ' + cards.length + ' carte — seleziona quella corretta.', 'success');
+      if (cards.length === 1 && typeof window.selectCard === 'function') {
+        window.selectCard(cards[0]);
+      } else if (typeof window.renderChoices === 'function') {
+        window.renderChoices(cards);
+      } else {
+        renderPwaChoices(cards);
+      }
+    } catch (err) {
+      showPwaMsg(err.message || 'Errore durante la ricerca.', 'error');
+    } finally {
+      setPwaSearchLoading(false);
+    }
+  }
+
+  window.__dlsSearch = function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    var installed = document.documentElement.classList.contains('is-standalone')
+      || window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: minimal-ui)').matches
+      || window.navigator.standalone === true;
+    if (installed || typeof window.doSearch !== 'function') {
+      pwaSearchPokemon();
+    } else {
+      window.doSearch();
+    }
+    return false;
+  };
+
+  function bindTap(el, fn) {
+    if (!el || el.dataset.pwaTap === '1') return;
+    el.dataset.pwaTap = '1';
+    var last = 0;
+    var run = function (e) {
+      if (e.type === 'touchend') e.preventDefault();
+      var now = Date.now();
+      if (now - last < 350) return;
+      last = now;
+      fn(e);
+    };
+    el.addEventListener('touchend', run, { passive: false });
+    el.addEventListener('click', run);
+  }
+
+  function bindSearchUi() {
+    var form = document.getElementById('pokemonForm');
+    var btn = document.getElementById('searchBtn');
+    if (form && !form.dataset.pwaBound) {
+      form.dataset.pwaBound = '1';
+      form.addEventListener('submit', function (e) {
+        window.__dlsSearch(e);
+      });
+    }
+    bindTap(btn, function () { window.__dlsSearch(); });
+
+    bindTap(document.getElementById('userBtn'), function () {
+      if (typeof window.openAuthModal === 'function') window.openAuthModal();
+    });
 
     var sel = document.getElementById('gameSelect');
     if (sel && !sel.dataset.pwaBound) {
@@ -80,9 +182,15 @@
         if (typeof window.switchActiveGame === 'function') window.switchActiveGame(sel.value);
       });
     }
+
+    document.querySelectorAll('.game-tab[data-game]').forEach(function (tab) {
+      bindTap(tab, function () {
+        if (typeof window.switchActiveGame === 'function') window.switchActiveGame(tab.dataset.game);
+      });
+    });
   }
 
-  if (standalone) document.documentElement.classList.add('is-standalone');
+  if (isInstalled) document.documentElement.classList.add('is-standalone');
 
   applyBodyTouch();
   purgeSwCache();
@@ -91,10 +199,10 @@
   document.addEventListener('DOMContentLoaded', function () {
     applyBodyTouch();
     hideBlockingOverlays();
-    bindPwaActions();
+    bindSearchUi();
   });
   window.addEventListener('pageshow', function () {
     hideBlockingOverlays();
-    bindPwaActions();
+    bindSearchUi();
   });
 })();
