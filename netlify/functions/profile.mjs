@@ -6,7 +6,7 @@ const MAX_AVATAR_LEN = 180000;
 
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
     const user = requireUser(req);

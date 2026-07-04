@@ -13,9 +13,9 @@
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DLS Tracker">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=4">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=4">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=5">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=5">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=5">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
   <meta name="msapplication-starturl" content="./index.html">
@@ -6104,7 +6104,6 @@ function isStandaloneApp() {
 function syncInstalledState() {
   if (!isStandaloneApp()) return;
   localStorage.setItem('dls_installed', '1');
-  localStorage.setItem('dls_install_dismissed', '1');
   document.getElementById('installBanner')?.remove();
   closeIosInstallSheet();
   deferredPrompt = null;
@@ -6122,23 +6121,27 @@ function isIosSafari() {
 }
 
 function markAppInstalled() {
+  localStorage.setItem('dls_installed', '1');
   syncInstalledState();
   updateInstallUi();
 }
 
 function canOfferInstall() {
   if (isStandaloneApp()) return false;
-  if (localStorage.getItem('dls_installed') === '1') return false;
-  if (localStorage.getItem('dls_install_dismissed') === '1') return false;
   if (deferredPrompt) return true;
-  if (isIosSafari()) return true;
+  if (isIosDevice()) return true;
   return false;
 }
 
+function canShowInstallBanner() {
+  if (isStandaloneApp()) return false;
+  if (localStorage.getItem('dls_install_banner_dismissed') === '1') return false;
+  return canOfferInstall();
+}
+
 function dismissInstallPrompt() {
-  localStorage.setItem('dls_install_dismissed', '1');
+  localStorage.setItem('dls_install_banner_dismissed', '1');
   document.getElementById('installBanner')?.remove();
-  closeIosInstallSheet();
   updateInstallUi();
 }
 
@@ -6165,6 +6168,10 @@ function triggerInstallFlow() {
   }
   if (isIosSafari()) {
     showIosInstallSheet();
+    return;
+  }
+  if (isIosDevice()) {
+    showMsg('Apri questa pagina in Safari, poi tocca Condividi → Aggiungi a Home.', 'info');
     return;
   }
   showMsg('Apri il menu del browser e seleziona "Installa app" o "Aggiungi a Home".', 'info');
@@ -6196,10 +6203,7 @@ function showIosInstallSheet() {
     if (e.target === overlay) closeIosInstallSheet();
   });
   document.getElementById('installIosDone')?.addEventListener('click', closeIosInstallSheet);
-  document.getElementById('installIosDismiss')?.addEventListener('click', () => {
-    closeIosInstallSheet();
-    dismissInstallPrompt();
-  });
+  document.getElementById('installIosDismiss')?.addEventListener('click', closeIosInstallSheet);
 }
 
 function closeIosInstallSheet() {
@@ -6208,7 +6212,7 @@ function closeIosInstallSheet() {
 }
 
 function showInstallBanner() {
-  if (!canOfferInstall() || document.getElementById('installBanner')) return;
+  if (!canShowInstallBanner() || document.getElementById('installBanner')) return;
   const ios = isIosSafari();
   const banner = document.createElement('div');
   banner.id = 'installBanner';
@@ -6245,6 +6249,9 @@ window.addEventListener('appinstalled', () => {
 $('installAppBtn')?.addEventListener('click', triggerInstallFlow);
 
 window.addEventListener('load', () => {
+  if (!isStandaloneApp()) {
+    localStorage.removeItem('dls_install_dismissed');
+  }
   updateInstallUi();
   document.addEventListener('focusin', e => {
     if (!e.target.matches('input, select, textarea')) return;
@@ -6256,7 +6263,7 @@ window.addEventListener('load', () => {
       document.getElementById('installBanner')?.classList.remove('keyboard-open');
     }, 120);
   });
-  if (canOfferInstall() && isIosSafari() && !sessionStorage.getItem('dls_install_banner_shown')) {
+  if (canShowInstallBanner() && isIosDevice() && !sessionStorage.getItem('dls_install_banner_shown')) {
     sessionStorage.setItem('dls_install_banner_shown', '1');
     setTimeout(showInstallBanner, 1400);
   }
