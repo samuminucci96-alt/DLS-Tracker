@@ -1176,6 +1176,17 @@
       pointer-events: auto;
     }
 
+    .game-tab .tab-icon,
+    .game-tab img {
+      pointer-events: none;
+    }
+
+    html.is-standalone #bgCanvas,
+    html.is-mobile #bgCanvas {
+      display: none !important;
+      pointer-events: none !important;
+    }
+
     html.is-standalone .user-btn,
     html.is-mobile .user-btn {
       touch-action: manipulation;
@@ -5312,32 +5323,9 @@ const GAME_UI = {
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
-}
-
-function bindHeaderTaps() {
-  if (document.documentElement.dataset.headerTaps === '1') return;
-  document.documentElement.dataset.headerTaps = '1';
-  document.querySelectorAll('.game-tab[data-game]').forEach(btn => {
-    const game = btn.dataset.game;
-    if (!game) return;
-    const activate = e => {
-      e.preventDefault();
-      e.stopPropagation();
-      switchActiveGame(game);
-    };
-    btn.addEventListener('touchend', activate, { passive: false });
-    btn.addEventListener('click', activate);
-  });
-  const userBtn = $('userBtn');
-  if (userBtn) {
-    const open = e => {
-      e.preventDefault();
-      e.stopPropagation();
-      openAuthModal();
-    };
-    userBtn.addEventListener('touchend', open, { passive: false });
-    userBtn.addEventListener('click', open);
-  }
+  $('authOverlay')?.classList.add('is-closed');
+  $('profileOverlay')?.classList.add('is-closed');
+  document.getElementById('installIosSheet')?.remove();
 }
 
 function switchActiveGame(game) {
@@ -5438,14 +5426,7 @@ bindCollectionActions();
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
   const canvas = $('bgCanvas');
-  if (!canvas) return;
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || window.matchMedia('(display-mode: fullscreen)').matches
-    || window.navigator.standalone === true;
-  if (standalone) {
-    canvas.style.display = 'none';
-    return;
-  }
+  if (!canvas || getComputedStyle(canvas).display === 'none') return;
   const ctx = canvas.getContext('2d');
   let W, H;
 
@@ -6456,12 +6437,11 @@ window.addEventListener('load', () => {
   }
 });
 
-bindHeaderTaps();
-initApp().catch(err => console.error('initApp:', err));
 window.switchActiveGame = switchActiveGame;
 window.openAuthModal = openAuthModal;
 window.openProfilePanel = openProfilePanel;
 window.removeItem = removeItem;
+initApp().catch(err => console.error('initApp:', err));
 </script>
 </body>
 </html>
