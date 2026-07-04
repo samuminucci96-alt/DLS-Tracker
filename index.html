@@ -16,28 +16,11 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=46">
+  <meta name="msapplication-starturl" content="./index.html?v=47">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 
   <title>DLS Tracker</title>
-  <script>
-  (function pwaBootstrap() {
-    var standalone = window.matchMedia('(display-mode: standalone)').matches
-      || window.matchMedia('(display-mode: fullscreen)').matches
-      || window.navigator.standalone === true;
-    if (!standalone) return;
-    document.documentElement.classList.add('is-standalone');
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        return Promise.all(regs.map(function(r) { return r.unregister(); }));
-      }).catch(function() {});
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(keys) {
-        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-      }).catch(function() {});
-    }
-  })();
-  </script>
+  <script src="pwa-fix.js?v=47"></script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -99,7 +82,7 @@
       display: block;
       overflow-x: clip;
       overflow-y: visible;
-      touch-action: pan-y;
+      touch-action: manipulation;
       padding:
         max(var(--shell-pad), var(--safe-top))
         max(var(--shell-pad), var(--safe-right))
@@ -2416,7 +2399,7 @@
 <canvas id="bgCanvas"></canvas>
 
 <!-- ── Auth Modal ────────────────────────────────────────────────── -->
-<div id="authOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true">
+<div id="authOverlay" class="auth-overlay is-closed" hidden style="display:none" role="dialog" aria-modal="true">
   <div class="auth-modal">
     <button class="auth-close" id="authClose" aria-label="Chiudi">✕</button>
     <div class="auth-title" id="authTitle">Accedi a DLS Tracker</div>
@@ -2455,7 +2438,7 @@
 </div>
 
 <!-- ── Profile Panel (utente loggato) ─────────────────────────────── -->
-<div id="profileOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+<div id="profileOverlay" class="auth-overlay is-closed" hidden style="display:none" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
   <div class="auth-modal profile-modal">
     <button class="auth-close" id="profileClose" aria-label="Chiudi">✕</button>
     <div class="profile-hero">
@@ -2507,15 +2490,15 @@
 
     <nav class="header-nav" aria-label="Selezione gioco">
       <div class="game-tabs">
-        <button type="button" class="game-tab active" data-game="pokemon">
+        <button type="button" class="game-tab active" data-game="pokemon" onclick="switchActiveGame('pokemon')">
           <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
           Pokémon TCG
         </button>
-        <button type="button" class="game-tab" data-game="onepiece">
+        <button type="button" class="game-tab" data-game="onepiece" onclick="switchActiveGame('onepiece')">
           <span class="tab-icon">☠️</span>
           One Piece TCG
         </button>
-        <button type="button" class="game-tab" data-game="riftbound">
+        <button type="button" class="game-tab" data-game="riftbound" onclick="switchActiveGame('riftbound')">
           <span class="tab-icon">⚔️</span>
           Riftbound
         </button>
@@ -2524,72 +2507,12 @@
 
     <div class="header-account">
       <button type="button" class="btn install-app-btn" id="installAppBtn" hidden aria-label="Installa app">Installa</button>
-      <button type="button" class="user-btn" id="userBtn">
+      <button type="button" class="user-btn" id="userBtn" onclick="openAuthModal()">
         <div class="user-avatar" id="userAvatar">👤</div>
         <span id="userLabel">Accedi</span>
       </button>
     </div>
   </header>
-
-  <script>
-  (function bindHeaderEarly() {
-    var GAME_LABELS = { pokemon: 'Pokémon TCG', onepiece: 'One Piece TCG', riftbound: 'Riftbound' };
-
-    function showGamePanels(game) {
-      if (!GAME_LABELS[game]) return;
-      document.querySelectorAll('.game-tab[data-game]').forEach(function(t) {
-        t.classList.toggle('active', t.dataset.game === game);
-      });
-      ['pokemon', 'onepiece', 'riftbound'].forEach(function(g) {
-        var on = g === game;
-        var s = document.getElementById(g + 'Search');
-        var r = document.getElementById(g + 'Results');
-        if (s) s.hidden = !on;
-        if (r) r.hidden = !on;
-      });
-      var tag = document.getElementById('gameTag');
-      if (tag) tag.textContent = GAME_LABELS[game];
-    }
-
-    function openAuthEarly() {
-      if (typeof window.openAuthModal === 'function') {
-        try { window.openAuthModal(); return; } catch (err) { console.error(err); }
-      }
-      document.getElementById('profileOverlay')?.classList.add('is-closed');
-      var o = document.getElementById('authOverlay');
-      if (o) {
-        o.classList.remove('is-closed');
-        document.body.classList.add('auth-open');
-      }
-    }
-
-    function onTap(el, fn) {
-      if (!el) return;
-      var last = 0;
-      var run = function(e) {
-        if (e.type === 'touchend') e.preventDefault();
-        var now = Date.now();
-        if (now - last < 300) return;
-        last = now;
-        fn();
-      };
-      el.addEventListener('touchend', run, { passive: false });
-      el.addEventListener('click', run);
-    }
-
-    document.querySelectorAll('.game-tab[data-game]').forEach(function(btn) {
-      onTap(btn, function() {
-        var game = btn.dataset.game;
-        showGamePanels(game);
-        if (typeof window.switchActiveGame === 'function') {
-          try { window.switchActiveGame(game); } catch (err) { console.error(err); }
-        }
-      });
-    });
-    onTap(document.getElementById('userBtn'), openAuthEarly);
-    window.__dlsShowGamePanels = showGamePanels;
-  })();
-  </script>
 
   <!-- ─── Main grid ───────────────────────────────────────────────── -->
   <div class="main-grid">
@@ -2658,7 +2581,7 @@
             </div>
           </div>
 
-          <button class="btn btn-primary" id="searchBtn">
+          <button type="button" class="btn btn-primary" id="searchBtn" onclick="doSearch()">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
           <div id="searchProgressBar"></div>
@@ -2921,17 +2844,8 @@
     root.classList.toggle('is-mobile', mobile);
     if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
   };
-  const lockPortrait = () => {
-    if (window.matchMedia('(display-mode: standalone)').matches
-      || window.navigator.standalone === true) return;
-    try {
-      if (screen.orientation?.lock) {
-        screen.orientation.lock('portrait-primary').catch(() => {});
-      }
-    } catch {}
-  };
+  const lockPortrait = () => {};
   sync();
-  lockPortrait();
   window.addEventListener('resize', () => {
     if (Math.abs(window.innerWidth - lastLayoutWidth) > 8) {
       lastLayoutWidth = window.innerWidth;
@@ -2945,22 +2859,9 @@
     sync();
   });
   window.addEventListener('orientationchange', () => {
-    setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); lockPortrait(); }, 120);
+    setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); }, 120);
   });
   window.matchMedia('(display-mode: standalone)').addEventListener('change', sync);
-  window.addEventListener('load', lockPortrait);
-})();
-
-(function purgeStalePwaCache() {
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || window.matchMedia('(display-mode: fullscreen)').matches
-    || window.navigator.standalone === true;
-  if (!standalone) return;
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('authOverlay')?.classList.add('is-closed');
-    document.getElementById('profileOverlay')?.classList.add('is-closed');
-    document.body.classList.remove('auth-open', 'ios-install-open');
-  });
 })();
 // ── Constants ────────────────────────────────────────────────────────
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
@@ -5394,9 +5295,20 @@ function resetModalLocks() {
 
 function bindHeaderUi() {
   document.querySelectorAll('.game-tab[data-game]').forEach(tab => {
+    if (tab.dataset.bound) return;
+    tab.dataset.bound = '1';
     tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
   });
-  $('userBtn')?.addEventListener('click', openAuthModal);
+  const ub = $('userBtn');
+  if (ub && !ub.dataset.bound) {
+    ub.dataset.bound = '1';
+    ub.addEventListener('click', openAuthModal);
+  }
+  const sb = $('searchBtn');
+  if (sb && !sb.dataset.bound) {
+    sb.dataset.bound = '1';
+    sb.addEventListener('click', doSearch);
+  }
 }
 
 function switchActiveGame(game) {
@@ -5982,7 +5894,12 @@ function openProfilePanel() {
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
   const overlay = $('profileOverlay');
-  if (overlay) overlay.classList.remove('is-closed');
+  if (overlay) {
+    overlay.hidden = false;
+    overlay.style.display = 'flex';
+    overlay.classList.remove('is-closed');
+  }
+  document.body.classList.add('auth-open');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
     $('profileName').textContent = dlsUser.displayName || 'Utente';
@@ -5993,7 +5910,13 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  $('profileOverlay')?.classList.add('is-closed');
+  const overlay = $('profileOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.hidden = true;
+    overlay.style.display = 'none';
+  }
+  document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
 
@@ -6054,12 +5977,19 @@ function openAuthModal() {
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   const overlay = $('authOverlay');
   if (!overlay) return;
+  overlay.hidden = false;
+  overlay.style.display = 'flex';
   overlay.classList.remove('is-closed');
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  $('authOverlay')?.classList.add('is-closed');
+  const overlay = $('authOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.hidden = true;
+    overlay.style.display = 'none';
+  }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -6456,8 +6386,9 @@ window.addEventListener('load', () => {
 bindHeaderUi();
 initApp();
 window.switchActiveGame = switchActiveGame;
-window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
+window.doSearch = doSearch;
+window.removeItem = removeItem;
 window.openProfilePanel = openProfilePanel;
 </script>
 </body>
