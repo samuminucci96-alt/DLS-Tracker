@@ -16,10 +16,10 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=48">
+  <meta name="msapplication-starturl" content="./index.html?v=49">
 
   <title>DLS Tracker</title>
-  <script src="pwa-fix.js?v=48"></script>
+  <script src="pwa-fix.js?v=49"></script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -2558,7 +2558,7 @@
 
         <!-- Pokémon form -->
         <div id="pokemonSearch">
-        <div class="form-grid" id="pokemonForm">
+        <form class="form-grid" id="pokemonForm" action="#" method="get" onsubmit="event.preventDefault(); if(window.doSearch) window.doSearch(); else if(typeof doSearch==='function') doSearch(); return false;">
 
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
@@ -2610,11 +2610,11 @@
             </div>
           </div>
 
-          <button type="button" class="btn btn-primary" id="searchBtn" onclick="doSearch()">
+          <button type="submit" class="btn btn-primary" id="searchBtn">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
           <div id="searchProgressBar"></div>
-        </div>
+        </form>
         <div id="msgBox" hidden></div>
         </div>
 
@@ -2664,7 +2664,7 @@
               <input id="opQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
-          <button class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px">
+          <button type="button" class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('onepiece')">
             <span id="opSearchBtnInner">🔍 &nbsp;Cerca Carta OP</span>
           </button>
           <div id="opProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#ef4444,#f97316,#ef4444);"></div>
@@ -2717,7 +2717,7 @@
               <input id="rbQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
-          <button class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px">
+          <button type="button" class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('riftbound')">
             <span id="rbSearchBtnInner">🔍 &nbsp;Cerca Carta Riftbound</span>
           </button>
           <div id="rbProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#c9920a,#2454a9,#c9920a);"></div>
@@ -2847,9 +2847,9 @@
   </div>
 </div>
 
-<script src="pokemon-sets.js"></script>
-<script src="onepiece-sets.js"></script>
-<script src="riftbound-sets.js"></script>
+<script src="pokemon-sets.js?v=49"></script>
+<script src="onepiece-sets.js?v=49"></script>
+<script src="riftbound-sets.js?v=49"></script>
 <script>
 (function initViewport() {
   const root = document.documentElement;
@@ -3211,9 +3211,15 @@ function apiFetchError(res, fallback) {
 }
 
 async function fetchCards(query, _unused, signal, pageSize = 20) {
-  const url = `/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
-  const res = await fetch(url, {
+  const url = new URL('/api/pokemontcg', location.origin);
+  url.searchParams.set('q', query);
+  url.searchParams.set('pageSize', String(pageSize));
+  const res = await fetch(url.href, {
+    method: 'GET',
     headers: { Accept: 'application/json' },
+    credentials: 'same-origin',
+    cache: 'no-store',
+    mode: 'cors',
     signal,
   });
   if (!res.ok) {
@@ -4225,7 +4231,7 @@ $('cardQty')?.addEventListener('input', () => {
 });
 
 async function doSearch() {
-  if (activeGame !== 'pokemon') return;
+  if (activeGame !== 'pokemon') switchActiveGame('pokemon');
 
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
@@ -5336,6 +5342,7 @@ function bindHeaderUi() {
 function switchActiveGame(game) {
   if (!game || !GAME_UI[game]) return;
   if (game === activeGame) return;
+  activeGame = game;
   try {
     priceFetchGen++;
     choicePriceCache.clear();
@@ -5345,7 +5352,6 @@ function switchActiveGame(game) {
     setSearchLoading(false);
     Object.keys(CT_TCG_CONFIG).forEach(k => tcgSetLoading(k, false));
 
-    activeGame = game;
     document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
     const sel = $('gameSelect');
     if (sel && sel.value !== game) sel.value = game;
@@ -5387,7 +5393,6 @@ function initApp() {
   if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
   restoreSessionLocal();
-  activeGame = '';
   switchActiveGame('pokemon');
   tryAutoLogin();
 }
@@ -6416,6 +6421,7 @@ initApp();
 window.switchActiveGame = switchActiveGame;
 window.openAuthModal = openAuthModal;
 window.doSearch = doSearch;
+window.tcgDoSearch = tcgDoSearch;
 window.removeItem = removeItem;
 window.openProfilePanel = openProfilePanel;
 </script>

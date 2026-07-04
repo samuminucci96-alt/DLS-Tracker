@@ -1,12 +1,12 @@
 {
-  "id": "dls-tracker-v48",
+  "id": "dls-tracker-v49",
   "name": "DLS Tracker — TCG Card Tracker",
   "short_name": "DLS Tracker",
   "description": "Tracker valore carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.",
-  "start_url": "./index.html?v=48",
+  "start_url": "./index.html?v=49",
   "scope": "./",
-  "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display": "minimal-ui",
+  "display_override": ["minimal-ui", "standalone", "browser"],
   "orientation": "portrait-primary",
   "background_color": "#e8f4fc",
   "theme_color": "#e8f4fc",
@@ -43,7 +43,7 @@
     {
       "name": "Cerca Carta Pokémon",
       "short_name": "Cerca",
-      "url": "./index.html?game=pokemon",
+      "url": "./index.html?game=pokemon&v=49",
       "icons": [{ "src": "icon-192.png?v=6", "sizes": "192x192" }]
     }
   ]
