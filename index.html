@@ -11,15 +11,14 @@
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DLS Tracker">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=6">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=6">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
-  <meta name="msapplication-starturl" content="./index.html?v=50">
+  <meta name="msapplication-starturl" content="./index.html">
 
   <title>DLS Tracker</title>
-  <script src="pwa-fix.js?v=50"></script>
 
   <!-- Auth gestita da Netlify Functions (nessun SDK esterno) -->
   <style>
@@ -415,24 +414,6 @@
     .game-tab[data-game="pokemon"].active { color: var(--poke); }
     .game-tab[data-game="onepiece"].active { color: var(--op); }
     .game-tab[data-game="riftbound"].active { color: var(--gold); }
-
-    /* PWA installata: menu nativo al posto dei tab (tap affidabili iOS/Android) */
-    .game-select-pwa {
-      display: none;
-      width: 100%;
-      min-width: 0;
-      font-size: 16px;
-      min-height: 44px;
-      padding: 10px 36px 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    html.is-standalone .game-tabs { display: none !important; }
-    html.is-standalone .game-select-pwa { display: block; }
 
     .tab-icon { font-size: 1rem; }
     .tab-icon-img {
@@ -2423,7 +2404,7 @@
 <canvas id="bgCanvas"></canvas>
 
 <!-- ── Auth Modal ────────────────────────────────────────────────── -->
-<div id="authOverlay" class="auth-overlay is-closed" hidden style="display:none" role="dialog" aria-modal="true">
+<div id="authOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true">
   <div class="auth-modal">
     <button class="auth-close" id="authClose" aria-label="Chiudi">✕</button>
     <div class="auth-title" id="authTitle">Accedi a DLS Tracker</div>
@@ -2462,7 +2443,7 @@
 </div>
 
 <!-- ── Profile Panel (utente loggato) ─────────────────────────────── -->
-<div id="profileOverlay" class="auth-overlay is-closed" hidden style="display:none" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+<div id="profileOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
   <div class="auth-modal profile-modal">
     <button class="auth-close" id="profileClose" aria-label="Chiudi">✕</button>
     <div class="profile-hero">
@@ -2513,21 +2494,16 @@
     </div>
 
     <nav class="header-nav" aria-label="Selezione gioco">
-      <select id="gameSelect" class="game-select-pwa" aria-label="Seleziona gioco" onchange="switchActiveGame(this.value)">
-        <option value="pokemon">Pokémon TCG</option>
-        <option value="onepiece">One Piece TCG</option>
-        <option value="riftbound">Riftbound</option>
-      </select>
       <div class="game-tabs">
-        <button type="button" class="game-tab active" data-game="pokemon" onclick="switchActiveGame('pokemon')">
+        <button type="button" class="game-tab active" data-game="pokemon">
           <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
           Pokémon TCG
         </button>
-        <button type="button" class="game-tab" data-game="onepiece" onclick="switchActiveGame('onepiece')">
+        <button type="button" class="game-tab" data-game="onepiece">
           <span class="tab-icon">☠️</span>
           One Piece TCG
         </button>
-        <button type="button" class="game-tab" data-game="riftbound" onclick="switchActiveGame('riftbound')">
+        <button type="button" class="game-tab" data-game="riftbound">
           <span class="tab-icon">⚔️</span>
           Riftbound
         </button>
@@ -2536,7 +2512,7 @@
 
     <div class="header-account">
       <button type="button" class="btn install-app-btn" id="installAppBtn" hidden aria-label="Installa app">Installa</button>
-      <button type="button" class="user-btn" id="userBtn" onclick="openAuthModal()">
+      <button type="button" class="user-btn" id="userBtn">
         <div class="user-avatar" id="userAvatar">👤</div>
         <span id="userLabel">Accedi</span>
       </button>
@@ -2558,7 +2534,7 @@
 
         <!-- Pokémon form -->
         <div id="pokemonSearch">
-        <form class="form-grid" id="pokemonForm" action="#" method="get" onsubmit="return window.__dlsSearch(event)">
+        <div class="form-grid" id="pokemonForm">
 
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
@@ -2610,11 +2586,11 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" id="searchBtn" onclick="return window.__dlsSearch(event)">
+          <button type="button" class="btn btn-primary" id="searchBtn">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
           <div id="searchProgressBar"></div>
-        </form>
+        </div>
         <div id="msgBox" hidden></div>
         </div>
 
@@ -2847,9 +2823,9 @@
   </div>
 </div>
 
-<script src="pokemon-sets.js?v=49"></script>
-<script src="onepiece-sets.js?v=49"></script>
-<script src="riftbound-sets.js?v=49"></script>
+<script src="pokemon-sets.js"></script>
+<script src="onepiece-sets.js"></script>
+<script src="riftbound-sets.js"></script>
 <script>
 (function initViewport() {
   const root = document.documentElement;
@@ -2909,9 +2885,50 @@ const CT_SET_CODE_MAP = {
   sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
   sv9: 'jtg', sv9pt5: 'dri',
   scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
+  svp: 'svp',
+  swshp: 'swshp',
+  scarletvioletblackstarpromos: 'svp',
+  svblackstarpromos: 'svp',
+  blackstarpromos: 'svp',
 };
 
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
+
+function isPokemonPromoSet(card) {
+  const id = (card?.set?.id || '').toLowerCase();
+  const n = norm(card?.set?.name || '').replace(/\s+/g, '');
+  return /^(svp|swshp|smp|xyp|bmp|dpp|hsp)$/.test(id) || /blackstarpromo/.test(n);
+}
+
+function ctPromoEraKey(setId) {
+  const id = (setId || '').toLowerCase();
+  if (id.startsWith('sv')) return 'sv';
+  if (id.startsWith('swsh')) return 'swsh';
+  if (id.startsWith('sm')) return 'sm';
+  if (id.startsWith('xy')) return 'xy';
+  return id.replace(/[^a-z0-9]/g, '').slice(0, 4);
+}
+
+function ctExpansionPromoEra(exp) {
+  const n = norm(ctExpName(exp)).replace(/\s+/g, '');
+  if (/blackstarpromo/.test(n)) {
+    if (/sv|scarlet|violet/.test(n)) return 'sv';
+    if (/swsh|sword|shield/.test(n)) return 'swsh';
+    if (/sun|moon|^sm/.test(n)) return 'sm';
+    if (/xy/.test(n)) return 'xy';
+    return 'generic';
+  }
+  return null;
+}
+
+function promoNumberMatches(rawNum, bpNum) {
+  if (!rawNum) return true;
+  if (!bpNum) return false;
+  if (bpNum === rawNum) return true;
+  const padded = rawNum.padStart(3, '0');
+  const variants = [rawNum, padded, `svp${rawNum}`, `sv${rawNum}`, `svp${padded}`];
+  return variants.some(v => bpNum === v || bpNum.endsWith(v) || bpNum.includes(rawNum));
+}
 
 function pokemonSetEnglishName(setId, setName) {
   if (typeof POKEMON_SETS !== 'undefined' && setId) {
@@ -2970,8 +2987,15 @@ function scoreBlueprintForCard(card, bp) {
   const bpNum = ctBpNumber(bp);
 
   if (rawNum) {
-    if (!bpNum || bpNum !== rawNum) return 0;
-    score += 30;
+    if (!bpNum) {
+      if (!isPokemonPromoSet(card)) return 0;
+      score += 4;
+    } else if (bpNum !== rawNum) {
+      if (isPokemonPromoSet(card) && promoNumberMatches(rawNum, bpNum)) score += 22;
+      else return 0;
+    } else {
+      score += 30;
+    }
   }
 
   const meta = ctBpMeta(bp);
@@ -3568,6 +3592,15 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
   if (mappedCode) {
     const m0 = expansions.find(e => norm(e.code) === norm(mappedCode));
     if (m0) { console.log('[CT] Match codice mappato:', m0.code, ctExpName(m0)); return m0; }
+  }
+
+  if (isPokemonPromoSet(card)) {
+    const era = ctPromoEraKey(card.set?.id);
+    const promoMatch = expansions.find(e => {
+      const expEra = ctExpansionPromoEra(e);
+      return expEra && (expEra === era || (era === 'sv' && expEra === 'sv'));
+    }) || expansions.find(e => ctExpansionPromoEra(e) === 'generic');
+    if (promoMatch) { console.log('[CT] Match promo set:', ctExpName(promoMatch)); return promoMatch; }
   }
 
   if (enName) {
@@ -4541,10 +4574,10 @@ function renderResult() {
   $('resultContent').innerHTML = `
     <div class="result-layout">
       ${img
-        ? `<div class="result-img"><img src="${img}" alt="${card.name}"></div>`
+        ? `<div class="result-img"><img src="${img}" alt="${escHtml(card.name)}"></div>`
         : `<div class="result-img-ph">Immagine<br>n.d.</div>`}
       <div>
-        <div class="result-name">${card.name}</div>
+        <div class="result-name">${escHtml(card.name)}</div>
         <div class="pills">
           ${card.set?.name   ? `<span class="pill pill-set">📦 ${card.set.name}</span>` : ''}
           ${card.number      ? `<span class="pill pill-num">#${card.number}</span>` : ''}
@@ -5316,27 +5349,14 @@ function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
 }
 
-function bindHeaderUi() {
-  document.querySelectorAll('.game-tab[data-game]').forEach(tab => {
-    if (tab.dataset.bound) return;
-    tab.dataset.bound = '1';
-    tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
+function bindAccountButton() {
+  const btn = $('userBtn');
+  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    openAuthModal();
   });
-  const gs = $('gameSelect');
-  if (gs && !gs.dataset.bound) {
-    gs.dataset.bound = '1';
-    gs.addEventListener('change', () => switchActiveGame(gs.value));
-  }
-  const ub = $('userBtn');
-  if (ub && !ub.dataset.bound) {
-    ub.dataset.bound = '1';
-    ub.addEventListener('click', openAuthModal);
-  }
-  const sb = $('searchBtn');
-  if (sb && !sb.dataset.bound) {
-    sb.dataset.bound = '1';
-    sb.addEventListener('click', doSearch);
-  }
 }
 
 function switchActiveGame(game) {
@@ -5353,8 +5373,6 @@ function switchActiveGame(game) {
     Object.keys(CT_TCG_CONFIG).forEach(k => tcgSetLoading(k, false));
 
     document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
-    const sel = $('gameSelect');
-    if (sel && sel.value !== game) sel.value = game;
     const panels = [
       ['pokemonSearch', game === 'pokemon'],
       ['onepieceSearch', game === 'onepiece'],
@@ -5923,12 +5941,7 @@ function openProfilePanel() {
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
   const overlay = $('profileOverlay');
-  if (overlay) {
-    overlay.hidden = false;
-    overlay.style.display = 'flex';
-    overlay.style.pointerEvents = 'auto';
-    overlay.classList.remove('is-closed');
-  }
+  if (overlay) overlay.classList.remove('is-closed');
   document.body.classList.add('auth-open');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
@@ -5940,13 +5953,7 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  const overlay = $('profileOverlay');
-  if (overlay) {
-    overlay.classList.add('is-closed');
-    overlay.hidden = true;
-    overlay.style.display = 'none';
-    overlay.style.pointerEvents = 'none';
-  }
+  $('profileOverlay')?.classList.add('is-closed');
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -6008,21 +6015,12 @@ function openAuthModal() {
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   const overlay = $('authOverlay');
   if (!overlay) return;
-  overlay.hidden = false;
-  overlay.style.display = 'flex';
-  overlay.style.pointerEvents = 'auto';
   overlay.classList.remove('is-closed');
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  const overlay = $('authOverlay');
-  if (overlay) {
-    overlay.classList.add('is-closed');
-    overlay.hidden = true;
-    overlay.style.display = 'none';
-    overlay.style.pointerEvents = 'none';
-  }
+  $('authOverlay')?.classList.add('is-closed');
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -6228,13 +6226,30 @@ $('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
 // Auto-refresh ogni 30 minuti se l'utente è loggato
 setInterval(() => { if (dlsUser) refreshAllPrices(); }, 30 * 60 * 1000);
 
-// ── Service Worker — disattivato (causava cache JS obsoleta in PWA) ──
+// ── Service Worker (PWA) — disattivato in anteprima locale/LAN ───────
+function isLocalPreviewHost() {
+  const h = location.hostname;
+  return h === 'localhost' || h === '127.0.0.1'
+    || /^192\.168\./.test(h) || /^10\./.test(h) || /\.local$/i.test(h);
+}
+
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
-  }).catch(() => {});
-  if ('caches' in window) {
-    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+  if (isLocalPreviewHost()) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+      console.log('[SW] Anteprima locale: cache PWA disattivata');
+    });
+    if ('caches' in window) {
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
+    }
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js?v=33').then(reg => {
+        console.log('[SW] Registrato, scope:', reg.scope);
+      }).catch(err => {
+        console.warn('[SW] Registrazione fallita:', err);
+      });
+    });
   }
 }
 
@@ -6416,16 +6431,13 @@ window.addEventListener('load', () => {
   }
 });
 
-bindHeaderUi();
+document.querySelectorAll('.game-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
+});
+bindAccountButton();
 initApp();
-window.switchActiveGame = switchActiveGame;
-window.openAuthModal = openAuthModal;
-window.doSearch = doSearch;
-window.tcgDoSearch = tcgDoSearch;
-window.selectCard = selectCard;
-window.renderChoices = renderChoices;
 window.removeItem = removeItem;
-window.openProfilePanel = openProfilePanel;
+window.openAuthModal = openAuthModal;
 </script>
 </body>
 </html>
