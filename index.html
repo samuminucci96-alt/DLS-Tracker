@@ -3002,6 +3002,8 @@ let basePrice       = 0;
 let priceSrc        = '';
 let collection      = [];
 let activeGame      = 'pokemon';
+let dlsUser         = null;
+let syncTimer       = null;
 let searchCtrl      = null;   // AbortController for main search
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
@@ -4624,10 +4626,23 @@ async function addToCollection() {
 }
 
 function removeItem(idx) {
+  if (idx < 0 || idx >= collection.length) return;
   collection.splice(idx, 1);
   persistLocalCollection();
-  if (dlsUser) saveCloudCollection();
   onCollectionChanged();
+  if (dlsUser) saveCloudCollection();
+}
+
+function bindCollectionActions() {
+  const body = $('collBody');
+  if (!body || body.dataset.bound === '1') return;
+  body.dataset.bound = '1';
+  body.addEventListener('click', e => {
+    const btn = e.target.closest('[data-remove-idx]');
+    if (!btn) return;
+    e.preventDefault();
+    removeItem(Number(btn.dataset.removeIdx));
+  });
 }
 
 $('clearBtn').addEventListener('click', () => {
@@ -5234,7 +5249,7 @@ function renderCollection() {
         ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
       </td>
       <td class="td-actions">
-        <button class="btn btn-ghost-danger" onclick="removeItem(${idx})" title="Rimuovi">✕</button>
+        <button type="button" class="btn btn-ghost-danger" data-remove-idx="${idx}" title="Rimuovi">✕</button>
       </td>
     </tr>`;
   }).join('');
@@ -5357,16 +5372,15 @@ function bindGameTabs() {
   tabs.addEventListener('click', activate);
   tabs.addEventListener('touchend', activate, { passive: false });
 }
-bindGameTabs();
 
 function bindAccountButton() {
   const btn = $('userBtn');
   if (!btn || btn.dataset.bound === '1') return;
   btn.dataset.bound = '1';
-  const onTap = uiTapGuard();
-  const open = onTap(() => openAuthModal());
-  btn.addEventListener('click', open);
-  btn.addEventListener('touchend', open, { passive: false });
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    openAuthModal();
+  });
 }
 
 // ── Advanced settings toggle — rimosso (token solo server-side)
@@ -5387,7 +5401,8 @@ function initApp() {
   tryAutoLogin();
 }
 
-initApp();
+bindGameTabs();
+bindCollectionActions();
 
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
@@ -5677,9 +5692,6 @@ const COMMUNITY_LINKS = [
   }
 ];
 
-let dlsUser  = null;  // { email, displayName, token, avatar? }
-let syncTimer = null;
-
 // ── Helpers
 function getToken()  { return localStorage.getItem('dls_token'); }
 function saveSession(data) {
@@ -5749,16 +5761,12 @@ function tryAutoLogin() {
 }
 
 window.addEventListener('pageshow', () => {
-  resetModalLocks();
   restoreSessionLocal();
   if (getToken()) refreshSessionInBackground();
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    resetModalLocks();
-    restoreSessionLocal();
-  }
+  if (document.visibilityState === 'visible') restoreSessionLocal();
 });
 
 document.addEventListener('keydown', e => {
@@ -5785,7 +5793,13 @@ async function loadCloudCollection(clearOnAuthFail = true) {
     let local = [];
     try { local = JSON.parse(localStorage.getItem('dls_collection') || '[]'); } catch {}
     const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
-    collection = mergeCollections(cloud, local, pending);
+    // Locale vince: non ripristinare carte eliminate; aggiungi solo ciò che manca in locale
+    collection = mergeCollections(local, pending);
+    const localKeys = new Set(collection.map(collectionItemKey));
+    for (const item of cloud) {
+      const key = collectionItemKey(item);
+      if (!localKeys.has(key)) collection.push(item);
+    }
     persistLocalCollection();
     renderCollection();
     if (pending.length) {
@@ -6063,7 +6077,6 @@ function showAuthErr(id, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
 
-bindAccountButton();
 $('authClose')?.addEventListener('click', closeAuthModal);
 $('authOverlay')?.addEventListener('click', e => {
   if (e.target === $('authOverlay') && !$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
@@ -6073,9 +6086,6 @@ $('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
 $('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
 $('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
 $('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
-
-window.openAuthModal = openAuthModal;
-window.openProfilePanel = openProfilePanel;
 
 $('profileClose')?.addEventListener('click', closeProfilePanel);
 $('profileOverlay')?.addEventListener('click', e => {
@@ -6219,7 +6229,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=38').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=39').then(reg => {
         console.log('[SW] Registrato (solo install), scope:', reg.scope);
         reg.update();
       }).catch(err => {
@@ -6406,6 +6416,12 @@ window.addEventListener('load', () => {
     setTimeout(showInstallBanner, 1400);
   }
 });
+
+bindAccountButton();
+initApp();
+window.removeItem = removeItem;
+window.openAuthModal = openAuthModal;
+window.openProfilePanel = openProfilePanel;
 </script>
 </body>
 </html>
