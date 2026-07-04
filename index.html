@@ -330,6 +330,18 @@
       touch-action: none;
     }
 
+    .install-app-btn[hidden],
+    html.is-standalone .install-app-btn,
+    html.is-standalone #installAppBtn {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    html.is-standalone .install-banner,
+    html.is-standalone #installBanner {
+      display: none !important;
+    }
+
     @media (max-width: 680px) {
       .install-banner.keyboard-open {
         opacity: 0;
@@ -2780,7 +2792,7 @@
     const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
     root.classList.toggle('is-mobile', mobile);
-    if (standalone && typeof markAppInstalled === 'function') markAppInstalled();
+    if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
   };
   const lockPortrait = () => {
     try {
@@ -5257,7 +5269,7 @@ function initApp() {
   sessionStorage.removeItem('dls_gate_token');
   const saved = localStorage.getItem('dls_collection');
   if (saved) try { collection = JSON.parse(saved); } catch {}
-  if (isStandaloneApp()) markAppInstalled();
+  if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
   restoreSessionLocal();
   activeGame = '';
@@ -5575,6 +5587,10 @@ async function refreshSessionInBackground() {
     if (res.status === 401) {
       clearSession();
       updateAuthUI();
+      return;
+    }
+    if (res.status === 404) {
+      console.warn('Profilo non trovato sul server — mantieni sessione locale');
       return;
     }
     if (!res.ok) return;
@@ -6037,7 +6053,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=27').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=33').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6051,7 +6067,17 @@ let deferredPrompt = null;
 
 function isStandaloneApp() {
   return window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
     || window.navigator.standalone === true;
+}
+
+function syncInstalledState() {
+  if (!isStandaloneApp()) return;
+  localStorage.setItem('dls_installed', '1');
+  localStorage.setItem('dls_install_dismissed', '1');
+  document.getElementById('installBanner')?.remove();
+  closeIosInstallSheet();
+  deferredPrompt = null;
 }
 
 function isIosDevice() {
@@ -6066,11 +6092,7 @@ function isIosSafari() {
 }
 
 function markAppInstalled() {
-  localStorage.setItem('dls_installed', '1');
-  localStorage.setItem('dls_install_dismissed', '1');
-  document.getElementById('installBanner')?.remove();
-  closeIosInstallSheet();
-  deferredPrompt = null;
+  syncInstalledState();
   updateInstallUi();
 }
 
@@ -6091,8 +6113,14 @@ function dismissInstallPrompt() {
 }
 
 function updateInstallUi() {
+  syncInstalledState();
   const btn = $('installAppBtn');
-  if (btn) btn.hidden = !canOfferInstall();
+  const show = canOfferInstall();
+  if (btn) {
+    btn.hidden = !show;
+    btn.style.display = show ? '' : 'none';
+    btn.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
 }
 
 function triggerInstallFlow() {

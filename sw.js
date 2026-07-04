@@ -1,4 +1,4 @@
-const CACHE  = 'dls-tracker-v32';
+const CACHE  = 'dls-tracker-v33';
 const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './icon-192-maskable.png', './icon-512-maskable.png', './apple-touch-icon.png'];
 
 // Logo e icone: sempre rete prima (evita PWA con icona/logo vecchi in cache)

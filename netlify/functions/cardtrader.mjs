@@ -5,7 +5,7 @@ const ALLOWED_PREFIXES = ["/games", "/expansions", "/blueprints", "/marketplace"
 
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { headers: cors });
+  if (req.method === "OPTIONS") return new Response("", { status: 204, headers: cors });
   if (req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Metodo non supportato" }), { status: 405, headers: cors });
   }
