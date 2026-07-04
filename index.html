@@ -5,17 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#e8f4fc">
-
-  <!-- PWA + installazione mobile -->
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DLS Tracker">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=5">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=5">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=5">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=6">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=6">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=6">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
   <meta name="msapplication-starturl" content="./index.html">
@@ -326,6 +324,10 @@
     }
 
     body.ios-install-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+    body.auth-open {
       overflow: hidden;
       touch-action: none;
     }
@@ -1636,6 +1638,18 @@
       display: flex; align-items: center; justify-content: center;
       animation: fadeIn .2s ease;
       padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    html.is-standalone .auth-overlay {
+      min-height: 100dvh;
+      min-height: 100svh;
+      padding:
+        max(16px, var(--safe-top))
+        max(16px, var(--safe-right))
+        max(16px, var(--safe-bottom))
+        max(16px, var(--safe-left));
     }
     .auth-modal {
       background: var(--surface);
@@ -2788,6 +2802,7 @@
       root.style.setProperty('--app-height', `${window.innerHeight}px`);
     }
     const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
       || window.navigator.standalone === true;
     const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
@@ -5514,13 +5529,16 @@ function apiUrl(path) {
 }
 
 function authFetch(url, opts = {}) {
-  const token = opts.sessionToken;
+  const token = opts.sessionToken ?? getToken();
   const headers = { ...(opts.headers || {}) };
   if (token) headers['X-DLS-Session'] = token;
   const { sessionToken, ...rest } = opts;
   return fetch(apiUrl(url), {
+    method: rest.method || 'GET',
     credentials: 'same-origin',
     cache: 'no-store',
+    mode: 'same-origin',
+    redirect: 'follow',
     ...rest,
     headers,
   });
@@ -5849,18 +5867,26 @@ async function handleAvatarPick(file) {
 }
 
 function openAuthModal() {
-  if (dlsUser && getToken()) {
+  const token = getToken();
+  if (dlsUser && token) {
     openProfilePanel();
     return;
   }
+  if (token && !dlsUser) clearSession();
+  closeProfilePanel();
   setEmailMode(false);
   const err = $('emailErr');
   if (err) { err.textContent = ''; err.style.display = 'none'; }
-  $('authOverlay').style.display = 'flex';
+  const overlay = $('authOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  $('authOverlay').style.display = 'none';
+  const overlay = $('authOverlay');
+  if (overlay) overlay.style.display = 'none';
+  document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
 
@@ -6083,8 +6109,24 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=34').then(reg => {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        location.reload();
+      });
+      navigator.serviceWorker.register('./sw.js?v=36').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
+        reg.update();
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', () => {
+          const worker = reg.installing;
+          worker?.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              worker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
       });
@@ -6096,6 +6138,7 @@ if ('serviceWorker' in navigator) {
 let deferredPrompt = null;
 
 function isStandaloneApp() {
+  if (document.documentElement.classList.contains('is-standalone')) return true;
   return window.matchMedia('(display-mode: standalone)').matches
     || window.matchMedia('(display-mode: fullscreen)').matches
     || window.navigator.standalone === true;
