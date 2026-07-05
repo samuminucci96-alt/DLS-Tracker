@@ -2867,6 +2867,7 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 
 const $ = (id) => document.getElementById(id);
+let deferredPrompt = null;
 
 (function initViewport() {
   const root = document.documentElement;
@@ -6381,7 +6382,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=37').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=38').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6391,7 +6392,6 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── PWA Install prompt ────────────────────────────────────────────────
-let deferredPrompt = null;
 
 function isStandaloneApp() {
   if (document.documentElement.classList.contains('is-standalone')) return true;
