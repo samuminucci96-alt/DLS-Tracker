@@ -6244,7 +6244,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=33').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=35').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);

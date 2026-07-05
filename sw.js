@@ -1,80 +1,122 @@
-const CACHE  = 'dls-tracker-v33';
-const STATIC = ['./index.html', './pokemon-sets.js', './onepiece-sets.js', './riftbound-sets.js', './logo.png', './pikachu-tab.png', './manifest.json', './icon-192.png', './icon-512.png', './icon-192-maskable.png', './icon-512-maskable.png', './apple-touch-icon.png'];
+const CACHE = 'dls-tracker-v35';
 
-// Logo e icone: sempre rete prima (evita PWA con icona/logo vecchi in cache)
-const NETWORK_FIRST = ['logo.png', 'icon-192.png', 'icon-512.png', 'icon-192-maskable.png', 'icon-512-maskable.png', 'apple-touch-icon.png'];
+const PRECACHE = [
+  './pokemon-sets.js',
+  './onepiece-sets.js',
+  './riftbound-sets.js',
+  './logo.png',
+  './pikachu-tab.png',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-192-maskable.png',
+  './icon-512-maskable.png',
+  './apple-touch-icon.png',
+];
 
-function isNetworkFirst(url) {
-  return NETWORK_FIRST.some(name => url.pathname.endsWith(name));
+// Se l'URL contiene uno di questi segmenti, il SW non interviene (return immediato).
+const BYPASS_URL_HINTS = [
+  '/api/',
+  '/.netlify/functions/',
+  'pokemontcg.io',
+  'cardtrader.com',
+];
+
+const NETWORK_FIRST_FILES = [
+  'logo.png',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-192-maskable.png',
+  'icon-512-maskable.png',
+  'apple-touch-icon.png',
+  'pokemon-sets.js',
+  'onepiece-sets.js',
+  'riftbound-sets.js',
+];
+
+function shouldBypassServiceWorker(request) {
+  if (request.method !== 'GET') return true;
+
+  const href = request.url;
+  if (BYPASS_URL_HINTS.some((hint) => href.includes(hint))) return true;
+
+  const url = new URL(href);
+  if (url.origin !== self.location.origin) return true;
+
+  return false;
 }
 
-// ── Install: cache static assets
-self.addEventListener('install', e => {
-  e.waitUntil(
+function isHtmlRequest(request, url) {
+  return request.mode === 'navigate'
+    || request.headers.get('accept')?.includes('text/html')
+    || url.pathname === '/'
+    || url.pathname.endsWith('.html');
+}
+
+function isNetworkFirstFile(url) {
+  return NETWORK_FIRST_FILES.some((name) => url.pathname.endsWith(name));
+}
+
+function networkFirst(request) {
+  return fetch(request)
+    .then((res) => {
+      if (res.ok && request.method === 'GET') {
+        const clone = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(request, clone));
+      }
+      return res;
+    })
+    .catch(() => caches.match(request));
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(STATIC))
+      .then((cache) => cache.addAll(PRECACHE))
       .then(() => self.skipWaiting())
   );
 });
 
-// ── Activate: remove old caches
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
 });
 
-// ── Fetch strategy
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
 
-  // API calls (PokéTCG, CardTrader, Netlify Functions) → Network only, no cache
-  if (url.hostname.includes('pokemontcg.io') ||
-      url.hostname.includes('cardtrader.com') ||
-      url.pathname.startsWith('/api/')) {
-    e.respondWith(fetch(e.request));
-    return;
-  }
+  // API, auth, proxy giochi, host esterni → il browser gestisce la rete da solo
+  if (shouldBypassServiceWorker(request)) return;
 
-  // App shell / HTML → Network first, then cache.
-  if (e.request.mode === 'navigate' ||
-      e.request.headers.get('accept')?.includes('text/html')) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+  const url = new URL(request.url);
+
+  // HTML / navigazione → network first (fallback offline)
+  if (isHtmlRequest(request, url)) {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches.match(request).then((cached) => cached || caches.match('./index.html'))
+      )
     );
     return;
   }
 
-  // Logo e icone → Network first
-  if (isNetworkFirst(url)) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(e.request))
-    );
+  // Logo, icone, liste set → network first con fallback cache
+  if (isNetworkFirstFile(url)) {
+    event.respondWith(networkFirst(request));
     return;
   }
 
-  // Altri static assets → Cache first, then network
-  e.respondWith(
-    caches.match(e.request).then(cached => {
+  // Altri asset statici same-origin → cache first
+  event.respondWith(
+    caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
+      return fetch(request).then((res) => {
+        if (res.ok && request.method === 'GET') {
           const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          caches.open(CACHE).then((cache) => cache.put(request, clone));
         }
         return res;
       });
