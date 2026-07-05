@@ -64,7 +64,6 @@
       height: auto;
       -webkit-text-size-adjust: 100%;
       text-size-adjust: 100%;
-      touch-action: manipulation;
       scroll-behavior: smooth;
       overflow-x: clip;
       overflow-y: auto;
@@ -80,7 +79,6 @@
       display: block;
       overflow-x: clip;
       overflow-y: visible;
-      touch-action: manipulation;
       padding:
         max(var(--shell-pad), var(--safe-top))
         max(var(--shell-pad), var(--safe-right))
@@ -142,7 +140,6 @@
         background: rgba(255, 255, 255, 0.97);
         position: relative;
         z-index: 50;
-        animation: fadeUp 0.5s ease-out 0.05s both;
       }
       #bgCanvas { display: none !important; pointer-events: none !important; }
     }
@@ -357,6 +354,13 @@
     html.is-standalone .install-banner,
     html.is-standalone #installBanner {
       display: none !important;
+    }
+
+    html.is-standalone #installIosSheet,
+    html.is-standalone .install-ios-overlay {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
 
     @media (max-width: 680px) {
@@ -1168,8 +1172,7 @@
 
     .game-tab,
     .user-btn {
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: rgba(36, 84, 169, 0.15);
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
       cursor: pointer;
     }
 
@@ -1385,6 +1388,16 @@
     .main-grid > .panel:first-child  { animation: fadeUp 0.5s ease-out 0.12s both; }
     .main-grid > .panel:last-child   { animation: fadeUp 0.5s ease-out 0.2s both; }
 
+    /* Standalone PWA: disabilita animazioni ingresso (fix coordinate tap su mobile) */
+    html.is-standalone .app-shell,
+    html.is-standalone header,
+    html.is-standalone .main-grid > .panel:first-child,
+    html.is-standalone .main-grid > .panel:last-child,
+    html.is-standalone .btn-primary,
+    html.is-standalone .choice-card {
+      animation: none !important;
+    }
+
     /* ─── Header animated glow (solo desktop) ───────────────────── */
     @media (min-width: 681px) {
       header {
@@ -1554,7 +1567,7 @@
       text-align: left;
       font: inherit;
       color: inherit;
-      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
       transition: background 0.15s, border-color 0.15s;
     }
     button.ct-cond-row:hover:not(.ct-cond-nm) {
@@ -3267,6 +3280,24 @@ function setSearchLoading(on) {
 }
 
 // ── API calls ────────────────────────────────────────────────────────
+function apiUrl(path) {
+  return new URL(path, location.origin).href;
+}
+
+function networkFetchErrorMessage(err, fallback) {
+  const msg = String(err?.message || err || '');
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return 'Connessione non disponibile. Verifica internet e riprova.';
+  }
+  return fallback || msg;
+}
+
+function rethrowNetworkError(err, fallback) {
+  if (err?.name === 'AbortError') throw err;
+  if (err?.status) throw err;
+  throw Object.assign(new Error(networkFetchErrorMessage(err, fallback)), { cause: err });
+}
+
 function apiFetchError(res, fallback) {
   return res.text().then(body => {
     let msg = fallback;
@@ -3291,11 +3322,21 @@ async function parsePokemonTcgResponse(res, fallbackMsg) {
 }
 
 async function fetchCards(query, _unused, signal, pageSize = 20) {
-  const opts = { headers: { Accept: 'application/json' }, signal };
-  const proxyUrl = `/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
+  const opts = {
+    headers: { Accept: 'application/json' },
+    signal,
+    cache: 'no-store',
+    credentials: 'same-origin',
+  };
+  const proxyUrl = new URL('/api/pokemontcg', location.origin);
+  proxyUrl.searchParams.set('q', query);
+  proxyUrl.searchParams.set('pageSize', String(pageSize));
+  const netErrFallback = 'Connessione non disponibile. Verifica internet e riprova.';
 
   try {
-    const res = await fetch(proxyUrl, opts);
+    const res = await fetch(proxyUrl.href, opts).catch(err => {
+      rethrowNetworkError(err, netErrFallback);
+    });
     return await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
   } catch (e) {
     if (e.name === 'AbortError') throw e;
@@ -3303,8 +3344,12 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
   }
 
   // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
-  const directUrl = `${API_BASE}?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
-  const directRes = await fetch(directUrl, opts);
+  const directUrl = new URL(API_BASE);
+  directUrl.searchParams.set('q', query);
+  directUrl.searchParams.set('pageSize', String(pageSize));
+  const directRes = await fetch(directUrl.href, opts).catch(err => {
+    rethrowNetworkError(err, netErrFallback);
+  });
   return parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
 }
 
@@ -3322,9 +3367,16 @@ async function ctFetch(path) {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const res = await fetch(`/api/cardtrader?path=${encodeURIComponent(path)}`, {
+    const url = new URL('/api/cardtrader', location.origin);
+    url.searchParams.set('path', path);
+    const res = await fetch(url.href, {
       headers: { Accept: 'application/json' },
       signal: ctrl.signal,
+      cache: 'no-store',
+      credentials: 'same-origin',
+    }).catch(err => {
+      if (err?.name === 'AbortError') throw err;
+      throw Object.assign(new Error('CardTrader non raggiungibile. Controlla la connessione.'), { cause: err });
     });
     if (!res.ok) {
       if (res.status === 404) {
@@ -3333,6 +3385,11 @@ async function ctFetch(path) {
       await apiFetchError(res, `Errore CardTrader (${res.status})`);
     }
     return res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw Object.assign(new Error('Timeout CardTrader: la richiesta ha impiegato troppo tempo. Riprova.'), { name: 'AbortError' });
+    }
+    throw e;
   } finally {
     clearTimeout(tid);
   }
@@ -4146,7 +4203,10 @@ async function loadSuggestions(name) {
     suggCache.set(key, names);
     renderSugg(names);
   } catch (e) {
-    if (e.name !== 'AbortError') hideSuggestions();
+    if (e.name !== 'AbortError') {
+      console.warn('Suggerimenti non disponibili:', networkFetchErrorMessage(e, e.message));
+      hideSuggestions();
+    }
   }
 }
 
@@ -4363,7 +4423,7 @@ async function doSearch() {
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev in locale.'
       : e.status === 503
         ? 'Servizio prezzi non configurato sul server. Contatta l\'amministratore.'
-        : (e.message || 'Errore durante la ricerca. Controlla la connessione.');
+        : networkFetchErrorMessage(e, e.message || 'Errore durante la ricerca. Controlla la connessione.');
     showMsg(msg, 'error');
   } finally {
     setSearchLoading(false);
@@ -5041,7 +5101,7 @@ async function tcgDoSearch(gameKey) {
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev.'
       : e.status === 503
         ? 'CardTrader non configurato sul server.'
-        : ('Errore di ricerca: ' + (e.message || e));
+        : networkFetchErrorMessage(e, e.message || 'Errore di ricerca.');
     tcgShowMsg(gameKey, msg, 'error');
   } finally {
     if (searchGen === ctTcgState[gameKey].searchGen) tcgSetLoading(gameKey, false);
@@ -5411,6 +5471,11 @@ const GAME_UI = {
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
+  ['authOverlay', 'profileOverlay'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.add('is-closed');
+  });
+  document.getElementById('installIosSheet')?.remove();
 }
 
 function bindAccountButton() {
@@ -5422,6 +5487,17 @@ function bindAccountButton() {
     openAuthModal();
   });
 }
+
+function bindGameTabs() {
+  document.querySelectorAll('.game-tab').forEach(tab => {
+    if (tab.dataset.bound === '1') return;
+    tab.dataset.bound = '1';
+    tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
+  });
+}
+
+bindGameTabs();
+bindAccountButton();
 
 function switchActiveGame(game) {
   if (!game || !GAME_UI[game]) return;
@@ -5711,10 +5787,6 @@ const API_AUTH       = '/api/auth';
 const API_COLLECTION = '/api/collection';
 const API_PROFILE    = '/api/profile';
 
-function apiUrl(path) {
-  return new URL(path, location.origin).href;
-}
-
 function authFetch(url, opts = {}) {
   const token = opts.sessionToken ?? getToken();
   const headers = { ...(opts.headers || {}) };
@@ -5728,7 +5800,10 @@ function authFetch(url, opts = {}) {
     redirect: 'follow',
     ...rest,
     headers,
-  });
+  }).catch(err => Promise.reject(Object.assign(
+    new Error(networkFetchErrorMessage(err, 'Connessione al server non disponibile. Verifica internet e riprova.')),
+    { cause: err }
+  )));
 }
 
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/BYOWCG21RiAA95KXXoZAZW';
@@ -6503,10 +6578,6 @@ window.addEventListener('load', () => {
   }
 });
 
-document.querySelectorAll('.game-tab').forEach(tab => {
-  tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
-});
-bindAccountButton();
 initApp();
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
