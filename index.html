@@ -3134,6 +3134,8 @@ let activeGame      = 'pokemon';
 let dlsUser         = null;
 let syncTimer       = null;
 let searchCtrl      = null;   // AbortController for main search
+let searchGen       = 0;
+let searchLangFilter = '';
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
@@ -3147,6 +3149,55 @@ function fmt(v) {
 
 function norm(v) {
   return String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+}
+
+const SEARCH_LANG_CODES = {
+  english: 'en', italian: 'it', spanish: 'es', german: 'de',
+  french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
+};
+
+function normalizeSearchLang(lang) {
+  if (!lang) return '';
+  const n = norm(lang);
+  for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
+    if (n === name || n.includes(name) || n === code) return code;
+  }
+  return n.slice(0, 2);
+}
+
+function listingMatchesLanguage(listing, lang) {
+  if (!lang) return true;
+  const want = normalizeSearchLang(lang);
+  const raw = norm(listing?.language || listing?.properties_hash?.language || '');
+  if (!raw || raw === '?' || raw === 'any') return false;
+  if (raw === want || raw.startsWith(want)) return true;
+  for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
+    if (code === want && (raw.includes(name) || raw === code)) return true;
+  }
+  return false;
+}
+
+function cardMatchesSearchLanguage(card, lang) {
+  if (!lang) return true;
+  if (listingMatchesLanguage({ language: card.language || card.lang }, lang)) return true;
+  const want = normalizeSearchLang(lang);
+  const setId = (card.set?.id || '').toLowerCase();
+  const setName = norm(card.set?.name || '');
+  const markers = {
+    it: ['it', 'ita', 'italian', 'italiano'],
+    ja: ['ja', 'jpn', 'japanese'],
+    de: ['de', 'deu', 'german', 'deutsch'],
+    fr: ['fr', 'fra', 'french', 'francais'],
+    es: ['es', 'spa', 'spanish', 'espanol'],
+    pt: ['pt', 'por', 'portuguese'],
+    ko: ['ko', 'kor', 'korean'],
+  };
+  if (want === 'en') {
+    const foreign = Object.values(markers).flat();
+    return !foreign.some(m => setId.includes(m) || setName.includes(m));
+  }
+  const hints = markers[want];
+  return hints ? hints.some(m => setId.includes(m) || setName.includes(m)) : true;
 }
 
 function normalizeTcgSetCode(raw) {
@@ -3363,6 +3414,24 @@ async function parsePokemonTcgResponse(res, fallbackMsg) {
   return Array.isArray(data.data) ? data.data : [];
 }
 
+async function fetchWithTimeout(url, opts = {}, ms = 15000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  const parent = opts.signal;
+  const onParentAbort = () => ctrl.abort();
+  if (parent?.aborted) {
+    clearTimeout(tid);
+    throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+  }
+  parent?.addEventListener('abort', onParentAbort, { once: true });
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(tid);
+    parent?.removeEventListener('abort', onParentAbort);
+  }
+}
+
 async function fetchCards(query, _unused, signal, pageSize = 20) {
   const opts = {
     headers: { Accept: 'application/json' },
@@ -3376,7 +3445,7 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
   const netErrFallback = 'Connessione non disponibile. Verifica internet e riprova.';
 
   try {
-    const res = await fetch(proxyUrl.href, opts).catch(err => {
+    const res = await fetchWithTimeout(proxyUrl.href, opts).catch(err => {
       rethrowNetworkError(err, netErrFallback);
     });
     return await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
@@ -3389,7 +3458,7 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
   const directUrl = new URL(API_BASE);
   directUrl.searchParams.set('q', query);
   directUrl.searchParams.set('pageSize', String(pageSize));
-  const directRes = await fetch(directUrl.href, opts).catch(err => {
+  const directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
     rethrowNetworkError(err, netErrFallback);
   });
   return parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
@@ -3895,14 +3964,15 @@ function ctTrimListingOutliers(listings) {
   return trimmed.length >= 2 ? trimmed : listings;
 }
 
-function ctAverageConditions(listings) {
+function ctAverageConditions(listings, langFilter = searchLangFilter) {
   const valid = listings
     .map(l => ({
       listing: l,
       price: Number(l.price_cents) / 100,
       currency: (l.price_currency || 'EUR').toUpperCase()
     }))
-    .filter(x => Number.isFinite(x.price) && x.price > 0);
+    .filter(x => Number.isFinite(x.price) && x.price > 0)
+    .filter(x => !langFilter || listingMatchesLanguage(x.listing, langFilter));
 
   const eur = valid.filter(x => x.currency === 'EUR');
   const priced = eur.length ? eur : valid;
@@ -3985,6 +4055,13 @@ function ctAverageConditions(listings) {
   };
 }
 
+function ctLangFilterError(listings, langFilter = searchLangFilter) {
+  if (!langFilter || !listings?.length) return null;
+  const hasAny = listings.some(l => listingMatchesLanguage(l, langFilter));
+  if (hasAny) return null;
+  return `Nessun annuncio CardTrader in ${langFilter} per questa carta. Prova "Qualsiasi" o un'altra lingua.`;
+}
+
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
@@ -3995,6 +4072,13 @@ async function ctGetPriceByBlueprintId(blueprintId) {
 
     if (!listings.length) return {
       error: 'Nessun venditore attivo su CardTrader al momento',
+      blueprintId,
+      url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
+    };
+
+    const langErr = ctLangFilterError(listings);
+    if (langErr) return {
+      error: langErr,
       blueprintId,
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
@@ -4068,6 +4152,13 @@ async function ctGetPrice(card, game = 'pokemon') {
       error: 'Nessun venditore attivo su CardTrader al momento',
       blueprintId: bp.id,
       url: `https://www.cardtrader.com/en/cards/${bp.id}`
+    };
+
+    const langErr = ctLangFilterError(listings);
+    if (langErr) return {
+      error: langErr,
+      blueprintId: bp.id,
+      url: `https://www.cardtrader.com/en/cards/${bp.id}`,
     };
 
     const { conditions, lowestAny } = ctAverageConditions(listings);
@@ -4436,12 +4527,17 @@ async function doSearch() {
     return;
   }
 
-  // Cancel any in-flight search
+  const myGen = ++searchGen;
+  searchLangFilter = lang;
+  priceFetchGen++;
+
+  // Cancel any in-flight search / stale CT price loads
   if (searchCtrl) searchCtrl.abort();
   searchCtrl = new AbortController();
 
   // Reset UI
   selectedCard = null;
+  selectedCtListing = null;
   choicePriceCache.clear();
   ctPriceData = null;
   $('resultCard').hidden = true;
@@ -4452,18 +4548,26 @@ async function doSearch() {
 
   try {
     const cards = await runSearch(name, number, cardSet, lang, null, searchCtrl.signal);
+    if (myGen !== searchGen) return;
     if (cards.length === 0) {
-      showMsg('Nessuna carta trovata. Prova con un termine diverso.', 'warning');
+      const langHint = lang ? ` per lingua ${lang}` : '';
+      showMsg(`Nessuna carta trovata${langHint}. Prova con un termine diverso.`, 'warning');
       return;
     }
-    showMsg(cards.length === 1 ? 'Carta trovata!' : `Trovate ${cards.length} carte — seleziona quella corretta.`, 'success');
+    const langNote = lang ? ` · lingua ${lang}` : '';
+    showMsg(
+      cards.length === 1
+        ? `Carta trovata${langNote}!`
+        : `Trovate ${cards.length} carte${langNote} — seleziona quella corretta.`,
+      'success'
+    );
     if (cards.length === 1) {
       selectCard(cards[0]);
     } else {
       renderChoices(cards);
     }
   } catch (e) {
-    if (e.name === 'AbortError') return;
+    if (e.name === 'AbortError' || myGen !== searchGen) return;
     console.error(e);
     const msg = e.status === 404
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev in locale.'
@@ -4472,7 +4576,7 @@ async function doSearch() {
         : networkFetchErrorMessage(e, e.message || 'Errore durante la ricerca. Controlla la connessione.');
     showMsg(msg, 'error');
   } finally {
-    setSearchLoading(false);
+    if (myGen === searchGen) setSearchLoading(false);
   }
 }
 
@@ -4539,6 +4643,10 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   }
   if (name && cards.length) {
     cards = cards.filter(c => norm(c.name || '').includes(nn));
+  }
+  if (lang && cards.length) {
+    const byLang = cards.filter(c => cardMatchesSearchLanguage(c, lang));
+    if (byLang.length) cards = byLang;
   }
 
   return cards;
@@ -4727,13 +4835,19 @@ function selectCard(card) {
     return;
   }
 
+  const priceGen = priceFetchGen;
   ctGetPrice(card).then(result => {
+    if (priceGen !== priceFetchGen) return;
     ctPriceData = result;
     if (result?.price && !result.error) {
       basePrice = result.price;
       priceSrc = 'CardTrader';
       choicePriceCache.set(choiceCacheKey(card), { price: result.price, src: 'CardTrader', ct: result });
     }
+    renderResult();
+  }).catch(err => {
+    if (priceGen !== priceFetchGen) return;
+    console.warn('ctGetPrice:', err);
     renderResult();
   });
 }
