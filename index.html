@@ -2866,6 +2866,8 @@ window.addEventListener('unhandledrejection', function(event) {
   alert("🚨 PROMISE FALLITA:\n" + event.reason);
 });
 
+const $ = (id) => document.getElementById(id);
+
 (function initViewport() {
   const root = document.documentElement;
   let lastLayoutWidth = window.innerWidth;
@@ -3094,9 +3096,6 @@ let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
 const suggCache     = new Map();
-
-// ── DOM ──────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
 
 // ── Utilities ────────────────────────────────────────────────────────
 function fmt(v) {
@@ -4179,14 +4178,14 @@ function renderCtSection() {
 }
 
 // ── Autocomplete ─────────────────────────────────────────────────────
-$('pokemonName').addEventListener('input', () => {
+document.getElementById('pokemonName')?.addEventListener('input', () => {
   const name = $('pokemonName').value.trim();
   clearTimeout(suggTimer);
   if (name.length < 1) { hideSuggestions(); return; }
   suggTimer = setTimeout(() => loadSuggestions(name), 180);
 });
 
-$('pokemonName').addEventListener('focus', () => {
+document.getElementById('pokemonName')?.addEventListener('focus', () => {
   const name = $('pokemonName').value.trim();
   if (name.length >= 1) loadSuggestions(name);
 });
@@ -4328,7 +4327,7 @@ function hideAllSuggestions() {
   hideSetSuggestions();
 }
 
-$('cardSet')?.addEventListener('input', () => {
+document.getElementById('cardSet')?.addEventListener('input', () => {
   $('cardSetId').value = '';
   clearTimeout(setSuggTimer);
   const v = $('cardSet').value.trim();
@@ -4336,12 +4335,12 @@ $('cardSet')?.addEventListener('input', () => {
   setSuggTimer = setTimeout(() => renderSetSuggestions(filterSetSuggestions(v)), 150);
 });
 
-$('cardSet')?.addEventListener('focus', () => {
+document.getElementById('cardSet')?.addEventListener('focus', () => {
   const v = $('cardSet').value.trim();
   if (v.length >= 1) renderSetSuggestions(filterSetSuggestions(v));
 });
 
-$('cardSet')?.addEventListener('keydown', e => {
+document.getElementById('cardSet')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     hideSetSuggestions();
     doSearch();
@@ -4362,16 +4361,16 @@ function searchLocal(name, number, set, lang) {
 }
 
 // ── Main search ───────────────────────────────────────────────────────
-$('searchBtn').addEventListener('click', doSearch);
-$('pokemonName').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-$('cardNumber').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('searchBtn')?.addEventListener('click', doSearch);
+document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
-$('condSelect')?.addEventListener('change', e => {
+document.getElementById('condSelect')?.addEventListener('change', e => {
   selectedQuality = e.target.value;
   if (selectedCard) renderResult();
 });
 
-$('cardQty')?.addEventListener('input', () => {
+document.getElementById('cardQty')?.addEventListener('input', () => {
   if (selectedCard) renderResult();
 });
 
@@ -4806,7 +4805,7 @@ function bindCollectionActions() {
   });
 }
 
-$('clearBtn').addEventListener('click', () => {
+document.getElementById('clearBtn')?.addEventListener('click', () => {
   const before = collection.length;
   collection = collection.filter(item => (item.game || 'pokemon') !== activeGame);
   persistLocalCollection();
@@ -5428,7 +5427,7 @@ function renderCollection() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────
-$('exportCsvBtn').addEventListener('click', () => {
+document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
   const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
   if (!items.length) return;
   const rows = [['Nome','Set','SetID','Numero','Lingua','Condizione','Prezzo (€)']];
@@ -5439,7 +5438,7 @@ $('exportCsvBtn').addEventListener('click', () => {
   dlBlob(csv, 'text/csv;charset=utf-8;', `dls-${activeGame}-lista.csv`);
 });
 
-$('exportJsonBtn').addEventListener('click', () => {
+document.getElementById('exportJsonBtn')?.addEventListener('click', () => {
   const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
   if (!items.length) return;
   const payload = {
@@ -5472,14 +5471,14 @@ const GAME_UI = {
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
   ['authOverlay', 'profileOverlay'].forEach(id => {
-    const el = $(id);
+    const el = document.getElementById(id);
     if (el) el.classList.add('is-closed');
   });
   document.getElementById('installIosSheet')?.remove();
 }
 
 function bindAccountButton() {
-  const btn = $('userBtn');
+  const btn = document.getElementById('userBtn');
   if (!btn || btn.dataset.bound === '1') return;
   btn.dataset.bound = '1';
   btn.addEventListener('click', e => {
@@ -5495,9 +5494,6 @@ function bindGameTabs() {
     tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
   });
 }
-
-bindGameTabs();
-bindAccountButton();
 
 function switchActiveGame(game) {
   if (!game || !GAME_UI[game]) return;
@@ -6231,39 +6227,41 @@ function showAuthErr(id, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
 
-$('authClose')?.addEventListener('click', closeAuthModal);
-$('authOverlay')?.addEventListener('click', e => {
-  if (e.target === $('authOverlay') && !$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
+document.getElementById('authClose')?.addEventListener('click', closeAuthModal);
+const authOverlayEl = document.getElementById('authOverlay');
+authOverlayEl?.addEventListener('click', e => {
+  if (e.target === authOverlayEl && !authOverlayEl.classList.contains('is-closed')) closeAuthModal();
 });
-$('emailLoginBtn')?.addEventListener('click', submitAuthForm);
-$('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
-$('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
-$('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
-$('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
+document.getElementById('emailLoginBtn')?.addEventListener('click', submitAuthForm);
+document.getElementById('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
+document.getElementById('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
+document.getElementById('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
+document.getElementById('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
 
-$('profileClose')?.addEventListener('click', closeProfilePanel);
-$('profileOverlay')?.addEventListener('click', e => {
-  if (e.target === $('profileOverlay') && !$('profileOverlay')?.classList.contains('is-closed')) closeProfilePanel();
+document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
+const profileOverlayEl = document.getElementById('profileOverlay');
+profileOverlayEl?.addEventListener('click', e => {
+  if (e.target === profileOverlayEl && !profileOverlayEl.classList.contains('is-closed')) closeProfilePanel();
 });
-$('profileLogoutBtn')?.addEventListener('click', () => {
+document.getElementById('profileLogoutBtn')?.addEventListener('click', () => {
   closeProfilePanel();
   clearSession();
   updateAuthUI();
   showMsg('Logout effettuato', 'success');
 });
-$('profileAvatarPickBtn')?.addEventListener('click', () => $('profileAvatarInput')?.click());
-$('profileAvatarEditBtn')?.addEventListener('click', () => $('profileAvatarInput')?.click());
-$('profileAvatarInput')?.addEventListener('change', e => {
+document.getElementById('profileAvatarPickBtn')?.addEventListener('click', () => document.getElementById('profileAvatarInput')?.click());
+document.getElementById('profileAvatarEditBtn')?.addEventListener('click', () => document.getElementById('profileAvatarInput')?.click());
+document.getElementById('profileAvatarInput')?.addEventListener('change', e => {
   const file = e.target.files?.[0];
   e.target.value = '';
   handleAvatarPick(file);
 });
-$('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
+document.getElementById('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
   if (!dlsUser?.avatar) return;
   try {
     await saveUserProfile({ avatar: null });
     renderUserAvatar($('profileAvatarLg'), dlsUser);
-    $('profileAvatarRemoveBtn').hidden = true;
+    document.getElementById('profileAvatarRemoveBtn').hidden = true;
     showMsg('Foto profilo rimossa', 'success');
   } catch (e) {
     showMsg(e.message || 'Errore', 'error');
@@ -6360,7 +6358,7 @@ async function refreshAllPrices() {
   renderCollection();
 }
 
-$('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
+document.getElementById('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
 
 // Auto-refresh ogni 30 minuti se l'utente è loggato
 setInterval(() => { if (dlsUser) refreshAllPrices(); }, 30 * 60 * 1000);
@@ -6383,7 +6381,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=36').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=37').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6547,7 +6545,7 @@ window.addEventListener('appinstalled', () => {
   showMsg('✅ DLS Tracker installato con successo!', 'success');
 });
 
-$('installAppBtn')?.addEventListener('click', triggerInstallFlow);
+document.getElementById('installAppBtn')?.addEventListener('click', triggerInstallFlow);
 
 window.addEventListener('load', () => {
   if (!isStandaloneApp()) {
@@ -6578,6 +6576,8 @@ window.addEventListener('load', () => {
   }
 });
 
+bindGameTabs();
+bindAccountButton();
 initApp();
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
