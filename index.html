@@ -1547,6 +1547,24 @@
       background: var(--surface-3);
       font-size: 0.82rem;
     }
+    button.ct-cond-row {
+      width: 100%;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button.ct-cond-row:hover:not(.ct-cond-nm) {
+      background: var(--surface-2);
+      border-color: var(--border);
+    }
+    button.ct-cond-row:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
     .ct-cond-nm {
       background: rgba(52,211,153,0.08);
       border: 1px solid rgba(52,211,153,0.18);
@@ -2865,6 +2883,25 @@ const QUALITY = {
 
 const CT_QUALITY_TO_COND = { NM: 'NM', EX: 'EX', GOOD: 'GOOD', PLAYED: 'PLAYED', POOR: 'POOR' };
 
+function qualityKeyFromCtCond(ctKey) {
+  if (QUALITY[ctKey]) return ctKey;
+  const match = Object.entries(CT_QUALITY_TO_COND).find(([, v]) => v === ctKey);
+  return match ? match[0] : 'NM';
+}
+
+function selectCtCondition(qualityKey) {
+  if (!QUALITY[qualityKey]) return;
+  selectedQuality = qualityKey;
+  if ($('condSelect')) $('condSelect').value = qualityKey;
+  if (selectedCard) renderResult();
+}
+
+function bindPokemonCtConditionRows() {
+  $('resultContent')?.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
+    row.addEventListener('click', () => selectCtCondition(qualityKeyFromCtCond(row.dataset.qualityKey)));
+  });
+}
+
 // Alias mantenuto per compatibilità con il catalogo locale
 const SET_ALIASES = {
   obf:               { id: 'sv3',    name: 'Obsidian Flames' },
@@ -3234,26 +3271,33 @@ function apiFetchError(res, fallback) {
   });
 }
 
-async function fetchCards(query, _unused, signal, pageSize = 20) {
-  const url = new URL('/api/pokemontcg', location.origin);
-  url.searchParams.set('q', query);
-  url.searchParams.set('pageSize', String(pageSize));
-  const res = await fetch(url.href, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    credentials: 'same-origin',
-    cache: 'no-store',
-    mode: 'cors',
-    signal,
-  });
+async function parsePokemonTcgResponse(res, fallbackMsg) {
   if (!res.ok) {
     if (res.status === 404) {
       throw Object.assign(new Error('API non disponibile. Usa la versione online o avvia netlify dev.'), { status: 404 });
     }
-    await apiFetchError(res, `Errore Pokémon TCG (${res.status})`);
+    await apiFetchError(res, fallbackMsg);
   }
   const data = await res.json();
   return Array.isArray(data.data) ? data.data : [];
+}
+
+async function fetchCards(query, _unused, signal, pageSize = 20) {
+  const opts = { headers: { Accept: 'application/json' }, signal };
+  const proxyUrl = `/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
+
+  try {
+    const res = await fetch(proxyUrl, opts);
+    return await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    if (e.status && e.status !== 404) throw e;
+  }
+
+  // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
+  const directUrl = `${API_BASE}?q=${encodeURIComponent(query)}&pageSize=${pageSize}`;
+  const directRes = await fetch(directUrl, opts);
+  return parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
 }
 
 // ── CardTrader API (proxy server-side: /api/cardtrader) ───────────────
@@ -4033,12 +4077,12 @@ function renderCtSection() {
     const foilMark = c.foil ? ' ✨' : '';
     const isSelected = c.key === selectedCtCond;
     return `
-      <div class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}">
-        <span class="ct-cond-label">${c.label}${isSelected ? ' ← selezionata' : ''}</span>
+      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
+        <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
         <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
         <span class="ct-cond-meta">Min CT${foilMark}</span>
         <span class="ct-cond-count">Min. Cardmarket · ${c.count} ann.</span>
-      </div>`;
+      </button>`;
   }).join('');
 
   return `
@@ -4264,7 +4308,10 @@ $('cardQty')?.addEventListener('input', () => {
 });
 
 async function doSearch() {
-  if (activeGame !== 'pokemon') switchActiveGame('pokemon');
+  if (activeGame !== 'pokemon') {
+    switchActiveGame('pokemon');
+    if (activeGame !== 'pokemon') activeGame = 'pokemon';
+  }
 
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
@@ -4612,6 +4659,7 @@ function renderResult() {
   `;
 
   $('addBtn').addEventListener('click', addToCollection);
+  bindPokemonCtConditionRows();
 }
 
 // ── Collection ────────────────────────────────────────────────────────
@@ -5077,12 +5125,12 @@ function tcgRenderResult(gameKey, bp, prices) {
         ${(prices.conditions || []).map(c => {
           const isSelected = c.key === selectedCtCond;
           return `
-          <div class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}">
-            <span class="ct-cond-label">${c.label}${isSelected ? ' ← selezionata' : ''}</span>
+          <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
+            <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
             <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
             <span class="ct-cond-meta">Minimo</span>
             <span class="ct-cond-count">${c.count} annunci CT</span>
-          </div>`;
+          </button>`;
         }).join('')}
       </div>
       <div class="ct-footer-row">
@@ -5116,6 +5164,14 @@ function tcgRenderResult(gameKey, bp, prices) {
       <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''}) ×${qty}</button>
     </div>`;
   card.hidden = false;
+  card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
+    row.addEventListener('click', () => {
+      const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
+      const sel = $(cfg.condField);
+      if (sel) sel.value = qKey;
+      tcgRenderResult(gameKey, bp, prices);
+    });
+  });
 }
 
 window.tcgAddToCollection = async function(gameKey) {
@@ -6244,7 +6300,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=35').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=36').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6414,7 +6470,11 @@ window.addEventListener('load', () => {
   if (!isStandaloneApp()) {
     localStorage.removeItem('dls_install_dismissed');
   }
-  updateInstallUi();
+  try {
+    updateInstallUi();
+  } catch (err) {
+    console.warn('[PWA] updateInstallUi fallito:', err);
+  }
   document.addEventListener('focusin', e => {
     if (!e.target.matches('input, select, textarea')) return;
     document.getElementById('installBanner')?.classList.add('keyboard-open');
@@ -6425,9 +6485,13 @@ window.addEventListener('load', () => {
       document.getElementById('installBanner')?.classList.remove('keyboard-open');
     }, 120);
   });
-  if (canShowInstallBanner() && isIosDevice() && !sessionStorage.getItem('dls_install_banner_shown')) {
-    sessionStorage.setItem('dls_install_banner_shown', '1');
-    setTimeout(showInstallBanner, 1400);
+  try {
+    if (canShowInstallBanner() && isIosDevice() && !sessionStorage.getItem('dls_install_banner_shown')) {
+      sessionStorage.setItem('dls_install_banner_shown', '1');
+      setTimeout(showInstallBanner, 1400);
+    }
+  } catch (err) {
+    console.warn('[PWA] Banner iOS non mostrato:', err);
   }
 });
 
