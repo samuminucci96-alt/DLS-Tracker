@@ -1,4 +1,4 @@
-const CACHE = 'dls-tracker-v38';
+const CACHE = 'dls-tracker-v39';
 
 // Solo asset statici per installabilità PWA — nessun fetch handler (API/login/ricerca passano dal browser)
 const PRECACHE = [
