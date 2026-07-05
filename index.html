@@ -2845,6 +2845,14 @@
 <script src="onepiece-sets.js"></script>
 <script src="riftbound-sets.js"></script>
 <script>
+window.onerror = function(message, source, lineno, colno, error) {
+  alert("🚨 CRASH JS:\n" + message + "\nRiga: " + lineno + "\nFile: " + source);
+  return false;
+};
+window.addEventListener('unhandledrejection', function(event) {
+  alert("🚨 PROMISE FALLITA:\n" + event.reason);
+});
+
 (function initViewport() {
   const root = document.documentElement;
   let lastLayoutWidth = window.innerWidth;
