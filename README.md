@@ -16,7 +16,20 @@ Una **Progressive Web App** (PWA) moderna, installabile su smartphone senza App 
 5. Premi **Cerca Carta**
 6. Seleziona la carta corretta dall'elenco
 7. Scegli la **condizione** (NM, EX, GOOD, PLAYED, POOR)
-8. Premi **Aggiungi alla collezione**
+8. (Opzionale) Inserisci un **prezzo manuale** se vuoi sovrascrivere il prezzo live/stimato
+9. Premi **Aggiungi alla collezione**
+
+### 1.b Prezzo manuale: quando usarlo
+
+Usa il prezzo manuale quando:
+- il prezzo live non è disponibile (API temporaneamente non raggiungibile)
+- vuoi allineare il valore alla tua valutazione reale (carta gradita, comprata in blocco, promozione)
+- desideri mantenere coerenza con un marketplace specifico non coperto
+
+Comportamento in app:
+- Il prezzo manuale ha priorità sul prezzo live e sulla stima
+- Puoi rimuoverlo in qualsiasi momento con **Reset**
+- Nella conferma di aggiunta viene indicato se il prezzo usato è manuale
 
 ### 2. Gestire la collezione
 - **Visualizza statistiche**: totale carte, valore stimato, prezzo medio
@@ -190,6 +203,7 @@ netlify deploy --prod
 
 ✅ **Ricerca carte** (Pokémon, One Piece, Riftbound)  
 ✅ **Prezzi in tempo reale** da CardTrader  
+✅ **Override prezzo manuale** prima dell'aggiunta in collezione  
 ✅ **Valutazione condizioni** (NM, EX, GOOD, PLAYED, POOR)  
 ✅ **Gestione collezione** (add/edit/delete)  
 ✅ **Statistiche** (totale, valore, prezzo medio)  
@@ -203,55 +217,54 @@ netlify deploy --prod
 
 ---
 
-## 📝 TODO & Roadmap
-
-### 🔴 Priorità Alta
-- [ ] **Magic TCG support** – Aggiungere Magic: The Gathering con API Scryfall
-- [ ] **Scanlation prices** – Integrare Cardmarket e altre fonti di prezzi oltre CardTrader
-- [ ] **Collection sharing** – Link pubblici per condividere collezione (read-only)
-- [ ] **Image preview** – Mostrare l'immagine della carta nella modal di ricerca
-- [ ] **Batch import** – Caricare CSV/JSON di carte in bulk
-- [ ] **Collezione per user** – Login e sincronizzazione automatica tra dispositivi
-
-### 🟡 Priorità Media
-- [ ] **Statistics dashboard** – Grafici andamento valore nel tempo (Time Series)
-- [ ] **Wishlist** – Elenco carte desiderate con notifica di prezzo
-- [ ] **Set filters** – Filtrare per set, tipo, rarity, colore
-- [ ] **Grading integration** – Connessione con PSA/BGS per carte gradite
-- [ ] **Barcode scanner** – QR/Code128 per aggiungere carte via fotocamera
-- [ ] **Competitive pricing** – Mostrare prezzi da più rivenditori a confronto
-- [ ] **PWA icon cache** – Ottimizzare icone per offline con versioning migliorato
-- [ ] **Language switching** – Multi-lingua (EN, IT, ES, FR)
-
-### 🟢 Priorità Bassa (Polish)
-- [ ] **Dark mode** – Tema scuro con toggle
-- [ ] **Animations** – Transizioni smooth per add/remove carte
-- [ ] **Notifications** – Toast notifiche per azioni (importate, prezzo cambiato)
-- [ ] **Favourites** – Segnare carte preferite
-- [ ] **Duplicate detection** – Avviso quando aggiungi una carta già in collezione
-- [ ] **Offline sync queue** – Coda di azioni offline, sync al ritorno online
-- [ ] **Advanced filters** – Ricerca avanzata (multi-criteria)
-- [ ] **Performance audit** – Lighthouse optimization
-- [ ] **Unit tests** – Test suite per funzioni critiche
-- [ ] **E2E tests** – Test Playwright per flussi utente
-
-### 🎯 Espansioni Future (Post-MVP)
-- [ ] **TCG World Tracker** – Database mondiale di prezzi storici
-- [ ] **Community ratings** – Sistema di valutazione carte da community
-- [ ] **Trading marketplace** – Borsa per scambi (peer-to-peer)
-- [ ] **Mobile app nativa** – React Native per iOS/Android con app store
-- [ ] **Telegram/Discord bot** – Comandi per ricerca carte via bot
-- [ ] **Browser extension** – Integrazione prezzi su siti di vendita
-- [ ] **Admin panel** – Dashboard per gestire espansioni e prezzari
-
----
-
 ## 🐛 Known Issues & Limitations
 
 - ⚠️ **CORS CardTrader**: Se self-hosted senza Netlify Functions, i prezzi richiederanno un proxy
 - ⚠️ **Rate limiting**: PokéTCG ha limite di 100 req/s (può bloccare in caso di spike)
 - ⚠️ **Prezzi non real-time**: CardTrader aggiorna ogni ~5-10 min, non al millisecondo
 - ⚠️ **Cache Service Worker**: Aggiornamenti del dataset delle espansioni richiedono cache bust manuale (v32, v33, ecc.)
+
+### Troubleshooting rapido: errore "Pokémon TCG (403)"
+
+Significato:
+- Il server ha rifiutato la richiesta (Forbidden)
+
+Cause più comuni:
+- Variabile ambiente `POKEMON_TCG_API_KEY` assente, non valida o revocata su Netlify
+- Limitazioni temporanee lato provider API
+
+Cosa verificare:
+1. Netlify → Site settings → Environment variables → `POKEMON_TCG_API_KEY`
+2. Function logs della route `/api/pokemontcg`
+3. Riprova la ricerca: se necessario usa il prezzo manuale per non bloccare l'inserimento
+
+---
+
+## 👩‍💻 Note per Sviluppatori
+
+### Prezzo manuale: regole tecniche
+
+- Il prezzo manuale è un override esplicito lato UI prima del salvataggio in collezione
+- Se presente, viene usato come `price` finale dell'item
+- L'item salva anche `manualPrice: true` per distinguere i record non derivati da feed live
+- Se non presente, il flusso mantiene priorità: annuncio CT selezionato → minimo condizione → stima
+
+### Impatto su data model collezione
+
+Campi coinvolti per riga:
+- `price`: valore finale usato nei totali
+- `ctPrice`: valorizzato solo quando il prezzo deriva da CardTrader live
+- `manualPrice`: booleano per audit e UI futura
+- `basePrice`: riferimento NM usato per calcoli/stime di condizione
+
+### Suggerimenti di manutenzione
+
+- Quando modifichi il pricing, valida sempre i casi:
+    - prezzo live disponibile
+    - prezzo live mancante
+    - prezzo manuale inserito e poi resettato
+- Mantieni coerenti i messaggi utente (live/stima/manuale) tra schermata risultato e conferma aggiunta
+- In test E2E, copri almeno un flusso con override manuale attivo
 
 ---
 

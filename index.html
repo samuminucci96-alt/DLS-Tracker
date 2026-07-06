@@ -3142,6 +3142,8 @@ let suggTimer       = null;
 let deferredPrompt  = null;
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
+let manualPokemonPrice = null;
+let manualPokemonPriceRaw = '';
 const suggCache     = new Map();
 
 // ── Utilities ────────────────────────────────────────────────────────
@@ -3151,6 +3153,60 @@ function fmt(v) {
 
 function norm(v) {
   return String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+}
+
+function parseManualPrice(raw) {
+  const val = String(raw || '').trim();
+  if (!val) return null;
+  const parsed = Number(val.replace(',', '.'));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parseFloat(parsed.toFixed(2));
+}
+
+function pokemonManualPriceUnit() {
+  const parsed = parseManualPrice(manualPokemonPriceRaw);
+  if (parsed == null) return manualPokemonPrice;
+  return parsed;
+}
+
+function pokemonEffectivePrice(selectedPrice) {
+  const manualUnit = pokemonManualPriceUnit();
+  if (manualUnit != null) {
+    return {
+      unit: manualUnit,
+      manual: true,
+      source: 'Prezzo manuale',
+      fromCt: false,
+      condition: null,
+    };
+  }
+  return {
+    ...selectedPrice,
+    manual: false,
+  };
+}
+
+function applyPokemonManualPrice() {
+  if (!manualPokemonPriceRaw.trim()) {
+    manualPokemonPrice = null;
+    renderResult();
+    return;
+  }
+  const parsed = parseManualPrice(manualPokemonPriceRaw);
+  if (parsed == null) {
+    showMsg('Prezzo manuale non valido. Usa un numero maggiore di 0.', 'warning');
+    return;
+  }
+  manualPokemonPrice = parsed;
+  manualPokemonPriceRaw = String(parsed).replace('.', ',');
+  showMsg(`Prezzo manuale applicato: ${fmt(parsed)}.`, 'info');
+  renderResult();
+}
+
+function clearPokemonManualPrice() {
+  manualPokemonPrice = null;
+  manualPokemonPriceRaw = '';
+  renderResult();
 }
 
 const SEARCH_LANG_CODES = {
@@ -4555,6 +4611,8 @@ async function doSearch() {
   // Reset UI
   selectedCard = null;
   selectedCtListing = null;
+  manualPokemonPrice = null;
+  manualPokemonPriceRaw = '';
   choicePriceCache.clear();
   ctPriceData = null;
   $('resultCard').hidden = true;
@@ -4827,6 +4885,8 @@ function selectCard(card) {
   selectedCard = card;
   selectedQuality = $('condSelect')?.value || 'NM';
   selectedCtListing = null;
+  manualPokemonPrice = null;
+  manualPokemonPriceRaw = '';
 
   const cached = choicePriceCache.get(choiceCacheKey(card));
   if (cached?.ct && cached.price != null && !cached.ct.error) {
@@ -4873,14 +4933,17 @@ function renderResult() {
   const card = selectedCard;
   const img  = getImg(card);
   const selectedPrice = getSelectedUnitPrice();
-  const calc = selectedPrice.unit;
+  const effectivePrice = pokemonEffectivePrice(selectedPrice);
+  const calc = effectivePrice.unit;
   const qty  = parseInt($('cardQty')?.value) || 1;
 
-  const srcLabel = selectedPrice.fromCt
-    ? `<span style="color:var(--success);font-weight:600;">${escHtml(selectedPrice.source)} ✓</span>`
-    : selectedPrice.condition
-      ? `<span style="color:var(--success);font-weight:600;">${escHtml(selectedPrice.source)} ✓</span>`
-      : `<span style="color:var(--text-muted);font-style:italic;">${escHtml(selectedPrice.source)}</span>`;
+  const srcLabel = effectivePrice.manual
+    ? `<span style="color:var(--accent);font-weight:700;">Prezzo manuale applicato</span>`
+    : effectivePrice.fromCt
+      ? `<span style="color:var(--success);font-weight:600;">${escHtml(effectivePrice.source)} ✓</span>`
+      : effectivePrice.condition
+        ? `<span style="color:var(--success);font-weight:600;">${escHtml(effectivePrice.source)} ✓</span>`
+        : `<span style="color:var(--text-muted);font-style:italic;">${escHtml(effectivePrice.source)}</span>`;
 
   $('resultContent').innerHTML = `
     <div class="result-layout">
@@ -4899,12 +4962,18 @@ function renderResult() {
         </div>
         <div class="price-box">
           <div class="price-row">
-            <span class="price-lbl">Prezzo min Cardmarket · ${selectedQuality}</span>
+            <span class="price-lbl">Prezzo usato per l'aggiunta · ${selectedQuality}</span>
             <span class="price-val lg">${fmt(calc)}</span>
           </div>
           <div class="price-row">
             <span class="price-lbl">Fonte</span>
             <span>${srcLabel}</span>
+          </div>
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Prezzo manuale (€)</span>
+            <input id="manualPokemonPriceInput" type="text" inputmode="decimal" placeholder="Es. 12,50" value="${escHtml(manualPokemonPriceRaw)}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
+            <button id="applyPokemonManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;">Applica</button>
+            <button id="clearPokemonManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;" ${manualPokemonPrice == null && !manualPokemonPriceRaw.trim() ? 'disabled' : ''}>Reset</button>
           </div>
           ${basePrice && selectedQuality !== 'NM' ? `
           <div class="price-row">
@@ -4918,11 +4987,22 @@ function renderResult() {
     ${renderCtSection()}
 
     <button class="btn btn-success" id="addBtn">
-      ＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}
+      ＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}
     </button>
   `;
 
   $('addBtn').addEventListener('click', addToCollection);
+  $('manualPokemonPriceInput')?.addEventListener('input', (e) => {
+    manualPokemonPriceRaw = e.target.value;
+  });
+  $('manualPokemonPriceInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyPokemonManualPrice();
+    }
+  });
+  $('applyPokemonManualPriceBtn')?.addEventListener('click', applyPokemonManualPrice);
+  $('clearPokemonManualPriceBtn')?.addEventListener('click', clearPokemonManualPrice);
   bindPokemonCtConditionRows();
   bindPokemonCtListingRows();
 }
@@ -4932,7 +5012,8 @@ async function addToCollection() {
   if (!selectedCard) return;
   const qty   = Math.max(1, Math.min(99, parseInt($('cardQty')?.value) || 1));
   const selPrice = getSelectedUnitPrice();
-  const unit  = parseFloat(selPrice.unit.toFixed(2));
+  const effectivePrice = pokemonEffectivePrice(selPrice);
+  const unit  = parseFloat(Number(effectivePrice.unit || 0).toFixed(2));
   if (!unit) {
     showMsg(`Nessun prezzo disponibile per ${QUALITY[selectedQuality]?.label || selectedQuality}.`, 'warning');
     return;
@@ -4950,8 +5031,9 @@ async function addToCollection() {
       condition: selectedQuality,
       price: unit,
       basePrice,
-      priceSrc,
-      ctPrice: selPrice.fromCt || selPrice.condition ? unit : null,
+      priceSrc: effectivePrice.manual ? 'Manuale' : priceSrc,
+      ctPrice: effectivePrice.manual ? null : (selPrice.fromCt || selPrice.condition ? unit : null),
+      manualPrice: effectivePrice.manual || false,
       img: getImg(selectedCard),
       imgUrl: getImg(selectedCard),
       addedAt: new Date().toISOString(),
@@ -4968,7 +5050,9 @@ async function addToCollection() {
     localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
   }
 
-  const srcNote = selPrice.fromCt || selPrice.condition ? '' : ' (stima)';
+  const srcNote = effectivePrice.manual
+    ? ' (manuale)'
+    : (selPrice.fromCt || selPrice.condition ? '' : ' (stima)');
   showMsg(
     qty > 1
       ? `${qty}× ${selectedCard.name} · ${selectedQuality} · ${fmt(unit)}${srcNote} aggiunte alla collezione.`
@@ -5060,9 +5144,44 @@ const CT_TCG_CONFIG = {
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
 };
+
+function tcgManualPriceUnit(gameKey) {
+  const state = ctTcgState[gameKey];
+  if (!state) return null;
+  const parsed = parseManualPrice(state.manualPriceRaw);
+  if (parsed == null) return state.manualPrice;
+  return parsed;
+}
+
+function applyTcgManualPrice(gameKey) {
+  const state = ctTcgState[gameKey];
+  if (!state) return;
+  if (!state.manualPriceRaw.trim()) {
+    state.manualPrice = null;
+    if (state.selected) tcgRenderResult(gameKey, state.selected, state.prices);
+    return;
+  }
+  const parsed = parseManualPrice(state.manualPriceRaw);
+  if (parsed == null) {
+    tcgShowMsg(gameKey, 'Prezzo manuale non valido. Usa un numero maggiore di 0.', 'warn');
+    return;
+  }
+  state.manualPrice = parsed;
+  state.manualPriceRaw = String(parsed).replace('.', ',');
+  if (state.selected) tcgRenderResult(gameKey, state.selected, state.prices);
+  tcgShowMsg(gameKey, `Prezzo manuale applicato: ${fmt(parsed)}.`, 'info');
+}
+
+function clearTcgManualPrice(gameKey) {
+  const state = ctTcgState[gameKey];
+  if (!state) return;
+  state.manualPrice = null;
+  state.manualPriceRaw = '';
+  if (state.selected) tcgRenderResult(gameKey, state.selected, state.prices);
+}
 
 function tcgShowMsg(gameKey, msg, type = 'info') {
   const cfg = CT_TCG_CONFIG[gameKey];
@@ -5270,6 +5389,8 @@ async function tcgDoSearch(gameKey) {
   $(`${cfg.prefix}ResultCard`).hidden = true;
   ctTcgState[gameKey].selected = null;
   ctTcgState[gameKey].prices = null;
+  ctTcgState[gameKey].manualPrice = null;
+  ctTcgState[gameKey].manualPriceRaw = '';
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
 
   try {
@@ -5343,6 +5464,8 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   ctTcgState[gameKey].selected = bp;
   ctTcgState[gameKey].prices = null;
   ctTcgState[gameKey].selectedListing = null;
+  ctTcgState[gameKey].manualPrice = null;
+  ctTcgState[gameKey].manualPriceRaw = '';
   tcgRenderResult(gameKey, bp, null);
 
   try {
@@ -5368,6 +5491,16 @@ function getTcgUnitPrice(gameKey) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const qKey = $(cfg.condField)?.value || 'NM';
   const prices = ctTcgState[gameKey].prices;
+  const manualUnit = tcgManualPriceUnit(gameKey);
+  if (manualUnit != null) {
+    return {
+      unit: manualUnit,
+      fromCt: false,
+      manual: true,
+      source: 'Prezzo manuale',
+      ctCond: null,
+    };
+  }
   if (!prices || prices.error) return null;
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const picked = ctTcgState[gameKey].selectedListing;
@@ -5380,7 +5513,10 @@ function getTcgUnitPrice(gameKey) {
       source: `CardTrader · annuncio${picked.seller ? ` · ${picked.seller}` : ''}`,
     };
   }
-  return resolved;
+  return {
+    ...resolved,
+    manual: false,
+  };
 }
 
 function tcgRenderResult(gameKey, bp, prices) {
@@ -5389,7 +5525,7 @@ function tcgRenderResult(gameKey, bp, prices) {
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
   const qKey = $(cfg.condField)?.value || 'NM';
   const qLabel = QUALITY[qKey]?.label || qKey;
-  const selPrice = prices && !prices.error ? getTcgUnitPrice(gameKey) : null;
+  const selPrice = getTcgUnitPrice(gameKey);
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const qty = parseInt($(cfg.qtyField)?.value) || 1;
   const priceHtml = !prices ? '<div class="ct-loading"><div class="spinner"></div><span>Caricamento prezzi…</span></div>'
@@ -5402,8 +5538,8 @@ function tcgRenderResult(gameKey, bp, prices) {
           <span class="ct-price-hero-val">${fmt(selPrice.unit)}</span>
         </div>
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">${selPrice.fromCt ? 'Da annunci CT reali' : 'Stima (nessun annuncio in questa condizione)'}</span>
-          <span class="ct-price-hero-val muted">${selPrice.fromCt ? `${selPrice.ctCond?.count || 0} annunci` : '—'}</span>
+          <span class="ct-price-hero-lbl">${selPrice.manual ? 'Prezzo inserito manualmente' : (selPrice.fromCt ? 'Da annunci CT reali' : 'Stima (nessun annuncio in questa condizione)')}</span>
+          <span class="ct-price-hero-val muted">${selPrice.manual ? 'override attivo' : (selPrice.fromCt ? `${selPrice.ctCond?.count || 0} annunci` : '—')}</span>
         </div>
       </div>` : ''}
       <div class="ct-cond-grid">
@@ -5443,13 +5579,32 @@ function tcgRenderResult(gameKey, bp, prices) {
           <div class="ct-header">CardTrader — Prezzi Mercato <span class="ct-badge live">● LIVE</span></div>
           ${priceHtml}
         </div>
+        <div class="price-box" style="margin-top:10px;">
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Prezzo manuale (€)</span>
+            <input id="${cfg.prefix}ManualPriceInput" type="text" inputmode="decimal" placeholder="Es. 7,90" value="${escHtml(ctTcgState[gameKey].manualPriceRaw || '')}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
+            <button id="${cfg.prefix}ApplyManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;">Applica</button>
+            <button id="${cfg.prefix}ClearManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;" ${ctTcgState[gameKey].manualPrice == null && !(ctTcgState[gameKey].manualPriceRaw || '').trim() ? 'disabled' : ''}>Reset</button>
+          </div>
+        </div>
       </div>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span class="pill pill-set">Condizione: ${escHtml(qLabel)} (${qKey})</span>
-      <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''}) ×${qty}</button>
+      <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''} ×${qty}</button>
     </div>`;
   card.hidden = false;
+  $(`${cfg.prefix}ManualPriceInput`)?.addEventListener('input', (e) => {
+    ctTcgState[gameKey].manualPriceRaw = e.target.value;
+  });
+  $(`${cfg.prefix}ManualPriceInput`)?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyTcgManualPrice(gameKey);
+    }
+  });
+  $(`${cfg.prefix}ApplyManualPriceBtn`)?.addEventListener('click', () => applyTcgManualPrice(gameKey));
+  $(`${cfg.prefix}ClearManualPriceBtn`)?.addEventListener('click', () => clearTcgManualPrice(gameKey));
   card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
     row.addEventListener('click', () => {
       const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
@@ -5485,8 +5640,11 @@ window.tcgAddToCollection = async function(gameKey) {
   if (!bp) return;
   const qKey = $(cfg.condField)?.value || 'NM';
   const qty = Math.max(1, Math.min(99, parseInt($(cfg.qtyField)?.value) || 1));
-  const resolved = getTcgUnitPrice(gameKey) || resolveCtConditionPrice(prices, qKey);
-  const unit = parseFloat(resolved.unit.toFixed(2));
+  const manualUnit = tcgManualPriceUnit(gameKey);
+  const resolved = getTcgUnitPrice(gameKey)
+    || (prices && !prices.error ? resolveCtConditionPrice(prices, qKey) : null)
+    || (manualUnit != null ? { unit: manualUnit, fromCt: false, manual: true } : null);
+  const unit = parseFloat(Number(resolved?.unit || 0).toFixed(2));
   if (!unit) {
     tcgShowMsg(gameKey, `Nessun prezzo disponibile per ${QUALITY[qKey]?.label || qKey}. Prova un'altra condizione.`, 'warn');
     return;
@@ -5507,7 +5665,8 @@ window.tcgAddToCollection = async function(gameKey) {
       condition: qKey,
       price: unit,
       basePrice: nmMin,
-      ctPrice: resolved.fromCt ? unit : null,
+      ctPrice: resolved?.manual ? null : (resolved?.fromCt ? unit : null),
+      manualPrice: resolved?.manual || false,
       img,
       imgUrl: img,
       addedAt: new Date().toISOString(),
@@ -5523,7 +5682,7 @@ window.tcgAddToCollection = async function(gameKey) {
     collection.slice(-qty).forEach(it => pending.push(it));
     localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
   }
-  const srcNote = resolved.fromCt ? '' : ' (stima)';
+  const srcNote = resolved?.manual ? ' (manuale)' : (resolved?.fromCt ? '' : ' (stima)');
   tcgShowMsg(gameKey, `${qty > 1 ? qty + '× ' : ''}${bp.name} · ${qKey} · ${fmt(unit)}${srcNote} aggiunta a La mia collezione!`, 'success');
 };
 

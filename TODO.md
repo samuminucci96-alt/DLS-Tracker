@@ -1,5 +1,23 @@
 # DLS Tracker — Development Roadmap
 
+## ✅ Completato (Aggiornamento 2026-07-06)
+
+### Prezzi e Inserimento carte
+- [x] **Prezzo manuale prima dell'aggiunta in collezione**
+  - Campo prezzo manuale in schermata risultato per Pokémon, One Piece e Riftbound
+  - Pulsanti Applica/Reset con validazione importo (> 0)
+  - Override del prezzo live quando richiesto dall'utente
+  - Salvataggio flag `manualPrice` nell'item collezione
+  - Messaggistica UI: distinzione tra prezzo live, stima e manuale
+
+### Ricerca e UX
+- [x] **Autocomplete ricerca** per Pokémon e TCG basati su CardTrader
+- [x] **Fallback locale catalogo** quando API non disponibile
+
+### Account e Sync
+- [x] **Autenticazione email/password** via Netlify Functions
+- [x] **Sincronizzazione cloud base** con storage locale + pending queue
+
 ## 🔴 Priorità Alta (MVP Completamento)
 
 ### Ricerca e Prezzi
@@ -30,18 +48,16 @@
   - Validazione e conflitto detection
   - Effort: 1-2 giorni
 
-- [ ] **Autenticazione e Sincronizzazione**
-  - Login con email (già infra con JWT)
-  - Sincronizzazione collezione multi-device
-  - Backup automatico su login
-  - Effort: 1 giorno
-
-- [ ] **Collezione per utente**
-  - Store collezione sul backend (Netlify Blobs)
-  - Login/Logout UI
-  - Sync automatico ogni 5 minuti
-  - Conflict resolution (ultima versione vince)
+- [ ] **Hardening autenticazione e sync**
+  - Retry/backoff su errori transitori API
+  - Conflict resolution esplicita (merge per item, non solo last-write-wins)
+  - Messaggi utente più dettagliati sui casi offline/online
   - Effort: 1-2 giorni
+
+- [ ] **Storico modifiche prezzo**
+  - Tracciare se il prezzo è live, stimato o manuale per ogni riga
+  - Audit trail minimo (timestamp e valore precedente)
+  - Effort: 1 giorno
 
 ---
 
@@ -61,6 +77,11 @@
   - Push notification quando prezzo scende
   - Sincronizzazione wishlist cloud
   - Effort: 1 giorno
+
+- [ ] **Bulk edit collezione**
+  - Modifica multipla di condizione/lingua/prezzo
+  - Applicazione prezzo manuale su selezione multipla
+  - Effort: 1-2 giorni
 
 ### Filtering & Search
 - [ ] **Advanced filters**
@@ -127,6 +148,11 @@
 - [ ] **Duplicate detection**
   - Avviso se aggiungi una carta già in collezione
   - Suggerisci di incrementare quantity
+  - Effort: 0.5 giorni
+
+- [ ] **Badge origine prezzo in tabella**
+  - Mostrare etichetta LIVE/STIMA/MANUALE per ogni riga
+  - Colori e tooltip coerenti con UI risultato
   - Effort: 0.5 giorni
 
 - [ ] **Offline sync queue**
@@ -258,6 +284,7 @@
   - PokéTCG rate limit usage
   - CardTrader API response time
   - Error rate per endpoint
+  - % prezzi manuali sul totale inserimenti
   - Cache hit ratio
 
 ---
