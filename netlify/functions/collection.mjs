@@ -1,14 +1,18 @@
 import { getStore } from "@netlify/blobs";
 import { requireUser, corsHeaders } from "./_lib/jwt.mjs";
+import { findUserRecord } from "./_lib/users.mjs";
 
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
     const user = requireUser(req);
+    const users = getStore({ name: "dls-users", consistency: "strong" });
+    const found = await findUserRecord(users, user.email);
+    const emailKey = found?.normalized || user.email;
     const store = getStore({ name: "dls-collections", consistency: "strong" });
-    const key = `user:${user.email}`;
+    const key = `user:${emailKey}`;
 
     if (req.method === "GET") {
       const data = await store.get(key, { type: "json" });

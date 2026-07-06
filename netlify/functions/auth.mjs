@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 import { randomBytes, pbkdf2 as _pbkdf2, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { signJwt, corsHeaders } from "./_lib/jwt.mjs";
+import { findUserRecord, saveUserRecord, normalizeEmail } from "./_lib/users.mjs";
 
 const pbkdf2 = promisify(_pbkdf2);
 
@@ -18,30 +19,9 @@ function passMatches(storedHash, candidateHash) {
   return timingSafeEqual(a, b);
 }
 
-async function findUserRecord(store, email) {
-  const normalized = email.toLowerCase().trim();
-  const raw = email.trim();
-  const keys = [...new Set([normalized, raw].filter(Boolean))];
-
-  for (const key of keys) {
-    const user = await store.get(key, { type: "json" });
-    if (user) return { user, key, normalized };
-  }
-  return null;
-}
-
-async function saveUserRecord(store, normalized, user, oldKey) {
-  const next = { ...user, email: normalized };
-  await store.setJSON(normalized, next);
-  if (oldKey && oldKey !== normalized) {
-    try { await store.delete(oldKey); } catch {}
-  }
-  return next;
-}
-
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
     let body;
@@ -54,7 +34,7 @@ export default async (req) => {
     }
 
     const store = getStore({ name: "dls-users", consistency: "strong" });
-    const userKey = email.toLowerCase().trim();
+    const userKey = normalizeEmail(email);
 
     if (action === "register") {
       const existing = await findUserRecord(store, email);

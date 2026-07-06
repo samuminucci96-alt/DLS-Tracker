@@ -1,19 +1,23 @@
 import { getStore } from "@netlify/blobs";
 import { requireUser, corsHeaders } from "./_lib/jwt.mjs";
+import { findUserRecord, saveUserRecord } from "./_lib/users.mjs";
 
 const MAX_AVATAR_LEN = 180000;
 
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
     const user = requireUser(req);
     const store = getStore({ name: "dls-users", consistency: "strong" });
-    const key = user.email;
-    const record = await store.get(key, { type: "json" });
-    if (!record) {
+    const found = await findUserRecord(store, user.email);
+    if (!found) {
       return new Response(JSON.stringify({ error: "Utente non trovato" }), { status: 404, headers: cors });
+    }
+    let record = found.user;
+    if (found.key !== found.normalized) {
+      record = await saveUserRecord(store, found.normalized, record, found.key);
     }
 
     if (req.method === "GET") {
@@ -46,7 +50,7 @@ export default async (req) => {
       }
 
       next.updatedAt = new Date().toISOString();
-      await store.setJSON(key, next);
+      await store.setJSON(found.normalized, next);
 
       return new Response(JSON.stringify({
         email: next.email,

@@ -4,7 +4,7 @@ const PT_BASE = "https://api.pokemontcg.io/v2/cards";
 
 export default async (req) => {
   const cors = corsHeaders;
-  if (req.method === "OPTIONS") return new Response("", { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
   if (req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Metodo non supportato" }), { status: 405, headers: cors });
   }

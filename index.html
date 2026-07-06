@@ -2,20 +2,18 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#e8f4fc">
-
-  <!-- PWA + installazione mobile -->
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DLS Tracker">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=4">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=4">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <!-- Android: colora la status bar e la navigation bar -->
   <meta name="msapplication-navbutton-color" content="#e8f4fc">
   <meta name="msapplication-starturl" content="./index.html">
@@ -66,7 +64,6 @@
       height: auto;
       -webkit-text-size-adjust: 100%;
       text-size-adjust: 100%;
-      touch-action: manipulation;
       scroll-behavior: smooth;
       overflow-x: clip;
       overflow-y: auto;
@@ -82,7 +79,6 @@
       display: block;
       overflow-x: clip;
       overflow-y: visible;
-      touch-action: pan-y;
       padding:
         max(var(--shell-pad), var(--safe-top))
         max(var(--shell-pad), var(--safe-right))
@@ -134,8 +130,18 @@
       background: var(--glass);
       border: 1px solid var(--glass-border);
       border-radius: 20px;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* backdrop-filter + sticky rompe i tap su PWA Android/iOS */
+    @media (max-width: 680px), (display-mode: standalone) {
+      header {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(255, 255, 255, 0.97);
+        position: relative;
+        z-index: 50;
+      }
+      #bgCanvas { display: none !important; pointer-events: none !important; }
     }
 
     .header-brand {
@@ -327,7 +333,34 @@
 
     body.ios-install-open {
       overflow: hidden;
-      touch-action: none;
+    }
+    body.auth-open {
+      overflow: hidden;
+    }
+
+    html.is-standalone .auth-overlay,
+    html.is-standalone .auth-overlay.is-closed {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    .install-app-btn[hidden],
+    html.is-standalone .install-app-btn,
+    html.is-standalone #installAppBtn {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    html.is-standalone .install-banner,
+    html.is-standalone #installBanner {
+      display: none !important;
+    }
+
+    html.is-standalone #installIosSheet,
+    html.is-standalone .install-ios-overlay {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
 
     @media (max-width: 680px) {
@@ -492,10 +525,11 @@
       background: var(--surface-2);
       color: var(--text);
       font: inherit;
-      font-size: 0.9rem;
+      font-size: 16px;
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
       width: 100%;
+      min-height: 44px;
     }
 
     input::placeholder { color: var(--text-muted); }
@@ -1125,8 +1159,21 @@
       gap: 8px;
     }
 
-    html.is-standalone header {
-      border-radius: 14px;
+    html.is-standalone header,
+    html.is-mobile header {
+      position: relative;
+      z-index: 50;
+    }
+
+    .game-tab .tab-icon,
+    .game-tab img {
+      pointer-events: none;
+    }
+
+    .game-tab,
+    .user-btn {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      cursor: pointer;
     }
 
     @media (max-width: 1100px) {
@@ -1341,9 +1388,23 @@
     .main-grid > .panel:first-child  { animation: fadeUp 0.5s ease-out 0.12s both; }
     .main-grid > .panel:last-child   { animation: fadeUp 0.5s ease-out 0.2s both; }
 
-    /* ─── Header animated glow ──────────────────────────────────── */
-    header {
-      animation: fadeUp 0.5s ease-out 0.05s both, headerGlow 5s ease-in-out infinite 1s;
+    /* Standalone PWA: disabilita animazioni ingresso (fix coordinate tap su mobile) */
+    html.is-standalone .app-shell,
+    html.is-standalone header,
+    html.is-standalone .main-grid > .panel:first-child,
+    html.is-standalone .main-grid > .panel:last-child,
+    html.is-standalone .btn-primary,
+    html.is-standalone .choice-card {
+      animation: none !important;
+    }
+
+    /* ─── Header animated glow (solo desktop) ───────────────────── */
+    @media (min-width: 681px) {
+      header {
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        animation: fadeUp 0.5s ease-out 0.05s both, headerGlow 5s ease-in-out infinite 1s;
+      }
     }
 
     /* ─── Canvas background ─────────────────────────────────────── */
@@ -1499,6 +1560,24 @@
       background: var(--surface-3);
       font-size: 0.82rem;
     }
+    button.ct-cond-row {
+      width: 100%;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button.ct-cond-row:hover:not(.ct-cond-nm) {
+      background: var(--surface-2);
+      border-color: var(--border);
+    }
+    button.ct-cond-row:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
     .ct-cond-nm {
       background: rgba(52,211,153,0.08);
       border: 1px solid rgba(52,211,153,0.18);
@@ -1583,6 +1662,27 @@
       background: rgba(36, 84, 169, 0.05);
       font-size: 0.78rem;
     }
+    button.ct-listing-row {
+      width: 100%;
+      border: 1px solid transparent;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button.ct-listing-row:hover {
+      background: rgba(36, 84, 169, 0.1);
+    }
+    button.ct-listing-row:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    button.ct-listing-row.ct-listing-selected {
+      border-color: rgba(52, 211, 153, 0.55);
+      background: rgba(52, 211, 153, 0.12);
+    }
     .ct-listing-price { color: var(--success); font-weight: 800; white-space: nowrap; }
     .ct-listing-seller { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ct-listing-meta { color: var(--text-muted); font-size: 0.7rem; white-space: nowrap; }
@@ -1624,6 +1724,24 @@
       display: flex; align-items: center; justify-content: center;
       animation: fadeIn .2s ease;
       padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      pointer-events: auto;
+    }
+    .auth-overlay.is-closed {
+      display: none !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
+    }
+    html.is-standalone .auth-overlay {
+      min-height: 100dvh;
+      min-height: 100svh;
+      padding:
+        max(16px, var(--safe-top))
+        max(16px, var(--safe-right))
+        max(16px, var(--safe-bottom))
+        max(16px, var(--safe-left));
     }
     .auth-modal {
       background: var(--surface);
@@ -2338,7 +2456,7 @@
 <canvas id="bgCanvas"></canvas>
 
 <!-- ── Auth Modal ────────────────────────────────────────────────── -->
-<div id="authOverlay" class="auth-overlay" style="display:none" role="dialog" aria-modal="true">
+<div id="authOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true">
   <div class="auth-modal">
     <button class="auth-close" id="authClose" aria-label="Chiudi">✕</button>
     <div class="auth-title" id="authTitle">Accedi a DLS Tracker</div>
@@ -2377,7 +2495,7 @@
 </div>
 
 <!-- ── Profile Panel (utente loggato) ─────────────────────────────── -->
-<div id="profileOverlay" class="auth-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+<div id="profileOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
   <div class="auth-modal profile-modal">
     <button class="auth-close" id="profileClose" aria-label="Chiudi">✕</button>
     <div class="profile-hero">
@@ -2429,15 +2547,15 @@
 
     <nav class="header-nav" aria-label="Selezione gioco">
       <div class="game-tabs">
-        <button class="game-tab active" data-game="pokemon">
-          <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30"></span>
+        <button type="button" class="game-tab active" data-game="pokemon">
+          <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
           Pokémon TCG
         </button>
-        <button class="game-tab" data-game="onepiece">
+        <button type="button" class="game-tab" data-game="onepiece">
           <span class="tab-icon">☠️</span>
           One Piece TCG
         </button>
-        <button class="game-tab" data-game="riftbound">
+        <button type="button" class="game-tab" data-game="riftbound">
           <span class="tab-icon">⚔️</span>
           Riftbound
         </button>
@@ -2520,7 +2638,7 @@
             </div>
           </div>
 
-          <button class="btn btn-primary" id="searchBtn">
+          <button type="button" class="btn btn-primary" id="searchBtn">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
           <div id="searchProgressBar"></div>
@@ -2574,7 +2692,7 @@
               <input id="opQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
-          <button class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px">
+          <button type="button" class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('onepiece')">
             <span id="opSearchBtnInner">🔍 &nbsp;Cerca Carta OP</span>
           </button>
           <div id="opProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#ef4444,#f97316,#ef4444);"></div>
@@ -2627,7 +2745,7 @@
               <input id="rbQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
-          <button class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px">
+          <button type="button" class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('riftbound')">
             <span id="rbSearchBtnInner">🔍 &nbsp;Cerca Carta Riftbound</span>
           </button>
           <div id="rbProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#c9920a,#2454a9,#c9920a);"></div>
@@ -2761,53 +2879,40 @@
 <script src="onepiece-sets.js"></script>
 <script src="riftbound-sets.js"></script>
 <script>
+window.onerror = function(message, source, lineno, colno, error) {
+  alert("🚨 CRASH JS:\n" + message + "\nRiga: " + lineno + "\nFile: " + source);
+  return false;
+};
+window.addEventListener('unhandledrejection', function(event) {
+  alert("🚨 PROMISE FALLITA:\n" + event.reason);
+});
+
+const $ = (id) => document.getElementById(id);
+
 (function initViewport() {
   const root = document.documentElement;
   let lastLayoutWidth = window.innerWidth;
 
-  function isVirtualKeyboardOpen() {
-    const vv = window.visualViewport;
-    if (!vv) return false;
-    return vv.height < window.innerHeight * 0.82;
-  }
-
-  const sync = (opts = {}) => {
-    if (!opts.skipHeight && !isVirtualKeyboardOpen()) {
-      root.style.setProperty('--app-height', `${window.innerHeight}px`);
-    }
+  const sync = () => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
       || window.navigator.standalone === true;
     const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
     root.classList.toggle('is-mobile', mobile);
-    if (standalone && typeof markAppInstalled === 'function') markAppInstalled();
-  };
-  const lockPortrait = () => {
-    try {
-      if (screen.orientation?.lock) {
-        screen.orientation.lock('portrait-primary').catch(() => {});
-      }
-    } catch {}
+    if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
   };
   sync();
-  lockPortrait();
   window.addEventListener('resize', () => {
     if (Math.abs(window.innerWidth - lastLayoutWidth) > 8) {
       lastLayoutWidth = window.innerWidth;
       sync();
-    } else {
-      sync({ skipHeight: isVirtualKeyboardOpen() });
     }
   });
-  window.visualViewport?.addEventListener('resize', () => {
-    if (isVirtualKeyboardOpen()) return;
-    sync();
-  });
   window.addEventListener('orientationchange', () => {
-    setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); lockPortrait(); }, 120);
+    setTimeout(() => { lastLayoutWidth = window.innerWidth; sync(); }, 120);
   });
   window.matchMedia('(display-mode: standalone)').addEventListener('change', sync);
-  window.addEventListener('load', lockPortrait);
 })();
 // ── Constants ────────────────────────────────────────────────────────
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
@@ -2821,6 +2926,46 @@ const QUALITY = {
 };
 
 const CT_QUALITY_TO_COND = { NM: 'NM', EX: 'EX', GOOD: 'GOOD', PLAYED: 'PLAYED', POOR: 'POOR' };
+
+function qualityKeyFromCtCond(ctKey) {
+  if (QUALITY[ctKey]) return ctKey;
+  const match = Object.entries(CT_QUALITY_TO_COND).find(([, v]) => v === ctKey);
+  return match ? match[0] : 'NM';
+}
+
+function selectCtCondition(qualityKey) {
+  if (!QUALITY[qualityKey]) return;
+  selectedQuality = qualityKey;
+  selectedCtListing = null;
+  if ($('condSelect')) $('condSelect').value = qualityKey;
+  if (selectedCard) renderResult();
+}
+
+function selectCtListing(condKey, index) {
+  const cond = ctPriceData?.conditions?.find(c => c.key === condKey);
+  const listing = cond?.listings?.[index];
+  if (!listing) return;
+  selectedCtListing = {
+    condKey,
+    index,
+    price: listing.price,
+    seller: listing.seller || '',
+    listing,
+  };
+  if (selectedCard) renderResult();
+}
+
+function bindPokemonCtConditionRows() {
+  $('resultContent')?.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
+    row.addEventListener('click', () => selectCtCondition(qualityKeyFromCtCond(row.dataset.qualityKey)));
+  });
+}
+
+function bindPokemonCtListingRows() {
+  $('resultContent')?.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
+    row.addEventListener('click', () => selectCtListing(row.dataset.condKey, Number(row.dataset.listingIndex)));
+  });
+}
 
 // Alias mantenuto per compatibilità con il catalogo locale
 const SET_ALIASES = {
@@ -2842,9 +2987,50 @@ const CT_SET_CODE_MAP = {
   sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
   sv9: 'jtg', sv9pt5: 'dri',
   scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
+  svp: 'svp',
+  swshp: 'swshp',
+  scarletvioletblackstarpromos: 'svp',
+  svblackstarpromos: 'svp',
+  blackstarpromos: 'svp',
 };
 
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
+
+function isPokemonPromoSet(card) {
+  const id = (card?.set?.id || '').toLowerCase();
+  const n = norm(card?.set?.name || '').replace(/\s+/g, '');
+  return /^(svp|swshp|smp|xyp|bmp|dpp|hsp)$/.test(id) || /blackstarpromo/.test(n);
+}
+
+function ctPromoEraKey(setId) {
+  const id = (setId || '').toLowerCase();
+  if (id.startsWith('sv')) return 'sv';
+  if (id.startsWith('swsh')) return 'swsh';
+  if (id.startsWith('sm')) return 'sm';
+  if (id.startsWith('xy')) return 'xy';
+  return id.replace(/[^a-z0-9]/g, '').slice(0, 4);
+}
+
+function ctExpansionPromoEra(exp) {
+  const n = norm(ctExpName(exp)).replace(/\s+/g, '');
+  if (/blackstarpromo/.test(n)) {
+    if (/sv|scarlet|violet/.test(n)) return 'sv';
+    if (/swsh|sword|shield/.test(n)) return 'swsh';
+    if (/sun|moon|^sm/.test(n)) return 'sm';
+    if (/xy/.test(n)) return 'xy';
+    return 'generic';
+  }
+  return null;
+}
+
+function promoNumberMatches(rawNum, bpNum) {
+  if (!rawNum) return true;
+  if (!bpNum) return false;
+  if (bpNum === rawNum) return true;
+  const padded = rawNum.padStart(3, '0');
+  const variants = [rawNum, padded, `svp${rawNum}`, `sv${rawNum}`, `svp${padded}`];
+  return variants.some(v => bpNum === v || bpNum.endsWith(v) || bpNum.includes(rawNum));
+}
 
 function pokemonSetEnglishName(setId, setName) {
   if (typeof POKEMON_SETS !== 'undefined' && setId) {
@@ -2903,8 +3089,15 @@ function scoreBlueprintForCard(card, bp) {
   const bpNum = ctBpNumber(bp);
 
   if (rawNum) {
-    if (!bpNum || bpNum !== rawNum) return 0;
-    score += 30;
+    if (!bpNum) {
+      if (!isPokemonPromoSet(card)) return 0;
+      score += 4;
+    } else if (bpNum !== rawNum) {
+      if (isPokemonPromoSet(card) && promoNumberMatches(rawNum, bpNum)) score += 22;
+      else return 0;
+    } else {
+      score += 30;
+    }
   }
 
   const meta = ctBpMeta(bp);
@@ -2937,7 +3130,11 @@ let basePrice       = 0;
 let priceSrc        = '';
 let collection      = [];
 let activeGame      = 'pokemon';
+let dlsUser         = null;
+let syncTimer       = null;
 let searchCtrl      = null;   // AbortController for main search
+let searchGen       = 0;
+let searchLangFilter = '';
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
@@ -2947,9 +3144,6 @@ let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
 const suggCache     = new Map();
 
-// ── DOM ──────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-
 // ── Utilities ────────────────────────────────────────────────────────
 function fmt(v) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v);
@@ -2957,6 +3151,55 @@ function fmt(v) {
 
 function norm(v) {
   return String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+}
+
+const SEARCH_LANG_CODES = {
+  english: 'en', italian: 'it', spanish: 'es', german: 'de',
+  french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
+};
+
+function normalizeSearchLang(lang) {
+  if (!lang) return '';
+  const n = norm(lang);
+  for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
+    if (n === name || n.includes(name) || n === code) return code;
+  }
+  return n.slice(0, 2);
+}
+
+function listingMatchesLanguage(listing, lang) {
+  if (!lang) return true;
+  const want = normalizeSearchLang(lang);
+  const raw = norm(listing?.language || listing?.properties_hash?.language || '');
+  if (!raw || raw === '?' || raw === 'any') return false;
+  if (raw === want || raw.startsWith(want)) return true;
+  for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
+    if (code === want && (raw.includes(name) || raw === code)) return true;
+  }
+  return false;
+}
+
+function cardMatchesSearchLanguage(card, lang) {
+  if (!lang) return true;
+  if (listingMatchesLanguage({ language: card.language || card.lang }, lang)) return true;
+  const want = normalizeSearchLang(lang);
+  const setId = (card.set?.id || '').toLowerCase();
+  const setName = norm(card.set?.name || '');
+  const markers = {
+    it: ['it', 'ita', 'italian', 'italiano'],
+    ja: ['ja', 'jpn', 'japanese'],
+    de: ['de', 'deu', 'german', 'deutsch'],
+    fr: ['fr', 'fra', 'french', 'francais'],
+    es: ['es', 'spa', 'spanish', 'espanol'],
+    pt: ['pt', 'por', 'portuguese'],
+    ko: ['ko', 'kor', 'korean'],
+  };
+  if (want === 'en') {
+    const foreign = Object.values(markers).flat();
+    return !foreign.some(m => setId.includes(m) || setName.includes(m));
+  }
+  const hints = markers[want];
+  return hints ? hints.some(m => setId.includes(m) || setName.includes(m)) : true;
 }
 
 function normalizeTcgSetCode(raw) {
@@ -3120,13 +3363,14 @@ function setSearchLoading(on) {
   const btn = $('searchBtn');
   const inner = $('searchBtnInner');
   const bar = $('searchProgressBar');
+  if (!btn || !inner) return;
   btn.disabled = on;
   if (on) {
     inner.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .65s linear infinite;flex-shrink:0;"></span>Ricerca in corso…</span>`;
-    bar.classList.add('active');
+    bar?.classList.add('active');
   } else {
     inner.innerHTML = '🔍 &nbsp;Cerca Carta';
-    bar.classList.remove('active');
+    bar?.classList.remove('active');
   }
 }
 
@@ -3146,6 +3390,24 @@ function apiUrl(path) {
 }
 
 // ── API calls ────────────────────────────────────────────────────────
+function apiUrl(path) {
+  return new URL(path, location.origin).href;
+}
+
+function networkFetchErrorMessage(err, fallback) {
+  const msg = String(err?.message || err || '');
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    return 'Connessione non disponibile. Verifica internet e riprova.';
+  }
+  return fallback || msg;
+}
+
+function rethrowNetworkError(err, fallback) {
+  if (err?.name === 'AbortError') throw err;
+  if (err?.status) throw err;
+  throw Object.assign(new Error(networkFetchErrorMessage(err, fallback)), { cause: err });
+}
+
 function apiFetchError(res, fallback) {
   return res.text().then(body => {
     let msg = fallback;
@@ -3158,20 +3420,65 @@ function apiFetchError(res, fallback) {
   });
 }
 
-async function fetchCards(query, _unused, signal, pageSize = 20) {
-  const url = apiUrl(`/api/pokemontcg?q=${encodeURIComponent(query)}&pageSize=${pageSize}`);
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json' },
-    signal,
-  });
+async function parsePokemonTcgResponse(res, fallbackMsg) {
   if (!res.ok) {
     if (res.status === 404) {
       throw Object.assign(new Error('API non disponibile. Usa la versione online o avvia netlify dev.'), { status: 404 });
     }
-    await apiFetchError(res, `Errore Pokémon TCG (${res.status})`);
+    await apiFetchError(res, fallbackMsg);
   }
   const data = await res.json();
   return Array.isArray(data.data) ? data.data : [];
+}
+
+async function fetchWithTimeout(url, opts = {}, ms = 15000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  const parent = opts.signal;
+  const onParentAbort = () => ctrl.abort();
+  if (parent?.aborted) {
+    clearTimeout(tid);
+    throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+  }
+  parent?.addEventListener('abort', onParentAbort, { once: true });
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(tid);
+    parent?.removeEventListener('abort', onParentAbort);
+  }
+}
+
+async function fetchCards(query, _unused, signal, pageSize = 20) {
+  const opts = {
+    headers: { Accept: 'application/json' },
+    signal,
+    cache: 'no-store',
+    credentials: 'same-origin',
+  };
+  const proxyUrl = new URL('/api/pokemontcg', location.origin);
+  proxyUrl.searchParams.set('q', query);
+  proxyUrl.searchParams.set('pageSize', String(pageSize));
+  const netErrFallback = 'Connessione non disponibile. Verifica internet e riprova.';
+
+  try {
+    const res = await fetchWithTimeout(proxyUrl.href, opts).catch(err => {
+      rethrowNetworkError(err, netErrFallback);
+    });
+    return await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    if (e.status && e.status !== 404) throw e;
+  }
+
+  // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
+  const directUrl = new URL(API_BASE);
+  directUrl.searchParams.set('q', query);
+  directUrl.searchParams.set('pageSize', String(pageSize));
+  const directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
+    rethrowNetworkError(err, netErrFallback);
+  });
+  return parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
 }
 
 // ── CardTrader API (proxy server-side: /api/cardtrader) ───────────────
@@ -3182,15 +3489,23 @@ const ctCache = {
   bpSearch:   new Map(),   // 'game:query' → []
 };
 let ctPriceData = null;
+let selectedCtListing = null;
 const choicePriceCache = new Map();
 
 async function ctFetch(path) {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const res = await fetch(apiUrl(`/api/cardtrader?path=${encodeURIComponent(path)}`), {
+    const url = new URL('/api/cardtrader', location.origin);
+    url.searchParams.set('path', path);
+    const res = await fetch(url.href, {
       headers: { Accept: 'application/json' },
       signal: ctrl.signal,
+      cache: 'no-store',
+      credentials: 'same-origin',
+    }).catch(err => {
+      if (err?.name === 'AbortError') throw err;
+      throw Object.assign(new Error('CardTrader non raggiungibile. Controlla la connessione.'), { cause: err });
     });
     if (!res.ok) {
       if (res.status === 404) {
@@ -3199,6 +3514,11 @@ async function ctFetch(path) {
       await apiFetchError(res, `Errore CardTrader (${res.status})`);
     }
     return res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw Object.assign(new Error('Timeout CardTrader: la richiesta ha impiegato troppo tempo. Riprova.'), { name: 'AbortError' });
+    }
+    throw e;
   } finally {
     clearTimeout(tid);
   }
@@ -3512,6 +3832,15 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
     if (m0) { console.log('[CT] Match codice mappato:', m0.code, ctExpName(m0)); return m0; }
   }
 
+  if (isPokemonPromoSet(card)) {
+    const era = ctPromoEraKey(card.set?.id);
+    const promoMatch = expansions.find(e => {
+      const expEra = ctExpansionPromoEra(e);
+      return expEra && (expEra === era || (era === 'sv' && expEra === 'sv'));
+    }) || expansions.find(e => ctExpansionPromoEra(e) === 'generic');
+    if (promoMatch) { console.log('[CT] Match promo set:', ctExpName(promoMatch)); return promoMatch; }
+  }
+
   if (enName) {
     const mEn = expansions.find(e => norm(ctExpName(e)) === enName)
       || expansions.find(e => {
@@ -3652,14 +3981,15 @@ function ctTrimListingOutliers(listings) {
   return trimmed.length >= 2 ? trimmed : listings;
 }
 
-function ctAverageConditions(listings) {
+function ctAverageConditions(listings, langFilter = searchLangFilter) {
   const valid = listings
     .map(l => ({
       listing: l,
       price: Number(l.price_cents) / 100,
       currency: (l.price_currency || 'EUR').toUpperCase()
     }))
-    .filter(x => Number.isFinite(x.price) && x.price > 0);
+    .filter(x => Number.isFinite(x.price) && x.price > 0)
+    .filter(x => !langFilter || listingMatchesLanguage(x.listing, langFilter));
 
   const eur = valid.filter(x => x.currency === 'EUR');
   const priced = eur.length ? eur : valid;
@@ -3742,6 +4072,13 @@ function ctAverageConditions(listings) {
   };
 }
 
+function ctLangFilterError(listings, langFilter = searchLangFilter) {
+  if (!langFilter || !listings?.length) return null;
+  const hasAny = listings.some(l => listingMatchesLanguage(l, langFilter));
+  if (hasAny) return null;
+  return `Nessun annuncio CardTrader in ${langFilter} per questa carta. Prova "Qualsiasi" o un'altra lingua.`;
+}
+
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
@@ -3752,6 +4089,13 @@ async function ctGetPriceByBlueprintId(blueprintId) {
 
     if (!listings.length) return {
       error: 'Nessun venditore attivo su CardTrader al momento',
+      blueprintId,
+      url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
+    };
+
+    const langErr = ctLangFilterError(listings);
+    if (langErr) return {
+      error: langErr,
       blueprintId,
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
@@ -3827,6 +4171,13 @@ async function ctGetPrice(card, game = 'pokemon') {
       url: `https://www.cardtrader.com/en/cards/${bp.id}`
     };
 
+    const langErr = ctLangFilterError(listings);
+    if (langErr) return {
+      error: langErr,
+      blueprintId: bp.id,
+      url: `https://www.cardtrader.com/en/cards/${bp.id}`,
+    };
+
     const { conditions, lowestAny } = ctAverageConditions(listings);
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
 
@@ -3862,26 +4213,28 @@ async function ctGetPrice(card, game = 'pokemon') {
   }
 }
 
-function renderCtMarketMenu(d, condKey) {
+function renderCtMarketMenu(d, condKey, selectedListing = null) {
   const cond = (d.conditions || []).find(c => c.key === condKey) || d.conditions?.[0];
   if (!cond) return '';
-  const rows = (cond.listings || []).map(l => {
+  const rows = (cond.listings || []).map((l, idx) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
     const qty = l.quantity > 1 ? ` · x${l.quantity}` : '';
+    const isSelected = selectedListing?.condKey === condKey && selectedListing?.index === idx;
     return `
-      <div class="ct-listing-row">
-        <span class="ct-listing-price">${fmt(l.price)}</span>
+      <button type="button" class="ct-listing-row${isSelected ? ' ct-listing-selected' : ''}"
+        data-listing-index="${idx}" data-cond-key="${escHtml(condKey)}" aria-pressed="${isSelected}">
+        <span class="ct-listing-price">${fmt(l.price)}${isSelected ? ' ←' : ''}</span>
         <span class="ct-listing-seller" title="${escHtml(l.seller)}">${escHtml(l.seller)}</span>
         <span class="ct-listing-meta">${lang}${foil}${qty}</span>
-      </div>`;
+      </button>`;
   }).join('');
 
   return `
     <div class="ct-market-menu">
       <div class="ct-market-title">
         <span>Annunci caricati su CT · ${escHtml(cond.label)}</span>
-        <span>${cond.count || 0} annunci</span>
+        <span>${cond.count || 0} annunci · tocca per scegliere il prezzo</span>
       </div>
       <div class="ct-listing-list">
         ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
@@ -3936,18 +4289,18 @@ function renderCtSection() {
   }
   // ✅ Prezzo trovato — mostra griglia condizioni
   const selectedCtCond = CT_QUALITY_TO_COND[selectedQuality] || 'NM';
-  const selPrice = resolveCtConditionPrice(d, selectedQuality, d.price || basePrice);
+  const priceView = getSelectedUnitPrice();
   const nmCond = (d.conditions || []).find(c => c.key === 'NM') || d.conditions?.[0];
   const condRows = (d.conditions || []).map(c => {
     const foilMark = c.foil ? ' ✨' : '';
     const isSelected = c.key === selectedCtCond;
     return `
-      <div class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}">
-        <span class="ct-cond-label">${c.label}${isSelected ? ' ← selezionata' : ''}</span>
+      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
+        <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
         <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
         <span class="ct-cond-meta">Min CT${foilMark}</span>
         <span class="ct-cond-count">Min. Cardmarket · ${c.count} ann.</span>
-      </div>`;
+      </button>`;
   }).join('');
 
   return `
@@ -3959,18 +4312,18 @@ function renderCtSection() {
       ${d.expansionName ? `<div class="ct-expansion-match">📦 Espansione CT: <strong>${escHtml(d.expansionName)}</strong>${d.setMatchWarning ? ' <span style="color:#f59e0b;font-size:.78rem">(match per nome/numero)</span>' : ''}</div>` : ''}
       <div class="ct-price-hero">
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">Prezzo min Cardmarket · ${escHtml(QUALITY[selectedQuality]?.label || selectedQuality)} (${selectedQuality})</span>
-          <span class="ct-price-hero-val">${fmt(selPrice.unit)}</span>
+          <span class="ct-price-hero-lbl">${selectedCtListing ? 'Annuncio CT selezionato' : 'Prezzo min Cardmarket'} · ${escHtml(QUALITY[selectedQuality]?.label || selectedQuality)} (${selectedQuality})</span>
+          <span class="ct-price-hero-val">${fmt(priceView.unit)}</span>
         </div>
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">${selPrice.fromCt ? 'Da annunci CT reali' : nmCond ? 'Stima (nessun annuncio in questa condizione)' : 'Prezzo stimato'}</span>
-          <span class="ct-price-hero-val muted">${selPrice.fromCt ? `${selPrice.ctCond?.count || 0} annunci` : nmCond ? `NM: ${fmt(nmCond.minPrice || nmCond.price)}` : '—'}</span>
+          <span class="ct-price-hero-lbl">${priceView.fromCt ? (selectedCtListing?.seller ? `Venditore: ${escHtml(selectedCtListing.seller)}` : 'Da annunci CT reali') : nmCond ? 'Stima (nessun annuncio in questa condizione)' : 'Prezzo stimato'}</span>
+          <span class="ct-price-hero-val muted">${priceView.fromCt ? `${priceView.condition?.count || 0} annunci` : nmCond ? `NM: ${fmt(nmCond.minPrice || nmCond.price)}` : '—'}</span>
         </div>
       </div>
       <div class="ct-cond-grid">
         ${condRows || '<p class="ct-msg warn">Nessuna condizione disponibile</p>'}
       </div>
-      ${renderCtMarketMenu(d, selectedCtCond)}
+      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing)}
       <div class="ct-footer-row">
         <span class="ct-chip">${d.total} listino${d.total > 1 ? 'i' : ''} totali</span>
         <a class="ct-link" href="${d.url}" target="_blank">↗ Vedi su CardTrader</a>
@@ -3979,14 +4332,14 @@ function renderCtSection() {
 }
 
 // ── Autocomplete ─────────────────────────────────────────────────────
-$('pokemonName').addEventListener('input', () => {
+document.getElementById('pokemonName')?.addEventListener('input', () => {
   const name = $('pokemonName').value.trim();
   clearTimeout(suggTimer);
   if (name.length < 1) { hideSuggestions(); return; }
   suggTimer = setTimeout(() => loadSuggestions(name), 180);
 });
 
-$('pokemonName').addEventListener('focus', () => {
+document.getElementById('pokemonName')?.addEventListener('focus', () => {
   const name = $('pokemonName').value.trim();
   if (name.length >= 1) loadSuggestions(name);
 });
@@ -4003,7 +4356,10 @@ async function loadSuggestions(name) {
     suggCache.set(key, names);
     renderSugg(names);
   } catch (e) {
-    if (e.name !== 'AbortError') hideSuggestions();
+    if (e.name !== 'AbortError') {
+      console.warn('Suggerimenti non disponibili:', networkFetchErrorMessage(e, e.message));
+      hideSuggestions();
+    }
   }
 }
 
@@ -4011,6 +4367,9 @@ function renderSugg(names) {
   const box = $('nameSuggestions');
   if (!names.length) { hideSuggestions(); return; }
   const query = $('pokemonName').value.trim().toLowerCase();
+  const key = names.join('|');
+  if (box.dataset.suggKey === key) return;
+  box.dataset.suggKey = key;
   box.innerHTML = names.map(n => {
     // Bold-highlight matching part
     const lo = n.toLowerCase();
@@ -4046,6 +4405,7 @@ function hideSuggestions() {
   const box = $('nameSuggestions');
   box.hidden = true;
   box.innerHTML = '';
+  delete box.dataset.suggKey;
 }
 
 let setSuggTimer = null;
@@ -4121,7 +4481,7 @@ function hideAllSuggestions() {
   hideSetSuggestions();
 }
 
-$('cardSet')?.addEventListener('input', () => {
+document.getElementById('cardSet')?.addEventListener('input', () => {
   $('cardSetId').value = '';
   clearTimeout(setSuggTimer);
   const v = $('cardSet').value.trim();
@@ -4129,12 +4489,12 @@ $('cardSet')?.addEventListener('input', () => {
   setSuggTimer = setTimeout(() => renderSetSuggestions(filterSetSuggestions(v)), 150);
 });
 
-$('cardSet')?.addEventListener('focus', () => {
+document.getElementById('cardSet')?.addEventListener('focus', () => {
   const v = $('cardSet').value.trim();
   if (v.length >= 1) renderSetSuggestions(filterSetSuggestions(v));
 });
 
-$('cardSet')?.addEventListener('keydown', e => {
+document.getElementById('cardSet')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     hideSetSuggestions();
     doSearch();
@@ -4155,21 +4515,25 @@ function searchLocal(name, number, set, lang) {
 }
 
 // ── Main search ───────────────────────────────────────────────────────
-$('searchBtn').addEventListener('click', doSearch);
-$('pokemonName').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-$('cardNumber').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('searchBtn')?.addEventListener('click', doSearch);
+document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
-$('condSelect')?.addEventListener('change', e => {
+document.getElementById('condSelect')?.addEventListener('change', e => {
   selectedQuality = e.target.value;
+  selectedCtListing = null;
   if (selectedCard) renderResult();
 });
 
-$('cardQty')?.addEventListener('input', () => {
+document.getElementById('cardQty')?.addEventListener('input', () => {
   if (selectedCard) renderResult();
 });
 
 async function doSearch() {
-  if (activeGame !== 'pokemon') return;
+  if (activeGame !== 'pokemon') {
+    switchActiveGame('pokemon');
+    if (activeGame !== 'pokemon') activeGame = 'pokemon';
+  }
 
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
@@ -4180,12 +4544,17 @@ async function doSearch() {
     return;
   }
 
-  // Cancel any in-flight search
+  const myGen = ++searchGen;
+  searchLangFilter = lang;
+  priceFetchGen++;
+
+  // Cancel any in-flight search / stale CT price loads
   if (searchCtrl) searchCtrl.abort();
   searchCtrl = new AbortController();
 
   // Reset UI
   selectedCard = null;
+  selectedCtListing = null;
   choicePriceCache.clear();
   ctPriceData = null;
   $('resultCard').hidden = true;
@@ -4196,27 +4565,35 @@ async function doSearch() {
 
   try {
     const cards = await runSearch(name, number, cardSet, lang, null, searchCtrl.signal);
+    if (myGen !== searchGen) return;
     if (cards.length === 0) {
-      showMsg('Nessuna carta trovata. Prova con un termine diverso.', 'warning');
+      const langHint = lang ? ` per lingua ${lang}` : '';
+      showMsg(`Nessuna carta trovata${langHint}. Prova con un termine diverso.`, 'warning');
       return;
     }
-    showMsg(cards.length === 1 ? 'Carta trovata!' : `Trovate ${cards.length} carte — seleziona quella corretta.`, 'success');
+    const langNote = lang ? ` · lingua ${lang}` : '';
+    showMsg(
+      cards.length === 1
+        ? `Carta trovata${langNote}!`
+        : `Trovate ${cards.length} carte${langNote} — seleziona quella corretta.`,
+      'success'
+    );
     if (cards.length === 1) {
       selectCard(cards[0]);
     } else {
       renderChoices(cards);
     }
   } catch (e) {
-    if (e.name === 'AbortError') return;
+    if (e.name === 'AbortError' || myGen !== searchGen) return;
     console.error(e);
     const msg = e.status === 404
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev in locale.'
       : e.status === 503
         ? 'Servizio prezzi non configurato sul server. Contatta l\'amministratore.'
-        : (e.message || 'Errore durante la ricerca. Controlla la connessione.');
+        : networkFetchErrorMessage(e, e.message || 'Errore durante la ricerca. Controlla la connessione.');
     showMsg(msg, 'error');
   } finally {
-    setSearchLoading(false);
+    if (myGen === searchGen) setSearchLoading(false);
   }
 }
 
@@ -4283,6 +4660,10 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   }
   if (name && cards.length) {
     cards = cards.filter(c => norm(c.name || '').includes(nn));
+  }
+  if (lang && cards.length) {
+    const byLang = cards.filter(c => cardMatchesSearchLanguage(c, lang));
+    if (byLang.length) cards = byLang;
   }
 
   return cards;
@@ -4364,6 +4745,24 @@ async function hydrateChoicePrices(cards) {
 }
 
 function getSelectedUnitPrice() {
+  const selectedCtCond = CT_QUALITY_TO_COND[selectedQuality] || 'NM';
+  if (
+    selectedCtListing
+    && selectedCtListing.condKey === selectedCtCond
+    && Number(selectedCtListing.price) > 0
+    && (ctPriceData?.conditions?.length || ctPriceData?.price)
+  ) {
+    const ctCond = ctPriceData.conditions?.find(c => c.key === selectedCtCond);
+    const seller = selectedCtListing.seller ? ` · ${selectedCtListing.seller}` : '';
+    return {
+      unit: selectedCtListing.price,
+      avg: ctCond?.avgPrice,
+      source: `CardTrader · annuncio${seller}`,
+      condition: ctCond,
+      fromCt: true,
+      listing: selectedCtListing.listing,
+    };
+  }
   if (ctPriceData?.conditions?.length || ctPriceData?.price) {
     const resolved = resolveCtConditionPrice(ctPriceData, selectedQuality, basePrice);
     return {
@@ -4427,6 +4826,7 @@ function renderChoices(cards) {
 function selectCard(card) {
   selectedCard = card;
   selectedQuality = $('condSelect')?.value || 'NM';
+  selectedCtListing = null;
 
   const cached = choicePriceCache.get(choiceCacheKey(card));
   if (cached?.ct && cached.price != null && !cached.ct.error) {
@@ -4452,13 +4852,19 @@ function selectCard(card) {
     return;
   }
 
+  const priceGen = priceFetchGen;
   ctGetPrice(card).then(result => {
+    if (priceGen !== priceFetchGen) return;
     ctPriceData = result;
     if (result?.price && !result.error) {
       basePrice = result.price;
       priceSrc = 'CardTrader';
       choicePriceCache.set(choiceCacheKey(card), { price: result.price, src: 'CardTrader', ct: result });
     }
+    renderResult();
+  }).catch(err => {
+    if (priceGen !== priceFetchGen) return;
+    console.warn('ctGetPrice:', err);
     renderResult();
   });
 }
@@ -4479,10 +4885,10 @@ function renderResult() {
   $('resultContent').innerHTML = `
     <div class="result-layout">
       ${img
-        ? `<div class="result-img"><img src="${img}" alt="${card.name}"></div>`
+        ? `<div class="result-img"><img src="${img}" alt="${escHtml(card.name)}"></div>`
         : `<div class="result-img-ph">Immagine<br>n.d.</div>`}
       <div>
-        <div class="result-name">${card.name}</div>
+        <div class="result-name">${escHtml(card.name)}</div>
         <div class="pills">
           ${card.set?.name   ? `<span class="pill pill-set">📦 ${card.set.name}</span>` : ''}
           ${card.number      ? `<span class="pill pill-num">#${card.number}</span>` : ''}
@@ -4517,6 +4923,8 @@ function renderResult() {
   `;
 
   $('addBtn').addEventListener('click', addToCollection);
+  bindPokemonCtConditionRows();
+  bindPokemonCtListingRows();
 }
 
 // ── Collection ────────────────────────────────────────────────────────
@@ -4576,13 +4984,26 @@ async function addToCollection() {
 }
 
 function removeItem(idx) {
+  if (idx < 0 || idx >= collection.length) return;
   collection.splice(idx, 1);
   persistLocalCollection();
-  if (dlsUser) saveCloudCollection();
   onCollectionChanged();
+  if (dlsUser) saveCloudCollection();
 }
 
-$('clearBtn').addEventListener('click', () => {
+function bindCollectionActions() {
+  const body = $('collBody');
+  if (!body || body.dataset.bound === '1') return;
+  body.dataset.bound = '1';
+  body.addEventListener('click', e => {
+    const btn = e.target.closest('[data-remove-idx]');
+    if (!btn) return;
+    e.preventDefault();
+    removeItem(Number(btn.dataset.removeIdx));
+  });
+}
+
+document.getElementById('clearBtn')?.addEventListener('click', () => {
   const before = collection.length;
   collection = collection.filter(item => (item.game || 'pokemon') !== activeGame);
   persistLocalCollection();
@@ -4639,8 +5060,8 @@ const CT_TCG_CONFIG = {
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0 },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0 },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null },
 };
 
 function tcgShowMsg(gameKey, msg, type = 'info') {
@@ -4656,10 +5077,11 @@ function tcgShowMsg(gameKey, msg, type = 'info') {
 function tcgSetLoading(gameKey, on) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const btn = $(`${cfg.prefix}SearchBtn`);
+  const inner = $(`${cfg.prefix}SearchBtnInner`);
   const bar = $(`${cfg.prefix}ProgressBar`);
-  if (!btn) return;
+  if (!btn || !inner) return;
   btn.disabled = on;
-  $(`${cfg.prefix}SearchBtnInner`).textContent = on ? '⌛ Ricerca in corso…' : cfg.searchLabel;
+  inner.textContent = on ? '⌛ Ricerca in corso…' : cfg.searchLabel;
   if (bar) bar.classList.toggle('active', on);
 }
 
@@ -4876,7 +5298,7 @@ async function tcgDoSearch(gameKey) {
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev.'
       : e.status === 503
         ? 'CardTrader non configurato sul server.'
-        : ('Errore di ricerca: ' + (e.message || e));
+        : networkFetchErrorMessage(e, e.message || 'Errore di ricerca.');
     tcgShowMsg(gameKey, msg, 'error');
   } finally {
     if (searchGen === ctTcgState[gameKey].searchGen) tcgSetLoading(gameKey, false);
@@ -4920,6 +5342,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   if (gameKey === 'riftbound') $('riftboundResults').hidden = false;
   ctTcgState[gameKey].selected = bp;
   ctTcgState[gameKey].prices = null;
+  ctTcgState[gameKey].selectedListing = null;
   tcgRenderResult(gameKey, bp, null);
 
   try {
@@ -4941,13 +5364,32 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   $(`${cfg.prefix}ResultCard`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function getTcgUnitPrice(gameKey) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  const qKey = $(cfg.condField)?.value || 'NM';
+  const prices = ctTcgState[gameKey].prices;
+  if (!prices || prices.error) return null;
+  const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
+  const picked = ctTcgState[gameKey].selectedListing;
+  const resolved = resolveCtConditionPrice(prices, qKey);
+  if (picked && picked.condKey === selectedCtCond && Number(picked.price) > 0) {
+    return {
+      ...resolved,
+      unit: picked.price,
+      fromCt: true,
+      source: `CardTrader · annuncio${picked.seller ? ` · ${picked.seller}` : ''}`,
+    };
+  }
+  return resolved;
+}
+
 function tcgRenderResult(gameKey, bp, prices) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const card = $(`${cfg.prefix}ResultCard`);
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
   const qKey = $(cfg.condField)?.value || 'NM';
   const qLabel = QUALITY[qKey]?.label || qKey;
-  const selPrice = prices && !prices.error ? resolveCtConditionPrice(prices, qKey) : null;
+  const selPrice = prices && !prices.error ? getTcgUnitPrice(gameKey) : null;
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const qty = parseInt($(cfg.qtyField)?.value) || 1;
   const priceHtml = !prices ? '<div class="ct-loading"><div class="spinner"></div><span>Caricamento prezzi…</span></div>'
@@ -4956,7 +5398,7 @@ function tcgRenderResult(gameKey, bp, prices) {
       ${selPrice ? `
       <div class="ct-price-hero" style="margin-bottom:10px">
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">Prezzo min Cardmarket · ${escHtml(qLabel)} (${qKey})</span>
+          <span class="ct-price-hero-lbl">Prezzo Cardmarket · ${escHtml(qLabel)} (${qKey})</span>
           <span class="ct-price-hero-val">${fmt(selPrice.unit)}</span>
         </div>
         <div class="ct-price-hero-item">
@@ -4968,14 +5410,15 @@ function tcgRenderResult(gameKey, bp, prices) {
         ${(prices.conditions || []).map(c => {
           const isSelected = c.key === selectedCtCond;
           return `
-          <div class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}">
-            <span class="ct-cond-label">${c.label}${isSelected ? ' ← selezionata' : ''}</span>
+          <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
+            <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
             <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
             <span class="ct-cond-meta">Minimo</span>
             <span class="ct-cond-count">${c.count} annunci CT</span>
-          </div>`;
+          </button>`;
         }).join('')}
       </div>
+      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing)}
       <div class="ct-footer-row">
         <span class="ct-chip">${prices.total} annunci totali</span>
         <a class="ct-link" href="${prices.url}" target="_blank" rel="noopener noreferrer">↗ Vedi su CardTrader</a>
@@ -5007,6 +5450,32 @@ function tcgRenderResult(gameKey, bp, prices) {
       <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''}) ×${qty}</button>
     </div>`;
   card.hidden = false;
+  card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
+    row.addEventListener('click', () => {
+      const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
+      const sel = $(cfg.condField);
+      if (sel) sel.value = qKey;
+      ctTcgState[gameKey].selectedListing = null;
+      tcgRenderResult(gameKey, bp, prices);
+    });
+  });
+  card.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
+    row.addEventListener('click', () => {
+      const condKey = row.dataset.condKey;
+      const index = Number(row.dataset.listingIndex);
+      const cond = prices?.conditions?.find(c => c.key === condKey);
+      const listing = cond?.listings?.[index];
+      if (!listing) return;
+      ctTcgState[gameKey].selectedListing = {
+        condKey,
+        index,
+        price: listing.price,
+        seller: listing.seller || '',
+        listing,
+      };
+      tcgRenderResult(gameKey, bp, prices);
+    });
+  });
 }
 
 window.tcgAddToCollection = async function(gameKey) {
@@ -5016,7 +5485,7 @@ window.tcgAddToCollection = async function(gameKey) {
   if (!bp) return;
   const qKey = $(cfg.condField)?.value || 'NM';
   const qty = Math.max(1, Math.min(99, parseInt($(cfg.qtyField)?.value) || 1));
-  const resolved = resolveCtConditionPrice(prices, qKey);
+  const resolved = getTcgUnitPrice(gameKey) || resolveCtConditionPrice(prices, qKey);
   const unit = parseFloat(resolved.unit.toFixed(2));
   if (!unit) {
     tcgShowMsg(gameKey, `Nessun prezzo disponibile per ${QUALITY[qKey]?.label || qKey}. Prova un'altra condizione.`, 'warn');
@@ -5185,7 +5654,7 @@ function renderCollection() {
         ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
       </td>
       <td class="td-actions">
-        <button class="btn btn-ghost-danger" onclick="removeItem(${idx})" title="Rimuovi">✕</button>
+        <button type="button" class="btn btn-ghost-danger" data-remove-idx="${idx}" title="Rimuovi">✕</button>
       </td>
     </tr>`;
   }).join('');
@@ -5195,7 +5664,7 @@ function renderCollection() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────
-$('exportCsvBtn').addEventListener('click', () => {
+document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
   const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
   if (!items.length) return;
   const rows = [['Nome','Set','SetID','Numero','Lingua','Condizione','Prezzo (€)']];
@@ -5206,7 +5675,7 @@ $('exportCsvBtn').addEventListener('click', () => {
   dlBlob(csv, 'text/csv;charset=utf-8;', `dls-${activeGame}-lista.csv`);
 });
 
-$('exportJsonBtn').addEventListener('click', () => {
+document.getElementById('exportJsonBtn')?.addEventListener('click', () => {
   const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
   if (!items.length) return;
   const payload = {
@@ -5236,54 +5705,90 @@ const GAME_UI = {
   riftbound: { label: 'Riftbound',     tagBg: 'rgba(201,146,10,0.15)',    tagColor: '#c9920a' },
 };
 
-function switchActiveGame(game) {
-  if (game === activeGame) return;
-  priceFetchGen++;
-  choicePriceCache.clear();
-  if (searchCtrl) { searchCtrl.abort(); searchCtrl = null; }
-  if (suggCtrl) { suggCtrl.abort(); suggCtrl = null; }
-  Object.keys(ctTcgState).forEach(k => { ctTcgState[k].searchGen++; });
-  setSearchLoading(false);
-  Object.keys(CT_TCG_CONFIG).forEach(k => tcgSetLoading(k, false));
-
-  activeGame = game;
-  document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
-  $('pokemonSearch').hidden   = game !== 'pokemon';
-  $('onepieceSearch').hidden  = game !== 'onepiece';
-  $('riftboundSearch').hidden = game !== 'riftbound';
-  $('pokemonResults').hidden   = game !== 'pokemon';
-  $('onepieceResults').hidden  = game !== 'onepiece';
-  $('riftboundResults').hidden = game !== 'riftbound';
-  const ui = GAME_UI[game] || GAME_UI.pokemon;
-  $('gameTag').textContent = ui.label;
-  $('gameTag').style.background = ui.tagBg;
-  $('gameTag').style.color = ui.tagColor;
-  renderCollection();
-  scheduleCtPreload(game);
+function resetModalLocks() {
+  document.body.classList.remove('auth-open', 'ios-install-open');
+  ['authOverlay', 'profileOverlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('is-closed');
+  });
+  document.getElementById('installIosSheet')?.remove();
 }
 
-document.querySelectorAll('.game-tab').forEach(tab => {
-  tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
-});
+function bindAccountButton() {
+  const btn = document.getElementById('userBtn');
+  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    openAuthModal();
+  });
+}
 
-// ── Advanced settings toggle — rimosso (token solo server-side)
+function bindGameTabs() {
+  document.querySelectorAll('.game-tab').forEach(tab => {
+    if (tab.dataset.bound === '1') return;
+    tab.dataset.bound = '1';
+    tab.addEventListener('click', () => switchActiveGame(tab.dataset.game));
+  });
+}
+
+function switchActiveGame(game) {
+  if (!game || !GAME_UI[game]) return;
+  if (game === activeGame) return;
+  activeGame = game;
+  try {
+    priceFetchGen++;
+    choicePriceCache.clear();
+    if (searchCtrl) { searchCtrl.abort(); searchCtrl = null; }
+    if (suggCtrl) { suggCtrl.abort(); suggCtrl = null; }
+    Object.keys(ctTcgState).forEach(k => { ctTcgState[k].searchGen++; });
+    setSearchLoading(false);
+    Object.keys(CT_TCG_CONFIG).forEach(k => tcgSetLoading(k, false));
+
+    document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
+    const panels = [
+      ['pokemonSearch', game === 'pokemon'],
+      ['onepieceSearch', game === 'onepiece'],
+      ['riftboundSearch', game === 'riftbound'],
+      ['pokemonResults', game === 'pokemon'],
+      ['onepieceResults', game === 'onepiece'],
+      ['riftboundResults', game === 'riftbound'],
+    ];
+    panels.forEach(([id, show]) => {
+      const el = $(id);
+      if (el) el.hidden = !show;
+    });
+    const ui = GAME_UI[game] || GAME_UI.pokemon;
+    const tag = $('gameTag');
+    if (tag) {
+      tag.textContent = ui.label;
+      tag.style.background = ui.tagBg;
+      tag.style.color = ui.tagColor;
+    }
+    renderCollection();
+    scheduleCtPreload(game);
+  } catch (e) {
+    console.error('switchActiveGame:', e);
+    showMsg('Impossibile cambiare gioco. Ricarica la pagina.', 'error');
+  }
+}
 
 // ── Avvio app ───────────────────────────────────────────────────────
 function initApp() {
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
+  resetModalLocks();
   const saved = localStorage.getItem('dls_collection');
   if (saved) try { collection = JSON.parse(saved); } catch {}
-  if (isStandaloneApp()) markAppInstalled();
+  if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
   restoreSessionLocal();
-  activeGame = '';
   switchActiveGame('pokemon');
   tryAutoLogin();
 }
 
-initApp();
+bindCollectionActions();
 
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
@@ -5515,6 +6020,25 @@ const API_AUTH       = apiUrl('/api/auth');
 const API_COLLECTION = apiUrl('/api/collection');
 const API_PROFILE    = apiUrl('/api/profile');
 
+function authFetch(url, opts = {}) {
+  const token = opts.sessionToken ?? getToken();
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['X-DLS-Session'] = token;
+  const { sessionToken, ...rest } = opts;
+  const target = apiUrl(url);
+  return fetch(target, {
+    method: rest.method || 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'follow',
+    ...rest,
+    headers,
+  }).catch(err => Promise.reject(Object.assign(
+    new Error(networkFetchErrorMessage(err, 'Connessione al server non disponibile. Verifica internet e riprova.')),
+    { cause: err }
+  )));
+}
+
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/BYOWCG21RiAA95KXXoZAZW';
 
 // Link community — aggiorna gli url quando disponibili
@@ -5553,19 +6077,21 @@ const COMMUNITY_LINKS = [
   }
 ];
 
-let dlsUser  = null;  // { email, displayName, token, avatar? }
-let syncTimer = null;
-
 // ── Helpers
 function getToken()  { return localStorage.getItem('dls_token'); }
 function saveSession(data) {
   dlsUser = data;
-  localStorage.setItem('dls_token', data.token);
-  localStorage.setItem('dls_user', JSON.stringify({
-    email: data.email,
-    displayName: data.displayName,
-    avatar: data.avatar || null
-  }));
+  try {
+    localStorage.setItem('dls_token', data.token);
+    localStorage.setItem('dls_user', JSON.stringify({
+      email: data.email,
+      displayName: data.displayName,
+      avatar: data.avatar || null
+    }));
+  } catch (e) {
+    console.error('saveSession storage error:', e);
+    throw new Error('Impossibile salvare la sessione. Su iPhone disattiva la navigazione privata o libera spazio.');
+  }
 }
 function clearSession() {
   dlsUser = null;
@@ -5589,10 +6115,14 @@ async function refreshSessionInBackground() {
   const token = getToken();
   if (!token || !navigator.onLine) return;
   try {
-    const res = await fetch(API_PROFILE, { headers: { ...apiHeaders(), 'X-DLS-Session': token } });
+    const res = await authFetch(API_PROFILE, { headers: { 'X-DLS-Session': token } });
     if (res.status === 401) {
       clearSession();
       updateAuthUI();
+      return;
+    }
+    if (res.status === 404) {
+      console.warn('Profilo non trovato sul server — mantieni sessione locale');
       return;
     }
     if (!res.ok) return;
@@ -5624,13 +6154,20 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') restoreSessionLocal();
 });
 
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
+  else if (!$('profileOverlay')?.classList.contains('is-closed')) closeProfilePanel();
+  else closeIosInstallSheet();
+});
+
 // ── Cloud collection
 async function loadCloudCollection(clearOnAuthFail = true) {
   const token = getToken();
   if (!token) return;
   try {
-    const res = await fetch(API_COLLECTION, {
-      headers: { ...apiHeaders(), 'X-DLS-Session': token }
+    const res = await authFetch(API_COLLECTION, {
+      headers: { 'X-DLS-Session': token }
     });
     if (res.status === 401) {
       if (clearOnAuthFail && navigator.onLine) { clearSession(); updateAuthUI(); }
@@ -5641,7 +6178,13 @@ async function loadCloudCollection(clearOnAuthFail = true) {
     let local = [];
     try { local = JSON.parse(localStorage.getItem('dls_collection') || '[]'); } catch {}
     const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
-    collection = mergeCollections(cloud, local, pending);
+    // Locale vince: non ripristinare carte eliminate; aggiungi solo ciò che manca in locale
+    collection = mergeCollections(local, pending);
+    const localKeys = new Set(collection.map(collectionItemKey));
+    for (const item of cloud) {
+      const key = collectionItemKey(item);
+      if (!localKeys.has(key)) collection.push(item);
+    }
     persistLocalCollection();
     renderCollection();
     if (pending.length) {
@@ -5660,9 +6203,9 @@ async function saveCloudCollection() {
   const token = getToken();
   if (!token) return;
   try {
-    await fetch(API_COLLECTION, {
+    await authFetch(API_COLLECTION, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...apiHeaders(), 'X-DLS-Session': token },
+      headers: { 'Content-Type': 'application/json', 'X-DLS-Session': token },
       body: JSON.stringify(collection)
     });
   } catch(e) { console.warn('saveCloudCollection error:', e); }
@@ -5702,7 +6245,7 @@ async function loadUserProfile() {
   const token = getToken();
   if (!token) return;
   try {
-    const res = await fetch(API_PROFILE, { headers: { ...apiHeaders(), 'X-DLS-Session': token } });
+    const res = await authFetch(API_PROFILE, { headers: { 'X-DLS-Session': token } });
     if (res.status === 401) { clearSession(); updateAuthUI(); return; }
     if (!res.ok) return;
     const data = await res.json();
@@ -5721,9 +6264,9 @@ async function loadUserProfile() {
 async function saveUserProfile(patch) {
   const token = getToken();
   if (!token) return null;
-  const res = await fetch(API_PROFILE, {
+  const res = await authFetch(API_PROFILE, {
     method: 'POST',
-    headers: { ...apiHeaders(), 'Content-Type': 'application/json', 'X-DLS-Session': token },
+    headers: { 'Content-Type': 'application/json', 'X-DLS-Session': token },
     body: JSON.stringify(patch)
   });
   const data = await res.json();
@@ -5769,7 +6312,9 @@ function openProfilePanel() {
   $('profileEmail').textContent = dlsUser.email || '';
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
-  $('profileOverlay').style.display = 'flex';
+  const overlay = $('profileOverlay');
+  if (overlay) overlay.classList.remove('is-closed');
+  document.body.classList.add('auth-open');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
     $('profileName').textContent = dlsUser.displayName || 'Utente';
@@ -5780,7 +6325,8 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  $('profileOverlay').style.display = 'none';
+  $('profileOverlay')?.classList.add('is-closed');
+  document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
 
@@ -5829,18 +6375,25 @@ async function handleAvatarPick(file) {
 }
 
 function openAuthModal() {
-  if (dlsUser && getToken()) {
+  const token = getToken();
+  if (dlsUser && token) {
     openProfilePanel();
     return;
   }
+  if (token && !dlsUser) clearSession();
+  closeProfilePanel();
   setEmailMode(false);
   const err = $('emailErr');
   if (err) { err.textContent = ''; err.style.display = 'none'; }
-  $('authOverlay').style.display = 'flex';
+  const overlay = $('authOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-closed');
+  document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  $('authOverlay').style.display = 'none';
+  $('authOverlay')?.classList.add('is-closed');
+  document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
 
@@ -5867,9 +6420,9 @@ async function submitAuthForm() {
   if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
   try {
     const action = emailIsRegister ? 'register' : 'login';
-    const res  = await fetch(API_AUTH, {
+    const res  = await authFetch(API_AUTH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, email, password: pass, displayName: dName })
     });
     let data = {};
@@ -5884,17 +6437,25 @@ async function submitAuthForm() {
       return;
     }
     setEmailMode(false);
-    saveSession(data);
+    try {
+      saveSession(data);
+    } catch (e) {
+      showAuthErr('emailErr', e.message || 'Impossibile salvare la sessione.');
+      return;
+    }
     closeAuthModal();
     updateAuthUI();
     showMsg(`✅ ${action === 'register' ? 'Account creato' : 'Accesso effettuato'}! Benvenuto, ${data.displayName || data.email}`, 'success');
     await loadUserProfile();
     await loadCloudCollection();
-  } catch {
+  } catch (e) {
+    console.error('submitAuthForm:', e);
     if (API_BASE_URL) {
       showAuthErr('emailErr', 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.');
     } else {
-      showAuthErr('emailErr', 'Errore di rete. Riprova.');
+      showAuthErr('emailErr', e.message?.includes('Failed to fetch')
+        ? 'Connessione non disponibile. Controlla internet e riprova.'
+        : 'Errore di rete. Riprova.');
     }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText; }
@@ -5907,39 +6468,41 @@ function showAuthErr(id, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
 
-$('userBtn')?.addEventListener('click', openAuthModal);
-$('authClose')?.addEventListener('click', closeAuthModal);
-$('authOverlay')?.addEventListener('click', e => { if (e.target === $('authOverlay')) closeAuthModal(); });
-$('emailLoginBtn')?.addEventListener('click', submitAuthForm);
-$('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
-$('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
-$('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
-$('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
+document.getElementById('authClose')?.addEventListener('click', closeAuthModal);
+const authOverlayEl = document.getElementById('authOverlay');
+authOverlayEl?.addEventListener('click', e => {
+  if (e.target === authOverlayEl && !authOverlayEl.classList.contains('is-closed')) closeAuthModal();
+});
+document.getElementById('emailLoginBtn')?.addEventListener('click', submitAuthForm);
+document.getElementById('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
+document.getElementById('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
+document.getElementById('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
+document.getElementById('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
 
-window.openAuthModal = openAuthModal;
-window.openProfilePanel = openProfilePanel;
-
-$('profileClose')?.addEventListener('click', closeProfilePanel);
-$('profileOverlay')?.addEventListener('click', e => { if (e.target === $('profileOverlay')) closeProfilePanel(); });
-$('profileLogoutBtn')?.addEventListener('click', () => {
+document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
+const profileOverlayEl = document.getElementById('profileOverlay');
+profileOverlayEl?.addEventListener('click', e => {
+  if (e.target === profileOverlayEl && !profileOverlayEl.classList.contains('is-closed')) closeProfilePanel();
+});
+document.getElementById('profileLogoutBtn')?.addEventListener('click', () => {
   closeProfilePanel();
   clearSession();
   updateAuthUI();
   showMsg('Logout effettuato', 'success');
 });
-$('profileAvatarPickBtn')?.addEventListener('click', () => $('profileAvatarInput')?.click());
-$('profileAvatarEditBtn')?.addEventListener('click', () => $('profileAvatarInput')?.click());
-$('profileAvatarInput')?.addEventListener('change', e => {
+document.getElementById('profileAvatarPickBtn')?.addEventListener('click', () => document.getElementById('profileAvatarInput')?.click());
+document.getElementById('profileAvatarEditBtn')?.addEventListener('click', () => document.getElementById('profileAvatarInput')?.click());
+document.getElementById('profileAvatarInput')?.addEventListener('change', e => {
   const file = e.target.files?.[0];
   e.target.value = '';
   handleAvatarPick(file);
 });
-$('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
+document.getElementById('profileAvatarRemoveBtn')?.addEventListener('click', async () => {
   if (!dlsUser?.avatar) return;
   try {
     await saveUserProfile({ avatar: null });
     renderUserAvatar($('profileAvatarLg'), dlsUser);
-    $('profileAvatarRemoveBtn').hidden = true;
+    document.getElementById('profileAvatarRemoveBtn').hidden = true;
     showMsg('Foto profilo rimossa', 'success');
   } catch (e) {
     showMsg(e.message || 'Errore', 'error');
@@ -6034,7 +6597,7 @@ async function refreshAllPrices() {
   renderCollection();
 }
 
-$('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
+document.getElementById('refreshPricesBtn')?.addEventListener('click', refreshAllPrices);
 
 // Auto-refresh ogni 30 minuti se l'utente è loggato
 setInterval(() => { if (dlsUser) refreshAllPrices(); }, 30 * 60 * 1000);
@@ -6057,7 +6620,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=27').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=40').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
@@ -6069,8 +6632,18 @@ if ('serviceWorker' in navigator) {
 // ── PWA Install prompt ────────────────────────────────────────────────
 
 function isStandaloneApp() {
+  if (document.documentElement.classList.contains('is-standalone')) return true;
   return window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
     || window.navigator.standalone === true;
+}
+
+function syncInstalledState() {
+  if (!isStandaloneApp()) return;
+  localStorage.setItem('dls_installed', '1');
+  document.getElementById('installBanner')?.remove();
+  closeIosInstallSheet();
+  deferredPrompt = null;
 }
 
 function isIosDevice() {
@@ -6086,32 +6659,38 @@ function isIosSafari() {
 
 function markAppInstalled() {
   localStorage.setItem('dls_installed', '1');
-  localStorage.setItem('dls_install_dismissed', '1');
-  document.getElementById('installBanner')?.remove();
-  closeIosInstallSheet();
-  deferredPrompt = null;
+  syncInstalledState();
   updateInstallUi();
 }
 
 function canOfferInstall() {
   if (isStandaloneApp()) return false;
-  if (localStorage.getItem('dls_installed') === '1') return false;
-  if (localStorage.getItem('dls_install_dismissed') === '1') return false;
   if (deferredPrompt) return true;
-  if (isIosSafari()) return true;
+  if (isIosDevice()) return true;
   return false;
 }
 
+function canShowInstallBanner() {
+  if (isStandaloneApp()) return false;
+  if (localStorage.getItem('dls_install_banner_dismissed') === '1') return false;
+  return canOfferInstall();
+}
+
 function dismissInstallPrompt() {
-  localStorage.setItem('dls_install_dismissed', '1');
+  localStorage.setItem('dls_install_banner_dismissed', '1');
   document.getElementById('installBanner')?.remove();
-  closeIosInstallSheet();
   updateInstallUi();
 }
 
 function updateInstallUi() {
+  syncInstalledState();
   const btn = $('installAppBtn');
-  if (btn) btn.hidden = !canOfferInstall();
+  const show = canOfferInstall();
+  if (btn) {
+    btn.hidden = !show;
+    btn.style.display = show ? '' : 'none';
+    btn.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
 }
 
 function triggerInstallFlow() {
@@ -6136,6 +6715,10 @@ function triggerInstallFlow() {
   }
   if (isIosSafari()) {
     showIosInstallSheet();
+    return;
+  }
+  if (isIosDevice()) {
+    showMsg('Apri questa pagina in Safari, poi tocca Condividi → Aggiungi a Home.', 'info');
     return;
   }
   showMsg('Apri il menu del browser e seleziona "Installa app" o "Aggiungi a Home".', 'info');
@@ -6167,10 +6750,7 @@ function showIosInstallSheet() {
     if (e.target === overlay) closeIosInstallSheet();
   });
   document.getElementById('installIosDone')?.addEventListener('click', closeIosInstallSheet);
-  document.getElementById('installIosDismiss')?.addEventListener('click', () => {
-    closeIosInstallSheet();
-    dismissInstallPrompt();
-  });
+  document.getElementById('installIosDismiss')?.addEventListener('click', closeIosInstallSheet);
 }
 
 function closeIosInstallSheet() {
@@ -6179,7 +6759,7 @@ function closeIosInstallSheet() {
 }
 
 function showInstallBanner() {
-  if (!canOfferInstall() || document.getElementById('installBanner')) return;
+  if (!canShowInstallBanner() || document.getElementById('installBanner')) return;
   const ios = isIosSafari();
   const banner = document.createElement('div');
   banner.id = 'installBanner';
@@ -6213,10 +6793,17 @@ window.addEventListener('appinstalled', () => {
   showMsg('✅ DLS Tracker installato con successo!', 'success');
 });
 
-$('installAppBtn')?.addEventListener('click', triggerInstallFlow);
+document.getElementById('installAppBtn')?.addEventListener('click', triggerInstallFlow);
 
 window.addEventListener('load', () => {
-  updateInstallUi();
+  if (!isStandaloneApp()) {
+    localStorage.removeItem('dls_install_dismissed');
+  }
+  try {
+    updateInstallUi();
+  } catch (err) {
+    console.warn('[PWA] updateInstallUi fallito:', err);
+  }
   document.addEventListener('focusin', e => {
     if (!e.target.matches('input, select, textarea')) return;
     document.getElementById('installBanner')?.classList.add('keyboard-open');
@@ -6227,11 +6814,21 @@ window.addEventListener('load', () => {
       document.getElementById('installBanner')?.classList.remove('keyboard-open');
     }, 120);
   });
-  if (canOfferInstall() && isIosSafari() && !sessionStorage.getItem('dls_install_banner_shown')) {
-    sessionStorage.setItem('dls_install_banner_shown', '1');
-    setTimeout(showInstallBanner, 1400);
+  try {
+    if (canShowInstallBanner() && isIosDevice() && !sessionStorage.getItem('dls_install_banner_shown')) {
+      sessionStorage.setItem('dls_install_banner_shown', '1');
+      setTimeout(showInstallBanner, 1400);
+    }
+  } catch (err) {
+    console.warn('[PWA] Banner iOS non mostrato:', err);
   }
 });
+
+bindGameTabs();
+bindAccountButton();
+initApp();
+window.removeItem = removeItem;
+window.openAuthModal = openAuthModal;
 </script>
 </body>
 </html>
