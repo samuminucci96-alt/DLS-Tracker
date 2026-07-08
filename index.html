@@ -3231,6 +3231,74 @@ function clearPokemonManualPrice() {
   renderResult();
 }
 
+function buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick) {
+  if (effectivePrice.manual) {
+    return {
+      price: unit,
+      priceMode: 'manual',
+      manualPrice: true,
+      ctPrice: null,
+      ctListing: null,
+      priceSrc: 'Manuale',
+    };
+  }
+  if (listingPick?.seller) {
+    return {
+      price: unit,
+      priceMode: 'listing',
+      manualPrice: false,
+      ctPrice: unit,
+      ctListing: listingPick,
+      priceSrc: `CardTrader · ${listingPick.seller}`,
+    };
+  }
+  return {
+    price: unit,
+    priceMode: selPrice.fromCt ? 'min_ct' : 'estimate',
+    manualPrice: false,
+    ctPrice: selPrice.fromCt || selPrice.condition ? unit : null,
+    ctListing: null,
+    priceSrc: effectivePrice.source || priceSrc || 'Stima',
+  };
+}
+
+function resolveCollectionItemPrice(item, ctResult) {
+  if (item.manualPrice || item.priceMode === 'manual') {
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  const qKey = item.quality || item.condition || 'NM';
+  const condKey = item.ctListing?.condKey || CT_QUALITY_TO_COND[qKey] || 'NM';
+
+  if (item.priceMode === 'listing' && item.ctListing) {
+    const cond = ctResult?.conditions?.find(c => c.key === condKey);
+    const listings = cond?.listings || [];
+    const wantSeller = norm(item.ctListing.seller || '');
+    let listing = listings.find(l => norm(l.seller || '') === wantSeller);
+    if (!listing && item.ctListing.price != null) {
+      const target = Number(item.ctListing.price);
+      listing = listings.find(l => Math.abs(Number(l.price) - target) < 0.02);
+    }
+    if (listing) {
+      const p = parseFloat(Number(listing.price).toFixed(2));
+      return { price: p, ctPrice: p, updated: true };
+    }
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  if (!ctResult?.conditions?.length) {
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  const resolved = resolveCtConditionPrice(ctResult, qKey);
+  const p = parseFloat(Number(resolved.unit || 0).toFixed(2));
+  return {
+    price: p,
+    ctPrice: resolved.fromCt ? p : null,
+    updated: true,
+  };
+}
+
 // Lingue UI → codice API CardTrader (GET /marketplace/products?language=en)
 const CT_LANGUAGE_BY_UI = {
   '': '',
@@ -5185,6 +5253,14 @@ async function addToCollection() {
     return;
   }
   const lang  = $('cardLanguage').value || 'Any';
+  const listingPick = !effectivePrice.manual && selectedCtListing?.seller
+    ? {
+        condKey: selectedCtListing.condKey,
+        seller: selectedCtListing.seller,
+        price: unit,
+      }
+    : null;
+  const priceFields = buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick);
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -5195,16 +5271,18 @@ async function addToCollection() {
       lang,
       quality: selectedQuality,
       condition: selectedQuality,
-      price: unit,
       basePrice,
-      priceSrc: effectivePrice.manual ? 'Manuale' : priceSrc,
-      ctPrice: effectivePrice.manual ? null : (selPrice.fromCt || selPrice.condition ? unit : null),
-      manualPrice: effectivePrice.manual || false,
       img: getImg(selectedCard),
       imgUrl: getImg(selectedCard),
       addedAt: new Date().toISOString(),
       game: 'pokemon',
-      card: { name: selectedCard.name, number: selectedCard.number, set: selectedCard.set }
+      card: {
+        name: selectedCard.name,
+        number: selectedCard.number,
+        set: selectedCard.set,
+        bpId: selectedCard.bpId || null,
+      },
+      ...priceFields,
     });
   }
   persistLocalCollection();
@@ -5820,6 +5898,16 @@ window.tcgAddToCollection = async function(gameKey) {
   const nmMin = nmCond?.minPrice || nmCond?.price || unit;
   const lang = $(cfg.langField)?.value || 'any';
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
+  const picked = ctTcgState[gameKey].selectedListing;
+  const listingPick = !resolved?.manual && picked?.seller
+    ? { condKey: picked.condKey, seller: picked.seller, price: unit }
+    : null;
+  const priceFields = buildCollectionPriceFields(
+    unit,
+    resolved || { fromCt: false, condition: null },
+    { manual: !!resolved?.manual, source: resolved?.source },
+    listingPick,
+  );
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -5830,15 +5918,13 @@ window.tcgAddToCollection = async function(gameKey) {
       lang,
       quality: qKey,
       condition: qKey,
-      price: unit,
       basePrice: nmMin,
-      ctPrice: resolved?.manual ? null : (resolved?.fromCt ? unit : null),
-      manualPrice: resolved?.manual || false,
       img,
       imgUrl: img,
       addedAt: new Date().toISOString(),
       game: cfg.game,
       card: { name: bp.name, number: bp.collector_number, bpId: bp.id, game: cfg.game },
+      ...priceFields,
     });
   }
   persistLocalCollection();
@@ -6898,16 +6984,20 @@ async function refreshAllPrices() {
         continue;
       }
       if (result.conditions?.length) {
-        const qKey = item.quality || item.condition || 'NM';
-        const ctCond = CT_QUALITY_TO_COND[qKey] || 'NM';
-        const resolved = resolveCtConditionPrice(result, qKey);
-        const newPrice = resolved.unit;
-        collection[i].ctPrice = resolved.fromCt ? newPrice : null;
-        collection[i].price = newPrice;
-        collection[i].lastPriceUpdate = new Date().toISOString();
-        persistLocalCollection();
-        if (cell) { cell.textContent = fmt(newPrice); cell.className = 'ct-price-cell updated'; }
-        updated++;
+        const resolved = resolveCollectionItemPrice(item, result);
+        if (resolved.updated) {
+          collection[i].price = resolved.price;
+          collection[i].ctPrice = resolved.ctPrice;
+          collection[i].lastPriceUpdate = new Date().toISOString();
+          persistLocalCollection();
+          if (cell) { cell.textContent = fmt(resolved.price); cell.className = 'ct-price-cell updated'; }
+          updated++;
+        } else if (cell) {
+          cell.textContent = fmt(item.price);
+          cell.className = item.manualPrice || item.priceMode === 'manual'
+            ? 'ct-price-cell manual'
+            : 'ct-price-cell locked';
+        }
       } else {
         if (cell) { cell.textContent = '—'; cell.className = 'ct-price-cell no-data'; }
       }
