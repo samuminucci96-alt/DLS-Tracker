@@ -1058,6 +1058,10 @@
     }
     .tbl-empty small { display: block; font-size: 0.78rem; margin-top: 4px; opacity: 0.7; }
 
+    tr.coll-row-open { cursor: pointer; }
+    tr.coll-row-open:hover td { background: var(--surface-2); }
+    tr.coll-row-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
     .coll-footer {
       display: flex;
       align-items: center;
@@ -5414,15 +5418,127 @@ function removeItem(idx) {
   if (dlsUser) saveCloudCollection();
 }
 
+function cardFromCollectionItem(item) {
+  const setId = item.setId || item.card?.set?.id || '';
+  const setName = item.set || item.card?.set?.name || '';
+  const img = ctResolveStoredImage(item.img || item.imgUrl || '');
+  const bpId = item.card?.bpId;
+  return {
+    name: item.name,
+    number: item.number,
+    set: { id: setId, name: setName },
+    bpId: bpId || undefined,
+    id: bpId ? `ct-${bpId}` : `coll-${norm(item.name)}|${setId}|${item.number}`,
+    images: img ? { small: img, large: img } : undefined,
+    _fromCt: !!bpId,
+  };
+}
+
+function bpFromCollectionItem(item) {
+  const img = ctResolveStoredImage(item.img || item.imgUrl || '');
+  return {
+    id: item.card?.bpId,
+    name: item.name,
+    collector_number: item.number,
+    expansion: {
+      code: item.setId || '',
+      name_en: item.set || '',
+    },
+    imgUrl: img,
+    image_url: img || undefined,
+  };
+}
+
+function fillPokemonSearchFromItem(item) {
+  if ($('pokemonName')) $('pokemonName').value = item.name || '';
+  if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
+  const lang = item.lang || item.language || '';
+  if ($('cardLanguage')) $('cardLanguage').value = lang === 'Any' ? '' : lang;
+  const qKey = item.quality || item.condition || 'NM';
+  if ($('condSelect')) $('condSelect').value = qKey;
+  selectedQuality = qKey;
+
+  const setId = item.setId || item.card?.set?.id || '';
+  const setRow = setId && typeof POKEMON_SETS !== 'undefined'
+    ? POKEMON_SETS.find(s => norm(s.id) === norm(setId))
+    : null;
+  if ($('cardSetId')) $('cardSetId').value = setId;
+  if ($('cardSet')) $('cardSet').value = setRow?.text || item.set || '';
+}
+
+function fillTcgSearchFromItem(gameKey, item) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return;
+  if ($(`${cfg.prefix}CardName`)) $(`${cfg.prefix}CardName`).value = item.name || '';
+  if ($(`${cfg.prefix}CardNumber`)) {
+    $(`${cfg.prefix}CardNumber`).value = item.number && item.number !== '?' ? item.number : '';
+  }
+  const lang = item.lang || item.language || '';
+  if ($(cfg.langField)) $(cfg.langField).value = lang === 'Any' || lang === 'any' ? '' : lang;
+  if ($(cfg.condField)) $(cfg.condField).value = item.quality || item.condition || 'NM';
+  const setField = $(`${cfg.prefix}CardSet`);
+  const setIdField = $(`${cfg.prefix}CardSetId`);
+  if (setIdField) setIdField.value = item.setId || '';
+  if (setField) {
+    const sets = cfg.getSets?.() || [];
+    const setRow = item.setId ? sets.find(s => norm(s.id) === norm(item.setId)) : null;
+    setField.value = setRow?.text || item.set || '';
+  }
+}
+
+function scrollToSearchPanel() {
+  document.querySelector('.main-grid .panel:first-child')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function openCollectionItem(idx) {
+  const item = collection[idx];
+  if (!item) return;
+
+  const game = item.game || 'pokemon';
+  if (game !== activeGame) switchActiveGame(game);
+
+  if (game === 'pokemon') {
+    fillPokemonSearchFromItem(item);
+    $('choicesCard').hidden = true;
+    hideAllSuggestions();
+    hideSetSuggestions();
+    selectCard(cardFromCollectionItem(item));
+    scrollToSearchPanel();
+    return;
+  }
+
+  const gameKey = game === 'onepiece' ? 'onepiece' : 'riftbound';
+  const bp = bpFromCollectionItem(item);
+  if (!bp.id) {
+    tcgShowMsg(gameKey, 'Impossibile aprire la carta: ID CardTrader mancante.', 'warn');
+    return;
+  }
+  fillTcgSearchFromItem(gameKey, item);
+  await tcgSelectCard(gameKey, bp);
+  scrollToSearchPanel();
+}
+
 function bindCollectionActions() {
   const body = $('collBody');
   if (!body || body.dataset.bound === '1') return;
   body.dataset.bound = '1';
   body.addEventListener('click', e => {
-    const btn = e.target.closest('[data-remove-idx]');
-    if (!btn) return;
+    const removeBtn = e.target.closest('[data-remove-idx]');
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeItem(Number(removeBtn.dataset.removeIdx));
+      return;
+    }
+    const row = e.target.closest('[data-open-idx]');
+    if (row) openCollectionItem(Number(row.dataset.openIdx));
+  });
+  body.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('[data-open-idx]');
+    if (!row) return;
     e.preventDefault();
-    removeItem(Number(btn.dataset.removeIdx));
+    openCollectionItem(Number(row.dataset.openIdx));
   });
 }
 
@@ -6143,7 +6259,7 @@ function renderCollection() {
     const imgRaw = item.img || item.imgUrl;
     const img = imgRaw ? ctResolveStoredImage(imgRaw) : '';
     return `
-    <tr>
+    <tr class="coll-row-open" data-open-idx="${idx}" tabindex="0" title="Apri nella ricerca">
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
           ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
