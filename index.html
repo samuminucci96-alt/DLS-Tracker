@@ -4583,7 +4583,7 @@ function renderCtSection() {
       ${d.expansionName ? `<div class="ct-expansion-match">📦 Espansione CT: <strong>${escHtml(d.expansionName)}</strong>${d.setMatchWarning ? ' <span style="color:#f59e0b;font-size:.78rem">(match per nome/numero)</span>' : ''}</div>` : ''}
       <div class="ct-price-hero">
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">${selectedCtListing ? 'Annuncio CT selezionato' : 'Prezzo min Cardmarket'} · ${escHtml(QUALITY[selectedQuality]?.label || selectedQuality)} (${selectedQuality})</span>
+          <span class="ct-price-hero-lbl">${selectedCtListing ? 'Annuncio CT selezionato' : 'Prezzo min CardTrader'} · ${escHtml(QUALITY[selectedQuality]?.label || selectedQuality)} (${selectedQuality})</span>
           <span class="ct-price-hero-val">${fmt(priceView.unit)}</span>
         </div>
         <div class="ct-price-hero-item">
