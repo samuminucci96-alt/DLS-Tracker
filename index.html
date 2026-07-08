@@ -1058,6 +1058,10 @@
     }
     .tbl-empty small { display: block; font-size: 0.78rem; margin-top: 4px; opacity: 0.7; }
 
+    tr.coll-row-open { cursor: pointer; }
+    tr.coll-row-open:hover td { background: var(--surface-2); }
+    tr.coll-row-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
     .coll-footer {
       display: flex;
       align-items: center;
@@ -2865,7 +2869,6 @@
         <div class="coll-footer">
           <div class="total-label" id="totalLabel">Totale: €0,00</div>
           <div class="export-btns">
-            <button class="btn btn-outline" id="exportJsonBtn" disabled>↓ JSON</button>
             <button class="btn btn-primary" id="exportCsvBtn" disabled style="padding:9px 16px; font-size:0.87rem;">↓ CSV</button>
           </div>
         </div>
@@ -2987,37 +2990,56 @@ const CT_SET_CODE_MAP = {
   sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
   sv9: 'jtg', sv9pt5: 'dri',
   scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
-  svp: 'svp',
-  swshp: 'swshp',
-  scarletvioletblackstarpromos: 'svp',
-  svblackstarpromos: 'svp',
-  blackstarpromos: 'svp',
+  mep: 'mep',
+  svp: 'svpromo',
+  swshp: 'swshbs',
+  smp: 'smbs',
+  xyp: 'xybsp',
+  bwp: 'bwbsp',
+  scarletvioletblackstarpromos: 'svpromo',
+  svblackstarpromos: 'svpromo',
+  blackstarpromos: 'svpromo',
+  mepblackstarpromos: 'mep',
 };
 
+const CT_PROMO_EXPANSION_CODES = new Set(['mep', 'svpromo', 'swshbs', 'smbs', 'xybsp', 'bwbsp']);
+
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
+
+function isPromoSetId(setId) {
+  return isPokemonPromoSet({ set: { id: setId || '', name: '' } });
+}
 
 function isPokemonPromoSet(card) {
   const id = (card?.set?.id || '').toLowerCase();
   const n = norm(card?.set?.name || '').replace(/\s+/g, '');
-  return /^(svp|swshp|smp|xyp|bmp|dpp|hsp)$/.test(id) || /blackstarpromo/.test(n);
+  if (/^(svp|swshp|smp|xyp|bmp|dpp|hsp|mep|bwp|np|pop|sma)$/.test(id)) return true;
+  if (/blackstarpromo|promos?$/i.test(n) || (/promo/i.test(n) && /black\s*star|mep|svp|swsh|mega/i.test(n))) return true;
+  return false;
 }
 
 function ctPromoEraKey(setId) {
   const id = (setId || '').toLowerCase();
+  if (id === 'mep' || id.startsWith('me')) return 'me';
   if (id.startsWith('sv')) return 'sv';
   if (id.startsWith('swsh')) return 'swsh';
   if (id.startsWith('sm')) return 'sm';
   if (id.startsWith('xy')) return 'xy';
+  if (id.startsWith('bw') || id === 'bwp') return 'bw';
   return id.replace(/[^a-z0-9]/g, '').slice(0, 4);
 }
 
 function ctExpansionPromoEra(exp) {
   const n = norm(ctExpName(exp)).replace(/\s+/g, '');
+  const code = norm(exp?.code || '');
+  if (code === 'mep' || /mep|megaevol/i.test(n)) return 'me';
   if (/blackstarpromo/.test(n)) {
+    if (/mep|mega/.test(n)) return 'me';
     if (/sv|scarlet|violet/.test(n)) return 'sv';
     if (/swsh|sword|shield/.test(n)) return 'swsh';
     if (/sun|moon|^sm/.test(n)) return 'sm';
     if (/xy/.test(n)) return 'xy';
+    if (/bw|blackwhite/.test(n)) return 'bw';
     return 'generic';
   }
   return null;
@@ -3028,8 +3050,47 @@ function promoNumberMatches(rawNum, bpNum) {
   if (!bpNum) return false;
   if (bpNum === rawNum) return true;
   const padded = rawNum.padStart(3, '0');
-  const variants = [rawNum, padded, `svp${rawNum}`, `sv${rawNum}`, `svp${padded}`];
-  return variants.some(v => bpNum === v || bpNum.endsWith(v) || bpNum.includes(rawNum));
+  const variants = [
+    rawNum, padded,
+    `svp${rawNum}`, `svp${padded}`,
+    `mep${rawNum}`, `mep${padded}`,
+    `sv${rawNum}`, `swsh${rawNum}`,
+  ];
+  return variants.some(v => {
+    if (bpNum === v) return true;
+    if (!bpNum.endsWith(v)) return false;
+    const i = bpNum.length - v.length;
+    return i === 0 || !/\d/.test(bpNum[i - 1]);
+  });
+}
+
+function cardNumberMatches(searchNumber, cardNumber) {
+  if (!searchNumber) return true;
+  const cn = norm(cardNumber || '');
+  if (!cn) return false;
+
+  const rawSearch = searchNumber.split('/')[0].replace(/^0+/, '') || '0';
+  const rawCard = String(cardNumber || '').split('/')[0].replace(/^0+/, '') || '0';
+  if (rawSearch === rawCard) return true;
+  if (promoNumberMatches(rawSearch, rawCard) || promoNumberMatches(rawCard, rawSearch)) return true;
+
+  const nnum = norm(searchNumber);
+  if (cn === nnum) return true;
+  // Evita falsi positivi tipo "9" dentro "90" — solo match esatti per numeri puri
+  if (/^\d+$/.test(nnum)) return false;
+  return cn.includes(nnum) || nnum.includes(cn);
+}
+
+function inferPromoSetIdFromText(text) {
+  const t = norm(text);
+  const compact = t.replace(/\s+/g, '');
+  if (/\bmep\b/.test(t) || compact.includes('mepblackstar') || /megaevolutionpromo/.test(compact)) return 'mep';
+  if (/\bsvp\b/.test(t) || compact.includes('svblackstar') || /scarletvioletpromo/.test(compact)) return 'svp';
+  if (/\bswshp\b/.test(t) || compact.includes('swshblackstar')) return 'swshp';
+  if (/\bsmp\b/.test(t) || compact.includes('smblackstar')) return 'smp';
+  if (/\bxyp\b/.test(t) || compact.includes('xyblackstar')) return 'xyp';
+  if (/\bbwp\b/.test(t) || compact.includes('bwblackstar')) return 'bwp';
+  return '';
 }
 
 function pokemonSetEnglishName(setId, setName) {
@@ -3081,11 +3142,16 @@ function pokemonRarityProfile(card) {
 function scoreBlueprintForCard(card, bp) {
   const cardName = norm(card.name || '');
   const bn = ctBpName(bp);
-  if (!cardName || !bn) return 0;
-  if (bn !== cardName && !bn.includes(cardName) && !cardName.includes(bn)) return 0;
-
-  let score = bn === cardName ? 12 : 7;
   const rawNum = (card.number || '').split('/')[0].replace(/^0+/, '');
+
+  if (cardName) {
+    if (!bn) return 0;
+    if (bn !== cardName && !bn.includes(cardName) && !cardName.includes(bn)) return 0;
+  } else if (!rawNum) {
+    return 0;
+  }
+
+  let score = cardName ? (bn === cardName ? 12 : 7) : 5;
   const bpNum = ctBpNumber(bp);
 
   if (rawNum) {
@@ -3093,7 +3159,7 @@ function scoreBlueprintForCard(card, bp) {
       if (!isPokemonPromoSet(card)) return 0;
       score += 4;
     } else if (bpNum !== rawNum) {
-      if (isPokemonPromoSet(card) && promoNumberMatches(rawNum, bpNum)) score += 22;
+      if (promoNumberMatches(rawNum, bpNum)) score += 22;
       else return 0;
     } else {
       score += 30;
@@ -3209,10 +3275,102 @@ function clearPokemonManualPrice() {
   renderResult();
 }
 
+function buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick) {
+  if (effectivePrice.manual) {
+    return {
+      price: unit,
+      priceMode: 'manual',
+      manualPrice: true,
+      ctPrice: null,
+      ctListing: null,
+      priceSrc: 'Manuale',
+    };
+  }
+  if (listingPick?.seller) {
+    return {
+      price: unit,
+      priceMode: 'listing',
+      manualPrice: false,
+      ctPrice: unit,
+      ctListing: listingPick,
+      priceSrc: `CardTrader · ${listingPick.seller}`,
+    };
+  }
+  return {
+    price: unit,
+    priceMode: selPrice.fromCt ? 'min_ct' : 'estimate',
+    manualPrice: false,
+    ctPrice: selPrice.fromCt || selPrice.condition ? unit : null,
+    ctListing: null,
+    priceSrc: effectivePrice.source || priceSrc || 'Stima',
+  };
+}
+
+function resolveCollectionItemPrice(item, ctResult) {
+  if (item.manualPrice || item.priceMode === 'manual') {
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  const qKey = item.quality || item.condition || 'NM';
+  const condKey = item.ctListing?.condKey || CT_QUALITY_TO_COND[qKey] || 'NM';
+
+  if (item.priceMode === 'listing' && item.ctListing) {
+    const cond = ctResult?.conditions?.find(c => c.key === condKey);
+    const listings = cond?.listings || [];
+    const wantSeller = norm(item.ctListing.seller || '');
+    let listing = listings.find(l => norm(l.seller || '') === wantSeller);
+    if (!listing && item.ctListing.price != null) {
+      const target = Number(item.ctListing.price);
+      listing = listings.find(l => Math.abs(Number(l.price) - target) < 0.02);
+    }
+    if (listing) {
+      const p = parseFloat(Number(listing.price).toFixed(2));
+      return { price: p, ctPrice: p, updated: true };
+    }
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  if (!ctResult?.conditions?.length) {
+    return { price: item.price, ctPrice: item.ctPrice, updated: false };
+  }
+
+  const resolved = resolveCtConditionPrice(ctResult, qKey);
+  const p = parseFloat(Number(resolved.unit || 0).toFixed(2));
+  return {
+    price: p,
+    ctPrice: resolved.fromCt ? p : null,
+    updated: true,
+  };
+}
+
+// Lingue UI → codice API CardTrader (GET /marketplace/products?language=en)
+const CT_LANGUAGE_BY_UI = {
+  '': '',
+  English: 'en',
+  Italian: 'it',
+  Spanish: 'es',
+  German: 'de',
+  French: 'fr',
+  Japanese: 'ja',
+  Portuguese: 'pt',
+  Korean: 'ko',
+};
+
 const SEARCH_LANG_CODES = {
   english: 'en', italian: 'it', spanish: 'es', german: 'de',
   french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
+  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', pt: 'pt', ko: 'ko',
 };
+
+function ctLanguageApiCode(lang) {
+  if (!lang) return '';
+  if (CT_LANGUAGE_BY_UI[lang]) return CT_LANGUAGE_BY_UI[lang];
+  const n = norm(lang);
+  for (const [ui, code] of Object.entries(CT_LANGUAGE_BY_UI)) {
+    if (ui && (n === norm(ui) || n.includes(norm(ui)))) return code;
+  }
+  return normalizeSearchLang(lang);
+}
 
 function normalizeSearchLang(lang) {
   if (!lang) return '';
@@ -3223,16 +3381,45 @@ function normalizeSearchLang(lang) {
   return n.slice(0, 2);
 }
 
+function ctListingLanguageRaw(listing) {
+  const ph = listing?.properties_hash || listing?.properties || {};
+  return ph.pokemon_language
+    || ph.mtg_language
+    || ph.yugioh_language
+    || ph.fab_language
+    || ph.onepiece_language
+    || ph.riftbound_language
+    || ph.language
+    || listing?.language
+    || '';
+}
+
 function listingMatchesLanguage(listing, lang) {
   if (!lang) return true;
-  const want = normalizeSearchLang(lang);
-  const raw = norm(listing?.language || listing?.properties_hash?.language || '');
+  const want = ctLanguageApiCode(lang);
+  if (!want) return true;
+  const raw = norm(ctListingLanguageRaw(listing));
   if (!raw || raw === '?' || raw === 'any') return false;
   if (raw === want || raw.startsWith(want)) return true;
   for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
     if (code === want && (raw.includes(name) || raw === code)) return true;
   }
   return false;
+}
+
+function ctMarketplaceProductsPath(blueprintId, lang = searchLangFilter) {
+  const id = encodeURIComponent(String(blueprintId));
+  const code = ctLanguageApiCode(lang);
+  return code
+    ? `/marketplace/products?blueprint_id=${id}&language=${encodeURIComponent(code)}`
+    : `/marketplace/products?blueprint_id=${id}`;
+}
+
+function ctLanguageLabel(lang) {
+  if (!lang) return 'Qualsiasi';
+  const code = ctLanguageApiCode(lang);
+  const entry = Object.entries(CT_LANGUAGE_BY_UI).find(([, c]) => c === code);
+  return entry?.[0] || lang;
 }
 
 function cardMatchesSearchLanguage(card, lang) {
@@ -3691,7 +3878,10 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
       } else if (!ctBpName(bp).includes(cardName) && !cardName.includes(ctBpName(bp))) {
         continue;
       }
-      if (!card && rawNum && ctBpNumber(bp) && ctBpNumber(bp) !== rawNum) continue;
+      if (!card && rawNum) {
+        const bpNum = ctBpNumber(bp);
+        if (bpNum && bpNum !== rawNum && !promoNumberMatches(rawNum, bpNum)) continue;
+      }
       hits.push({ bp, score: score || 1, expansion: exp });
       if (hits.length >= 12) break;
     }
@@ -3708,6 +3898,30 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
 
   ctCache.bpSearch.set(cacheKey, result);
   return result;
+}
+
+async function searchCtPromoBlueprints(stubCard, signal) {
+  const expansions = await ctGetExpansions(null, 'pokemon');
+  const promoExps = expansions.filter(e =>
+    CT_PROMO_EXPANSION_CODES.has(norm(e.code)) || ctExpansionPromoEra(e)
+  );
+  const hits = [];
+  for (const exp of promoExps) {
+    if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    const bps = await ctGetBlueprints(exp.id);
+    for (const bp of bps) {
+      const score = scoreBlueprintForCard(stubCard, bp);
+      if (score > 0) hits.push({ bp, score, expansion: exp });
+    }
+    if (hits.length >= 24) break;
+  }
+  return hits
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12)
+    .map(({ bp, expansion }) => ({
+      ...bp,
+      expansion: { id: expansion.id, name_en: ctExpName(expansion), code: expansion.code },
+    }));
 }
 
 function dedupeBlueprints(bps) {
@@ -4068,8 +4282,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
         currency: x.currency,
         count: 0,
         seller: l.user?.username || '?',
-        language: l.properties_hash?.language || '?',
-        foil: l.properties_hash?.foil ?? false,
+        language: ctListingLanguageRaw(l) || '?',
+        foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
         listings: [],
       };
     }
@@ -4083,16 +4297,16 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
       price: x.price,
       currency: x.currency,
       seller: l.user?.username || l.seller?.username || '?',
-      language: l.properties_hash?.language || '?',
-      foil: l.properties_hash?.foil ?? false,
+      language: ctListingLanguageRaw(l) || '?',
+      foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
       quantity: l.quantity || 1,
       url: l.url || l.card_url || ''
     });
 
     if (x.price === row.minPrice) {
       row.seller = l.user?.username || '?';
-      row.language = l.properties_hash?.language || '?';
-      row.foil = l.properties_hash?.foil ?? false;
+      row.language = ctListingLanguageRaw(l) || '?';
+      row.foil = l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false;
     }
   }
 
@@ -4129,16 +4343,17 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
 }
 
 function ctLangFilterError(listings, langFilter = searchLangFilter) {
-  if (!langFilter || !listings?.length) return null;
+  if (!langFilter) return null;
+  if (!listings?.length) return null;
   const hasAny = listings.some(l => listingMatchesLanguage(l, langFilter));
   if (hasAny) return null;
-  return `Nessun annuncio CardTrader in ${langFilter} per questa carta. Prova "Qualsiasi" o un'altra lingua.`;
+  return `Nessun annuncio CardTrader in ${ctLanguageLabel(langFilter)}. Prova "Qualsiasi" o un'altra lingua.`;
 }
 
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
-    const raw = await ctFetch(`/marketplace/products?blueprint_id=${blueprintId}`);
+    const raw = await ctFetch(ctMarketplaceProductsPath(blueprintId));
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
@@ -4216,7 +4431,7 @@ async function ctGetPrice(card, game = 'pokemon') {
       ctSearchUrl: `https://www.cardtrader.com/en/search?q=${encodeURIComponent(card.name + ' ' + (card.set?.name || ''))}`
     };
 
-    const raw = await ctFetch(`/marketplace/products?blueprint_id=${bp.id}`);
+    const raw = await ctFetch(ctMarketplaceProductsPath(bp.id));
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
@@ -4474,6 +4689,8 @@ function getSelectedSetId() {
   const q = norm(text);
   const exact = POKEMON_SETS.find(s => norm(s.id) === q || norm(s.id).replace(/[\.\-]/g, '') === q.replace(/[\.\-]/g, ''));
   if (exact) return exact.id;
+  const inferredPromo = inferPromoSetIdFromText(text);
+  if (inferredPromo) return inferredPromo;
   const matches = filterSetSuggestions(text);
   return matches.length === 1 ? matches[0].id : '';
 }
@@ -4556,6 +4773,104 @@ document.getElementById('cardSet')?.addEventListener('keydown', e => {
     doSearch();
   }
 });
+
+function ctCardFromBlueprint(bp) {
+  const exp = bp.expansion || {};
+  const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
+  const num = bp?.fixed_properties?.collector_number || bp?.collector_number || ctBpNumber(bp) || '';
+  return {
+    id: `ct-${bp.id}`,
+    bpId: bp.id,
+    name: bp.name,
+    number: num,
+    set: { id: exp.code || '', name: exp.name_en || ctExpName(exp) },
+    rarity: bp.category_name || '',
+    images: img ? { small: img, large: img } : undefined,
+    _fromCt: true,
+  };
+}
+
+async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
+  if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+
+  const setInput = $('cardSet')?.value?.trim() || '';
+  const effectiveSetId = cardSet || inferPromoSetIdFromText(setInput);
+  const setRow = effectiveSetId ? POKEMON_SETS.find(s => norm(s.id) === norm(effectiveSetId)) : null;
+  let setName = setInput;
+  if (setRow?.text) {
+    const m = setRow.text.match(/–\s*([^()]+?)(?:\s*\(|$)/);
+    if (m) setName = m[1].trim();
+  }
+
+  const stubCard = {
+    name: name || '',
+    number: number || '',
+    set: { id: effectiveSetId || '', name: setName },
+  };
+
+  let bps = [];
+  try {
+    const ctCode = effectiveSetId ? resolveCtCodeForPokemonSet(effectiveSetId, setName) : null;
+    if (effectiveSetId && (isPromoSetId(effectiveSetId) || ctCode)) {
+      const exp = await ctMatchExpansion(stubCard, null, 'pokemon');
+      if (exp) {
+        if (name && number) {
+          const bp = await ctFindBlueprint(stubCard, exp.id, null);
+          if (bp) bps = [{ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }];
+        } else {
+          const all = await ctGetBlueprints(exp.id);
+          const nn = norm(name);
+          const rawNum = (number || '').split('/')[0].replace(/^0+/, '');
+          for (const bp of all) {
+            if (name && nn && !norm(bp.name).includes(nn)) continue;
+            if (number && rawNum) {
+              const bpNum = ctBpNumber(bp);
+              if (bpNum !== rawNum && !promoNumberMatches(rawNum, bpNum)) continue;
+            }
+            bps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
+            if (bps.length >= 24) break;
+          }
+        }
+      }
+    }
+    if (!bps.length && name) {
+      bps = await ctSearchBlueprintsByName(name, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
+      if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
+    }
+    if (!bps.length && !effectiveSetId && (name || number)) {
+      bps = await searchCtPromoBlueprints(stubCard, signal);
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    console.warn('[CT] searchPokemonViaCardTrader:', e);
+    return [];
+  }
+
+  return dedupeBlueprints(bps).map(ctCardFromBlueprint);
+}
+
+function shouldTryCtPromoSearch(cardSet) {
+  const setText = $('cardSet')?.value?.trim() || '';
+  return isPromoSetId(cardSet)
+    || !!inferPromoSetIdFromText(setText)
+    || /promo|black\s*star|\bmep\b|\bsvp\b|mega\s*evolution/i.test(`${setText} ${cardSet || ''}`);
+}
+
+function shouldTryCtFallback(name, number, cardSet) {
+  if (shouldTryCtPromoSearch(cardSet)) return true;
+  if (name && number) return true;
+  if (number && cardSet) return true;
+  return false;
+}
+
+function filterCardsToQuery(cards, name, number, cardSet) {
+  if (!cards.length) return cards;
+  let out = cards;
+  if (number) out = out.filter(c => cardNumberMatches(number, c.number));
+  if (cardSet) out = out.filter(c => norm(c.set?.id || '') === norm(cardSet));
+  if (name) out = out.filter(c => norm(c.name || '').includes(norm(name)));
+  return out;
+}
 
 // ── Local fallback search ─────────────────────────────────────────────
 function searchLocal(name, number, set, lang) {
@@ -4709,18 +5024,30 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
     if (local.length) cards = local;
   }
 
+  // Se l'API ha restituito match larghi (es. *9* → #90) scartali e prova CardTrader
+  if (cards.length && !cards.every(c => c._fromCt)) {
+    const strict = filterCardsToQuery(cards, name, number, cardSet);
+    cards = strict.length ? strict : [];
+  }
+
+  // Set assente da Pokémon TCG API → CardTrader (anche senza set/espansione)
+  if (!cards.length && (name || number) && shouldTryCtFallback(name, number, cardSet)) {
+    const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
+    if (ctCards.length) {
+      showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
+      cards = ctCards;
+    }
+  }
+
   // Client-side post-filtering
   if (number && cards.length) {
-    cards = cards.filter(c => {
-      const cn = norm(c.number || '');
-      return cn.includes(nnum) || cn.includes(nnum.replace(/[^0-9]/g, ''));
-    });
+    cards = cards.filter(c => cardNumberMatches(number, c.number));
   }
   if (name && cards.length) {
     cards = cards.filter(c => norm(c.name || '').includes(nn));
   }
   if (lang && cards.length) {
-    const byLang = cards.filter(c => cardMatchesSearchLanguage(c, lang));
+    const byLang = cards.filter(c => c._fromCt || cardMatchesSearchLanguage(c, lang));
     if (byLang.length) cards = byLang;
   }
 
@@ -4729,7 +5056,12 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
 
 // ── Card helpers ──────────────────────────────────────────────────────
 function getImg(card) {
-  return card.images?.small || card.images?.large || '';
+  if (card?.images?.small || card?.images?.large) return card.images.small || card.images.large;
+  if (card?.bpId) {
+    const img = ctBpImageUrl(card) || ctBpImageUrl(card, 'thumb');
+    if (img) return img;
+  }
+  return '';
 }
 
 function getPrice(card) {
@@ -5019,6 +5351,14 @@ async function addToCollection() {
     return;
   }
   const lang  = $('cardLanguage').value || 'Any';
+  const listingPick = !effectivePrice.manual && selectedCtListing?.seller
+    ? {
+        condKey: selectedCtListing.condKey,
+        seller: selectedCtListing.seller,
+        price: unit,
+      }
+    : null;
+  const priceFields = buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick);
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -5029,16 +5369,18 @@ async function addToCollection() {
       lang,
       quality: selectedQuality,
       condition: selectedQuality,
-      price: unit,
       basePrice,
-      priceSrc: effectivePrice.manual ? 'Manuale' : priceSrc,
-      ctPrice: effectivePrice.manual ? null : (selPrice.fromCt || selPrice.condition ? unit : null),
-      manualPrice: effectivePrice.manual || false,
       img: getImg(selectedCard),
       imgUrl: getImg(selectedCard),
       addedAt: new Date().toISOString(),
       game: 'pokemon',
-      card: { name: selectedCard.name, number: selectedCard.number, set: selectedCard.set }
+      card: {
+        name: selectedCard.name,
+        number: selectedCard.number,
+        set: selectedCard.set,
+        bpId: selectedCard.bpId || null,
+      },
+      ...priceFields,
     });
   }
   persistLocalCollection();
@@ -5075,15 +5417,127 @@ function removeItem(idx) {
   if (dlsUser) saveCloudCollection();
 }
 
+function cardFromCollectionItem(item) {
+  const setId = item.setId || item.card?.set?.id || '';
+  const setName = item.set || item.card?.set?.name || '';
+  const img = ctResolveStoredImage(item.img || item.imgUrl || '');
+  const bpId = item.card?.bpId;
+  return {
+    name: item.name,
+    number: item.number,
+    set: { id: setId, name: setName },
+    bpId: bpId || undefined,
+    id: bpId ? `ct-${bpId}` : `coll-${norm(item.name)}|${setId}|${item.number}`,
+    images: img ? { small: img, large: img } : undefined,
+    _fromCt: !!bpId,
+  };
+}
+
+function bpFromCollectionItem(item) {
+  const img = ctResolveStoredImage(item.img || item.imgUrl || '');
+  return {
+    id: item.card?.bpId,
+    name: item.name,
+    collector_number: item.number,
+    expansion: {
+      code: item.setId || '',
+      name_en: item.set || '',
+    },
+    imgUrl: img,
+    image_url: img || undefined,
+  };
+}
+
+function fillPokemonSearchFromItem(item) {
+  if ($('pokemonName')) $('pokemonName').value = item.name || '';
+  if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
+  const lang = item.lang || item.language || '';
+  if ($('cardLanguage')) $('cardLanguage').value = lang === 'Any' ? '' : lang;
+  const qKey = item.quality || item.condition || 'NM';
+  if ($('condSelect')) $('condSelect').value = qKey;
+  selectedQuality = qKey;
+
+  const setId = item.setId || item.card?.set?.id || '';
+  const setRow = setId && typeof POKEMON_SETS !== 'undefined'
+    ? POKEMON_SETS.find(s => norm(s.id) === norm(setId))
+    : null;
+  if ($('cardSetId')) $('cardSetId').value = setId;
+  if ($('cardSet')) $('cardSet').value = setRow?.text || item.set || '';
+}
+
+function fillTcgSearchFromItem(gameKey, item) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return;
+  if ($(`${cfg.prefix}CardName`)) $(`${cfg.prefix}CardName`).value = item.name || '';
+  if ($(`${cfg.prefix}CardNumber`)) {
+    $(`${cfg.prefix}CardNumber`).value = item.number && item.number !== '?' ? item.number : '';
+  }
+  const lang = item.lang || item.language || '';
+  if ($(cfg.langField)) $(cfg.langField).value = lang === 'Any' || lang === 'any' ? '' : lang;
+  if ($(cfg.condField)) $(cfg.condField).value = item.quality || item.condition || 'NM';
+  const setField = $(`${cfg.prefix}CardSet`);
+  const setIdField = $(`${cfg.prefix}CardSetId`);
+  if (setIdField) setIdField.value = item.setId || '';
+  if (setField) {
+    const sets = cfg.getSets?.() || [];
+    const setRow = item.setId ? sets.find(s => norm(s.id) === norm(item.setId)) : null;
+    setField.value = setRow?.text || item.set || '';
+  }
+}
+
+function scrollToSearchPanel() {
+  document.querySelector('.main-grid .panel:first-child')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function openCollectionItem(idx) {
+  const item = collection[idx];
+  if (!item) return;
+
+  const game = item.game || 'pokemon';
+  if (game !== activeGame) switchActiveGame(game);
+
+  if (game === 'pokemon') {
+    fillPokemonSearchFromItem(item);
+    $('choicesCard').hidden = true;
+    hideAllSuggestions();
+    hideSetSuggestions();
+    selectCard(cardFromCollectionItem(item));
+    scrollToSearchPanel();
+    return;
+  }
+
+  const gameKey = game === 'onepiece' ? 'onepiece' : 'riftbound';
+  const bp = bpFromCollectionItem(item);
+  if (!bp.id) {
+    tcgShowMsg(gameKey, 'Impossibile aprire la carta: ID CardTrader mancante.', 'warn');
+    return;
+  }
+  fillTcgSearchFromItem(gameKey, item);
+  await tcgSelectCard(gameKey, bp);
+  scrollToSearchPanel();
+}
+
 function bindCollectionActions() {
   const body = $('collBody');
   if (!body || body.dataset.bound === '1') return;
   body.dataset.bound = '1';
   body.addEventListener('click', e => {
-    const btn = e.target.closest('[data-remove-idx]');
-    if (!btn) return;
+    const removeBtn = e.target.closest('[data-remove-idx]');
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeItem(Number(removeBtn.dataset.removeIdx));
+      return;
+    }
+    const row = e.target.closest('[data-open-idx]');
+    if (row) openCollectionItem(Number(row.dataset.openIdx));
+  });
+  body.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('[data-open-idx]');
+    if (!row) return;
     e.preventDefault();
-    removeItem(Number(btn.dataset.removeIdx));
+    openCollectionItem(Number(row.dataset.openIdx));
   });
 }
 
@@ -5469,10 +5923,11 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   tcgRenderResult(gameKey, bp, null);
 
   try {
-    const data = await ctFetch(`/marketplace/products?blueprint_id=${bp.id}`);
+    const lang = $(cfg.langField)?.value?.trim() || '';
+    const data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     const listings = Object.values(data).flat();
-    const { conditions } = ctAverageConditions(listings);
+    const { conditions } = ctAverageConditions(listings, lang);
     ctTcgState[gameKey].prices = {
       conditions,
       total: listings.length,
@@ -5653,6 +6108,16 @@ window.tcgAddToCollection = async function(gameKey) {
   const nmMin = nmCond?.minPrice || nmCond?.price || unit;
   const lang = $(cfg.langField)?.value || 'any';
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
+  const picked = ctTcgState[gameKey].selectedListing;
+  const listingPick = !resolved?.manual && picked?.seller
+    ? { condKey: picked.condKey, seller: picked.seller, price: unit }
+    : null;
+  const priceFields = buildCollectionPriceFields(
+    unit,
+    resolved || { fromCt: false, condition: null },
+    { manual: !!resolved?.manual, source: resolved?.source },
+    listingPick,
+  );
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -5663,15 +6128,13 @@ window.tcgAddToCollection = async function(gameKey) {
       lang,
       quality: qKey,
       condition: qKey,
-      price: unit,
       basePrice: nmMin,
-      ctPrice: resolved?.manual ? null : (resolved?.fromCt ? unit : null),
-      manualPrice: resolved?.manual || false,
       img,
       imgUrl: img,
       addedAt: new Date().toISOString(),
       game: cfg.game,
       card: { name: bp.name, number: bp.collector_number, bpId: bp.id, game: cfg.game },
+      ...priceFields,
     });
   }
   persistLocalCollection();
@@ -5765,10 +6228,8 @@ function renderCollection() {
 
   const hasItems = visible.length > 0;
   const exportCsvBtn = $('exportCsvBtn');
-  const exportJsonBtn = $('exportJsonBtn');
   const clearBtn = $('clearBtn');
   if (exportCsvBtn) exportCsvBtn.disabled = !hasItems;
-  if (exportJsonBtn) exportJsonBtn.disabled = !hasItems;
   if (clearBtn) clearBtn.disabled = !hasItems;
 
   const collBody = $('collBody');
@@ -5795,7 +6256,7 @@ function renderCollection() {
     const imgRaw = item.img || item.imgUrl;
     const img = imgRaw ? ctResolveStoredImage(imgRaw) : '';
     return `
-    <tr>
+    <tr class="coll-row-open" data-open-idx="${idx}" tabindex="0" title="Apri nella ricerca">
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
           ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
@@ -5832,19 +6293,6 @@ document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
   rows.push(['','','','','TOTALE','',total.toFixed(2)]);
   const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   dlBlob(csv, 'text/csv;charset=utf-8;', `dls-${activeGame}-lista.csv`);
-});
-
-document.getElementById('exportJsonBtn')?.addEventListener('click', () => {
-  const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
-  if (!items.length) return;
-  const payload = {
-    exportDate: new Date().toISOString(),
-    game: activeGame,
-    totalCards: items.length,
-    totalValue: parseFloat(items.reduce((s, i) => s + i.price, 0).toFixed(2)),
-    cards: items.map(({ imgUrl, ...rest }) => rest)
-  };
-  dlBlob(JSON.stringify(payload, null, 2), 'application/json', `dls-${activeGame}-lista.json`);
 });
 
 function dlBlob(content, type, name) {
@@ -6731,16 +7179,20 @@ async function refreshAllPrices() {
         continue;
       }
       if (result.conditions?.length) {
-        const qKey = item.quality || item.condition || 'NM';
-        const ctCond = CT_QUALITY_TO_COND[qKey] || 'NM';
-        const resolved = resolveCtConditionPrice(result, qKey);
-        const newPrice = resolved.unit;
-        collection[i].ctPrice = resolved.fromCt ? newPrice : null;
-        collection[i].price = newPrice;
-        collection[i].lastPriceUpdate = new Date().toISOString();
-        persistLocalCollection();
-        if (cell) { cell.textContent = fmt(newPrice); cell.className = 'ct-price-cell updated'; }
-        updated++;
+        const resolved = resolveCollectionItemPrice(item, result);
+        if (resolved.updated) {
+          collection[i].price = resolved.price;
+          collection[i].ctPrice = resolved.ctPrice;
+          collection[i].lastPriceUpdate = new Date().toISOString();
+          persistLocalCollection();
+          if (cell) { cell.textContent = fmt(resolved.price); cell.className = 'ct-price-cell updated'; }
+          updated++;
+        } else if (cell) {
+          cell.textContent = fmt(item.price);
+          cell.className = item.manualPrice || item.priceMode === 'manual'
+            ? 'ct-price-cell manual'
+            : 'ct-price-cell locked';
+        }
       } else {
         if (cell) { cell.textContent = '—'; cell.className = 'ct-price-cell no-data'; }
       }
@@ -6779,7 +7231,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=40').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
