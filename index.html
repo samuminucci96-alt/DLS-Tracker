@@ -3209,10 +3209,34 @@ function clearPokemonManualPrice() {
   renderResult();
 }
 
+// Lingue UI → codice API CardTrader (GET /marketplace/products?language=en)
+const CT_LANGUAGE_BY_UI = {
+  '': '',
+  English: 'en',
+  Italian: 'it',
+  Spanish: 'es',
+  German: 'de',
+  French: 'fr',
+  Japanese: 'ja',
+  Portuguese: 'pt',
+  Korean: 'ko',
+};
+
 const SEARCH_LANG_CODES = {
   english: 'en', italian: 'it', spanish: 'es', german: 'de',
   french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
+  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', pt: 'pt', ko: 'ko',
 };
+
+function ctLanguageApiCode(lang) {
+  if (!lang) return '';
+  if (CT_LANGUAGE_BY_UI[lang]) return CT_LANGUAGE_BY_UI[lang];
+  const n = norm(lang);
+  for (const [ui, code] of Object.entries(CT_LANGUAGE_BY_UI)) {
+    if (ui && (n === norm(ui) || n.includes(norm(ui)))) return code;
+  }
+  return normalizeSearchLang(lang);
+}
 
 function normalizeSearchLang(lang) {
   if (!lang) return '';
@@ -3223,16 +3247,45 @@ function normalizeSearchLang(lang) {
   return n.slice(0, 2);
 }
 
+function ctListingLanguageRaw(listing) {
+  const ph = listing?.properties_hash || listing?.properties || {};
+  return ph.pokemon_language
+    || ph.mtg_language
+    || ph.yugioh_language
+    || ph.fab_language
+    || ph.onepiece_language
+    || ph.riftbound_language
+    || ph.language
+    || listing?.language
+    || '';
+}
+
 function listingMatchesLanguage(listing, lang) {
   if (!lang) return true;
-  const want = normalizeSearchLang(lang);
-  const raw = norm(listing?.language || listing?.properties_hash?.language || '');
+  const want = ctLanguageApiCode(lang);
+  if (!want) return true;
+  const raw = norm(ctListingLanguageRaw(listing));
   if (!raw || raw === '?' || raw === 'any') return false;
   if (raw === want || raw.startsWith(want)) return true;
   for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
     if (code === want && (raw.includes(name) || raw === code)) return true;
   }
   return false;
+}
+
+function ctMarketplaceProductsPath(blueprintId, lang = searchLangFilter) {
+  const id = encodeURIComponent(String(blueprintId));
+  const code = ctLanguageApiCode(lang);
+  return code
+    ? `/marketplace/products?blueprint_id=${id}&language=${encodeURIComponent(code)}`
+    : `/marketplace/products?blueprint_id=${id}`;
+}
+
+function ctLanguageLabel(lang) {
+  if (!lang) return 'Qualsiasi';
+  const code = ctLanguageApiCode(lang);
+  const entry = Object.entries(CT_LANGUAGE_BY_UI).find(([, c]) => c === code);
+  return entry?.[0] || lang;
 }
 
 function cardMatchesSearchLanguage(card, lang) {
@@ -4068,8 +4121,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
         currency: x.currency,
         count: 0,
         seller: l.user?.username || '?',
-        language: l.properties_hash?.language || '?',
-        foil: l.properties_hash?.foil ?? false,
+        language: ctListingLanguageRaw(l) || '?',
+        foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
         listings: [],
       };
     }
@@ -4083,16 +4136,16 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
       price: x.price,
       currency: x.currency,
       seller: l.user?.username || l.seller?.username || '?',
-      language: l.properties_hash?.language || '?',
-      foil: l.properties_hash?.foil ?? false,
+      language: ctListingLanguageRaw(l) || '?',
+      foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
       quantity: l.quantity || 1,
       url: l.url || l.card_url || ''
     });
 
     if (x.price === row.minPrice) {
       row.seller = l.user?.username || '?';
-      row.language = l.properties_hash?.language || '?';
-      row.foil = l.properties_hash?.foil ?? false;
+      row.language = ctListingLanguageRaw(l) || '?';
+      row.foil = l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false;
     }
   }
 
@@ -4129,16 +4182,17 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
 }
 
 function ctLangFilterError(listings, langFilter = searchLangFilter) {
-  if (!langFilter || !listings?.length) return null;
+  if (!langFilter) return null;
+  if (!listings?.length) return null;
   const hasAny = listings.some(l => listingMatchesLanguage(l, langFilter));
   if (hasAny) return null;
-  return `Nessun annuncio CardTrader in ${langFilter} per questa carta. Prova "Qualsiasi" o un'altra lingua.`;
+  return `Nessun annuncio CardTrader in ${ctLanguageLabel(langFilter)}. Prova "Qualsiasi" o un'altra lingua.`;
 }
 
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
-    const raw = await ctFetch(`/marketplace/products?blueprint_id=${blueprintId}`);
+    const raw = await ctFetch(ctMarketplaceProductsPath(blueprintId));
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
@@ -4216,7 +4270,7 @@ async function ctGetPrice(card, game = 'pokemon') {
       ctSearchUrl: `https://www.cardtrader.com/en/search?q=${encodeURIComponent(card.name + ' ' + (card.set?.name || ''))}`
     };
 
-    const raw = await ctFetch(`/marketplace/products?blueprint_id=${bp.id}`);
+    const raw = await ctFetch(ctMarketplaceProductsPath(bp.id));
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
@@ -5469,10 +5523,11 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   tcgRenderResult(gameKey, bp, null);
 
   try {
-    const data = await ctFetch(`/marketplace/products?blueprint_id=${bp.id}`);
+    const lang = $(cfg.langField)?.value?.trim() || '';
+    const data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     const listings = Object.values(data).flat();
-    const { conditions } = ctAverageConditions(listings);
+    const { conditions } = ctAverageConditions(listings, lang);
     ctTcgState[gameKey].prices = {
       conditions,
       total: listings.length,
@@ -6779,7 +6834,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=40').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
