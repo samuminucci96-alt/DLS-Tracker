@@ -2987,37 +2987,54 @@ const CT_SET_CODE_MAP = {
   sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
   sv9: 'jtg', sv9pt5: 'dri',
   scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
-  svp: 'svp',
-  swshp: 'swshp',
-  scarletvioletblackstarpromos: 'svp',
-  svblackstarpromos: 'svp',
-  blackstarpromos: 'svp',
+  mep: 'mep',
+  svp: 'svpromo',
+  swshp: 'swshbs',
+  smp: 'smbs',
+  xyp: 'xybsp',
+  bwp: 'bwbsp',
+  scarletvioletblackstarpromos: 'svpromo',
+  svblackstarpromos: 'svpromo',
+  blackstarpromos: 'svpromo',
+  mepblackstarpromos: 'mep',
 };
 
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
 
+function isPromoSetId(setId) {
+  return isPokemonPromoSet({ set: { id: setId || '', name: '' } });
+}
+
 function isPokemonPromoSet(card) {
   const id = (card?.set?.id || '').toLowerCase();
   const n = norm(card?.set?.name || '').replace(/\s+/g, '');
-  return /^(svp|swshp|smp|xyp|bmp|dpp|hsp)$/.test(id) || /blackstarpromo/.test(n);
+  if (/^(svp|swshp|smp|xyp|bmp|dpp|hsp|mep|bwp|np|pop|sma)$/.test(id)) return true;
+  if (/blackstarpromo|promos?$/i.test(n) || (/promo/i.test(n) && /black\s*star|mep|svp|swsh|mega/i.test(n))) return true;
+  return false;
 }
 
 function ctPromoEraKey(setId) {
   const id = (setId || '').toLowerCase();
+  if (id === 'mep' || id.startsWith('me')) return 'me';
   if (id.startsWith('sv')) return 'sv';
   if (id.startsWith('swsh')) return 'swsh';
   if (id.startsWith('sm')) return 'sm';
   if (id.startsWith('xy')) return 'xy';
+  if (id.startsWith('bw') || id === 'bwp') return 'bw';
   return id.replace(/[^a-z0-9]/g, '').slice(0, 4);
 }
 
 function ctExpansionPromoEra(exp) {
   const n = norm(ctExpName(exp)).replace(/\s+/g, '');
+  const code = norm(exp?.code || '');
+  if (code === 'mep' || /mep|megaevol/i.test(n)) return 'me';
   if (/blackstarpromo/.test(n)) {
+    if (/mep|mega/.test(n)) return 'me';
     if (/sv|scarlet|violet/.test(n)) return 'sv';
     if (/swsh|sword|shield/.test(n)) return 'swsh';
     if (/sun|moon|^sm/.test(n)) return 'sm';
     if (/xy/.test(n)) return 'xy';
+    if (/bw|blackwhite/.test(n)) return 'bw';
     return 'generic';
   }
   return null;
@@ -3028,7 +3045,12 @@ function promoNumberMatches(rawNum, bpNum) {
   if (!bpNum) return false;
   if (bpNum === rawNum) return true;
   const padded = rawNum.padStart(3, '0');
-  const variants = [rawNum, padded, `svp${rawNum}`, `sv${rawNum}`, `svp${padded}`];
+  const variants = [
+    rawNum, padded,
+    `svp${rawNum}`, `svp${padded}`,
+    `mep${rawNum}`, `mep${padded}`,
+    `sv${rawNum}`, `swsh${rawNum}`,
+  ];
   return variants.some(v => bpNum === v || bpNum.endsWith(v) || bpNum.includes(rawNum));
 }
 
@@ -4611,6 +4633,82 @@ document.getElementById('cardSet')?.addEventListener('keydown', e => {
   }
 });
 
+function ctCardFromBlueprint(bp) {
+  const exp = bp.expansion || {};
+  const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
+  const num = ctBpNumber(bp) || bp.collector_number || '';
+  return {
+    id: `ct-${bp.id}`,
+    bpId: bp.id,
+    name: bp.name,
+    number: num,
+    set: { id: exp.code || '', name: exp.name_en || ctExpName(exp) },
+    rarity: bp.category_name || '',
+    images: img ? { small: img, large: img } : undefined,
+    _fromCt: true,
+  };
+}
+
+async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
+  if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+
+  const setRow = cardSet ? POKEMON_SETS.find(s => norm(s.id) === norm(cardSet)) : null;
+  let setName = $('cardSet')?.value?.trim() || '';
+  if (setRow?.text) {
+    const m = setRow.text.match(/–\s*([^()]+?)(?:\s*\(|$)/);
+    if (m) setName = m[1].trim();
+  }
+
+  const stubCard = {
+    name: name || '',
+    number: number || '',
+    set: { id: cardSet || '', name: setName },
+  };
+
+  let bps = [];
+  try {
+    const ctCode = cardSet ? resolveCtCodeForPokemonSet(cardSet, setName) : null;
+    if (cardSet && (isPromoSetId(cardSet) || ctCode)) {
+      const exp = await ctMatchExpansion(stubCard, null, 'pokemon');
+      if (exp) {
+        if (name && number) {
+          const bp = await ctFindBlueprint(stubCard, exp.id, null);
+          if (bp) bps = [{ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }];
+        } else {
+          const all = await ctGetBlueprints(exp.id);
+          const nn = norm(name);
+          const rawNum = (number || '').split('/')[0].replace(/^0+/, '');
+          for (const bp of all) {
+            if (name && nn && !norm(bp.name).includes(nn)) continue;
+            if (number && rawNum) {
+              const bpNum = ctBpNumber(bp);
+              if (bpNum !== rawNum && !promoNumberMatches(rawNum, bpNum)) continue;
+            }
+            bps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
+            if (bps.length >= 24) break;
+          }
+        }
+      }
+    }
+    if (!bps.length && name) {
+      bps = await ctSearchBlueprintsByName(name, null, 'pokemon', (number || cardSet) ? stubCard : null);
+      if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    console.warn('[CT] searchPokemonViaCardTrader:', e);
+    return [];
+  }
+
+  return dedupeBlueprints(bps).map(ctCardFromBlueprint);
+}
+
+function shouldTryCtPromoSearch(cardSet) {
+  const setText = $('cardSet')?.value?.trim() || '';
+  return isPromoSetId(cardSet)
+    || /promo|black\s*star|\bmep\b|\bsvp\b/i.test(`${setText} ${cardSet || ''}`);
+}
+
 // ── Local fallback search ─────────────────────────────────────────────
 function searchLocal(name, number, set, lang) {
   const nn = norm(name), nnum = norm(number), nset = norm(set), nl = norm(lang);
@@ -4763,6 +4861,15 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
     if (local.length) cards = local;
   }
 
+  // Promo / set assente da Pokémon TCG API → CardTrader
+  if (!cards.length && name && shouldTryCtPromoSearch(cardSet)) {
+    const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
+    if (ctCards.length) {
+      showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
+      cards = ctCards;
+    }
+  }
+
   // Client-side post-filtering
   if (number && cards.length) {
     cards = cards.filter(c => {
@@ -4774,7 +4881,7 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
     cards = cards.filter(c => norm(c.name || '').includes(nn));
   }
   if (lang && cards.length) {
-    const byLang = cards.filter(c => cardMatchesSearchLanguage(c, lang));
+    const byLang = cards.filter(c => c._fromCt || cardMatchesSearchLanguage(c, lang));
     if (byLang.length) cards = byLang;
   }
 
@@ -4783,7 +4890,12 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
 
 // ── Card helpers ──────────────────────────────────────────────────────
 function getImg(card) {
-  return card.images?.small || card.images?.large || '';
+  if (card?.images?.small || card?.images?.large) return card.images.small || card.images.large;
+  if (card?.bpId) {
+    const img = ctBpImageUrl(card) || ctBpImageUrl(card, 'thumb');
+    if (img) return img;
+  }
+  return '';
 }
 
 function getPrice(card) {

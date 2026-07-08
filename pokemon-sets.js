@@ -1,6 +1,30 @@
 // Auto-generated from index.html set list
 const POKEMON_SETS = [
   {
+    "id": "mep",
+    "text": "MEP Black Star Promos – Mega Evolution Promos (mep) · 2025"
+  },
+  {
+    "id": "svp",
+    "text": "SV Black Star Promos – Scarlet & Violet Promos (svp)"
+  },
+  {
+    "id": "swshp",
+    "text": "SWSH Black Star Promos – Sword & Shield Promos (swshp)"
+  },
+  {
+    "id": "smp",
+    "text": "SM Black Star Promos – Sun & Moon Promos (smp)"
+  },
+  {
+    "id": "xyp",
+    "text": "XY Black Star Promos – XY Promos (xyp)"
+  },
+  {
+    "id": "bwp",
+    "text": "BW Black Star Promos – Black & White Promos (bwp)"
+  },
+  {
     "id": "me4",
     "text": "Chaos Rising – Caos Ascendente (me4) · 2026"
   },
