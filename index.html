@@ -2869,7 +2869,6 @@
         <div class="coll-footer">
           <div class="total-label" id="totalLabel">Totale: €0,00</div>
           <div class="export-btns">
-            <button class="btn btn-outline" id="exportJsonBtn" disabled>↓ JSON</button>
             <button class="btn btn-primary" id="exportCsvBtn" disabled style="padding:9px 16px; font-size:0.87rem;">↓ CSV</button>
           </div>
         </div>
@@ -6229,10 +6228,8 @@ function renderCollection() {
 
   const hasItems = visible.length > 0;
   const exportCsvBtn = $('exportCsvBtn');
-  const exportJsonBtn = $('exportJsonBtn');
   const clearBtn = $('clearBtn');
   if (exportCsvBtn) exportCsvBtn.disabled = !hasItems;
-  if (exportJsonBtn) exportJsonBtn.disabled = !hasItems;
   if (clearBtn) clearBtn.disabled = !hasItems;
 
   const collBody = $('collBody');
@@ -6296,19 +6293,6 @@ document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
   rows.push(['','','','','TOTALE','',total.toFixed(2)]);
   const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   dlBlob(csv, 'text/csv;charset=utf-8;', `dls-${activeGame}-lista.csv`);
-});
-
-document.getElementById('exportJsonBtn')?.addEventListener('click', () => {
-  const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
-  if (!items.length) return;
-  const payload = {
-    exportDate: new Date().toISOString(),
-    game: activeGame,
-    totalCards: items.length,
-    totalValue: parseFloat(items.reduce((s, i) => s + i.price, 0).toFixed(2)),
-    cards: items.map(({ imgUrl, ...rest }) => rest)
-  };
-  dlBlob(JSON.stringify(payload, null, 2), 'application/json', `dls-${activeGame}-lista.json`);
 });
 
 function dlBlob(content, type, name) {
