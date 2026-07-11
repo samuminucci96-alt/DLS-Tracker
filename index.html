@@ -539,6 +539,7 @@
     }
 
     input[type="number"] {
+      appearance: textfield;
       -moz-appearance: textfield;
     }
     input[type="number"]::-webkit-inner-spin-button,
@@ -797,6 +798,7 @@
       white-space: normal;
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -907,6 +909,20 @@
     .pill-rarity { background: var(--gold-dim); color: var(--warning); }
     .pill-hp     { background: rgba(248,113,113,0.1); color: #fca5a5; }
     .pill-type   { background: rgba(167,139,250,0.1); color: #c4b5fd; }
+    .edit-mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.73rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: rgba(245, 158, 11, 0.16);
+      color: #92400e;
+      border: 1px solid rgba(180, 83, 9, 0.28);
+      margin-bottom: 8px;
+    }
 
     .price-box {
       padding: 11px 13px;
@@ -1061,6 +1077,10 @@
     tr.coll-row-open { cursor: pointer; }
     tr.coll-row-open:hover td { background: var(--surface-2); }
     tr.coll-row-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    tr.coll-row-editing td {
+      background: rgba(245, 158, 11, 0.14) !important;
+      box-shadow: inset 0 1px 0 rgba(180, 83, 9, 0.22), inset 0 -1px 0 rgba(180, 83, 9, 0.22);
+    }
 
     .coll-footer {
       display: flex;
@@ -1766,7 +1786,7 @@
     .auth-title {
       font-size: 1.25rem; font-weight: 800; margin-bottom: 6px;
       background: linear-gradient(135deg, var(--accent), #c9920a);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .auth-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px; }
     .auth-tabs {
@@ -1800,6 +1820,20 @@
     }
     .auth-toggle { font-size: 0.8rem; color: var(--text-muted); text-align: center; }
     .auth-toggle a { color: var(--accent); cursor: pointer; text-decoration: none; }
+
+    .manual-price-modal {
+      width: min(380px, 100%);
+    }
+    .manual-price-actions {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .manual-price-actions .btn {
+      flex: 1;
+      min-height: 42px;
+    }
 
     /* ─── User button in header ─────────────────────────────────── */
     .user-btn {
@@ -2063,6 +2097,8 @@
     }
     .ct-price-cell.refreshing { color: var(--accent); opacity: 0.6; }
     .ct-price-cell.updated   { color: var(--success); animation: countFlip .3s ease; }
+    .ct-price-cell.manual    { color: var(--warning); }
+    .ct-price-cell.locked    { color: var(--text-dim); }
     .ct-price-cell.no-data   { color: var(--text-muted); font-weight: 400; }
 
     /* ─── Firebase setup banner ─────────────────────────────────── */
@@ -2535,6 +2571,24 @@
     <button type="button" class="btn profile-logout" id="profileLogoutBtn">Esci dall'account</button>
   </div>
 </div>
+
+<!-- ── Manual Price Modal ───────────────────────────────────────── -->
+<div id="manualPriceOverlay" class="auth-overlay is-closed" role="dialog" aria-modal="true" aria-labelledby="manualPriceTitle">
+  <div class="auth-modal manual-price-modal">
+    <button class="auth-close" id="manualPriceClose" aria-label="Chiudi">✕</button>
+    <div class="auth-title" id="manualPriceTitle">Prezzo manuale</div>
+    <div class="auth-sub" id="manualPriceSub">Inserisci il prezzo manuale per la carta selezionata.</div>
+    <div class="auth-field">
+      <label for="manualPriceInput">Prezzo (EUR)</label>
+      <input id="manualPriceInput" type="text" inputmode="decimal" placeholder="Es. 12,90" autocomplete="off">
+    </div>
+    <div class="auth-err" id="manualPriceErr"></div>
+    <div class="manual-price-actions">
+      <button type="button" class="btn btn-outline" id="manualPriceCancelBtn">Annulla</button>
+      <button type="button" class="btn" id="manualPriceSaveBtn">Salva</button>
+    </div>
+  </div>
+</div>
 <div class="app-shell" id="appShell">
 
   <!-- ─── Header ─────────────────────────────────────────────────── -->
@@ -2601,7 +2655,7 @@
           <div class="form-row">
             <div class="field">
               <label for="cardNumber">Numero carta</label>
-              <input id="cardNumber" type="text" placeholder="Es. 199/197" autocomplete="off">
+              <input id="cardNumber" type="text" placeholder="Es. 095" autocomplete="off">
             </div>
             <div class="field">
               <label for="cardSet">Set / Espansione</label>
@@ -3210,6 +3264,7 @@ let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
+let collectionEditEntryId = null;
 const suggCache     = new Map();
 
 // ── Utilities ────────────────────────────────────────────────────────
@@ -3505,6 +3560,45 @@ function normCardName(v) {
 
 function collectionEntryId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function resolveCollectionEditIndex() {
+  if (!collectionEditEntryId) return -1;
+  return collection.findIndex(item => item?._id === collectionEditEntryId);
+}
+
+function isCollectionEditActive(gameKey = null) {
+  const idx = resolveCollectionEditIndex();
+  if (idx < 0) return false;
+  if (!gameKey) return true;
+  return (collection[idx]?.game || 'pokemon') === gameKey;
+}
+
+function setCollectionEditByIndex(idx) {
+  const item = collection[idx];
+  if (!item) {
+    if (collectionEditEntryId !== null) {
+      collectionEditEntryId = null;
+      renderCollection();
+    }
+    return;
+  }
+  if (!item._id) {
+    item._id = collectionEntryId();
+    persistLocalCollection();
+  }
+  const nextId = item._id;
+  if (collectionEditEntryId !== nextId) {
+    collectionEditEntryId = nextId;
+    renderCollection();
+  }
+}
+
+function clearCollectionEdit() {
+  if (collectionEditEntryId !== null) {
+    collectionEditEntryId = null;
+    renderCollection();
+  }
 }
 
 function pushCollectionItem(item) {
@@ -4905,6 +4999,7 @@ async function doSearch() {
     switchActiveGame('pokemon');
     if (activeGame !== 'pokemon') activeGame = 'pokemon';
   }
+  clearCollectionEdit();
 
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
@@ -5268,6 +5363,7 @@ function renderResult() {
   const effectivePrice = pokemonEffectivePrice(selectedPrice);
   const calc = effectivePrice.unit;
   const qty  = parseInt($('cardQty')?.value) || 1;
+  const isEditMode = isCollectionEditActive('pokemon');
 
   const srcLabel = effectivePrice.manual
     ? `<span style="color:var(--accent);font-weight:700;">Prezzo manuale applicato</span>`
@@ -5283,6 +5379,7 @@ function renderResult() {
         ? `<div class="result-img"><img src="${img}" alt="${escHtml(card.name)}"></div>`
         : `<div class="result-img-ph">Immagine<br>n.d.</div>`}
       <div>
+        ${isEditMode ? `<div class="edit-mode-badge">✏️ Modifica carta in collezione</div>` : ''}
         <div class="result-name">${escHtml(card.name)}</div>
         <div class="pills">
           ${card.set?.name   ? `<span class="pill pill-set">📦 ${card.set.name}</span>` : ''}
@@ -5319,7 +5416,9 @@ function renderResult() {
     ${renderCtSection()}
 
     <button class="btn btn-success" id="addBtn">
-      ＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}
+      ${isEditMode
+        ? `💾 &nbsp;Salva modifiche (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}`
+        : `＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}`}
     </button>
   `;
 
@@ -5342,6 +5441,8 @@ function renderResult() {
 // ── Collection ────────────────────────────────────────────────────────
 async function addToCollection() {
   if (!selectedCard) return;
+  const editIdx = resolveCollectionEditIndex();
+  const isEditMode = editIdx >= 0 && (collection[editIdx]?.game || 'pokemon') === 'pokemon';
   const qty   = Math.max(1, Math.min(99, parseInt($('cardQty')?.value) || 1));
   const selPrice = getSelectedUnitPrice();
   const effectivePrice = pokemonEffectivePrice(selPrice);
@@ -5359,6 +5460,39 @@ async function addToCollection() {
       }
     : null;
   const priceFields = buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick);
+
+  if (isEditMode) {
+    const current = collection[editIdx];
+    collection[editIdx] = {
+      ...current,
+      name: selectedCard.name,
+      set: selectedCard.set?.name || 'Set sconosciuto',
+      setId: selectedCard.set?.id || '',
+      number: selectedCard.number || '-',
+      lang,
+      quality: selectedQuality,
+      condition: selectedQuality,
+      basePrice,
+      img: getImg(selectedCard),
+      imgUrl: getImg(selectedCard),
+      game: 'pokemon',
+      card: {
+        name: selectedCard.name,
+        number: selectedCard.number,
+        set: selectedCard.set,
+        bpId: selectedCard.bpId || null,
+      },
+      lastPriceUpdate: new Date().toISOString(),
+      ...priceFields,
+    };
+    persistLocalCollection();
+    onCollectionChanged({ scroll: true });
+    if (dlsUser) await saveCloudCollection();
+    clearCollectionEdit();
+    renderResult();
+    showMsg(`${selectedCard.name} aggiornata in collezione (${selectedQuality} · ${fmt(unit)}).`, 'success');
+    return;
+  }
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -5411,7 +5545,9 @@ async function addToCollection() {
 
 function removeItem(idx) {
   if (idx < 0 || idx >= collection.length) return;
+  const removedId = collection[idx]?._id;
   collection.splice(idx, 1);
+  if (removedId && removedId === collectionEditEntryId) clearCollectionEdit();
   persistLocalCollection();
   onCollectionChanged();
   if (dlsUser) saveCloudCollection();
@@ -5492,29 +5628,195 @@ function scrollToSearchPanel() {
 async function openCollectionItem(idx) {
   const item = collection[idx];
   if (!item) return;
+  setCollectionEditByIndex(idx);
 
   const game = item.game || 'pokemon';
   if (game !== activeGame) switchActiveGame(game);
 
   if (game === 'pokemon') {
+    if ($('cardQty')) $('cardQty').value = '1';
     fillPokemonSearchFromItem(item);
     $('choicesCard').hidden = true;
     hideAllSuggestions();
     hideSetSuggestions();
     selectCard(cardFromCollectionItem(item));
+    if (item.manualPrice || item.priceMode === 'manual') {
+      manualPokemonPrice = Number(item.price) || null;
+      manualPokemonPriceRaw = manualPokemonPrice != null ? String(manualPokemonPrice).replace('.', ',') : '';
+    } else {
+      manualPokemonPrice = null;
+      manualPokemonPriceRaw = '';
+    }
+    selectedCtListing = item.ctListing?.seller
+      ? {
+          condKey: item.ctListing.condKey,
+          seller: item.ctListing.seller,
+          price: Number(item.ctListing.price || item.price || 0),
+          listing: null,
+        }
+      : null;
+    renderResult();
     scrollToSearchPanel();
     return;
   }
 
   const gameKey = game === 'onepiece' ? 'onepiece' : 'riftbound';
+  const cfg = CT_TCG_CONFIG[gameKey];
   const bp = bpFromCollectionItem(item);
   if (!bp.id) {
     tcgShowMsg(gameKey, 'Impossibile aprire la carta: ID CardTrader mancante.', 'warn');
     return;
   }
+  if ($(cfg.qtyField)) $(cfg.qtyField).value = '1';
   fillTcgSearchFromItem(gameKey, item);
   await tcgSelectCard(gameKey, bp);
+  if (item.manualPrice || item.priceMode === 'manual') {
+    ctTcgState[gameKey].manualPrice = Number(item.price) || null;
+    ctTcgState[gameKey].manualPriceRaw = ctTcgState[gameKey].manualPrice != null
+      ? String(ctTcgState[gameKey].manualPrice).replace('.', ',')
+      : '';
+  } else {
+    ctTcgState[gameKey].manualPrice = null;
+    ctTcgState[gameKey].manualPriceRaw = '';
+  }
+  ctTcgState[gameKey].selectedListing = item.ctListing?.seller
+    ? {
+        condKey: item.ctListing.condKey,
+        index: null,
+        price: Number(item.ctListing.price || item.price || 0),
+        seller: item.ctListing.seller,
+        listing: null,
+      }
+    : null;
+  tcgRenderResult(gameKey, bp, ctTcgState[gameKey].prices);
   scrollToSearchPanel();
+}
+
+function editCollectionItemManualPrice(idx) {
+  const item = collection[idx];
+  if (!item) return;
+  openManualPriceModal(idx);
+}
+
+let manualPriceEditIdx = null;
+
+function openManualPriceModal(idx) {
+  const item = collection[idx];
+  const overlay = $('manualPriceOverlay');
+  const input = $('manualPriceInput');
+  const err = $('manualPriceErr');
+  if (!item || !overlay || !input) return;
+
+  manualPriceEditIdx = idx;
+  const initial = Number(item.price || 0) > 0
+    ? String(Number(item.price).toFixed(2)).replace('.', ',')
+    : '';
+  $('manualPriceSub').textContent = `Inserisci il prezzo manuale per ${item.name}.`;
+  input.value = initial;
+  if (err) {
+    err.textContent = '';
+    err.style.display = 'none';
+  }
+  overlay.classList.remove('is-closed');
+  document.body.classList.add('auth-open');
+  setTimeout(() => {
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+  }, 60);
+}
+
+function closeManualPriceModal() {
+  $('manualPriceOverlay')?.classList.add('is-closed');
+  manualPriceEditIdx = null;
+  if ($('authOverlay')?.classList.contains('is-closed') && $('profileOverlay')?.classList.contains('is-closed')) {
+    document.body.classList.remove('auth-open');
+  }
+  document.activeElement?.blur();
+}
+
+function showManualPriceErr(msg) {
+  const err = $('manualPriceErr');
+  if (!err) return;
+  err.textContent = msg;
+  err.style.display = 'block';
+}
+
+function submitManualPriceModal() {
+  if (manualPriceEditIdx == null) return;
+  const idx = manualPriceEditIdx;
+  const item = collection[idx];
+  const input = $('manualPriceInput');
+  const raw = input?.value || '';
+  if (!item) {
+    closeManualPriceModal();
+    return;
+  }
+
+  const parsed = parseManualPrice(raw);
+  if (parsed == null) {
+    showManualPriceErr('Prezzo non valido. Usa un numero maggiore di 0.');
+    return;
+  }
+
+  collection[idx].price = parsed;
+  collection[idx].manualPrice = true;
+  collection[idx].priceMode = 'manual';
+  collection[idx].ctPrice = null;
+  collection[idx].priceSrc = 'Manuale';
+  collection[idx].lastPriceUpdate = new Date().toISOString();
+  persistLocalCollection();
+  if (dlsUser) saveCloudCollection();
+  closeManualPriceModal();
+  onCollectionChanged();
+  showMsg(`Prezzo manuale salvato per ${item.name}: ${fmt(parsed)}.`, 'success');
+}
+
+async function resetCollectionItemManualPrice(idx) {
+  const item = collection[idx];
+  if (!item) return;
+  if (!item.card?.bpId && !item.card) {
+    showMsg('Impossibile ripristinare: riferimento CardTrader mancante.', 'warning');
+    return;
+  }
+
+  showMsg(`Ripristino prezzo di mercato per ${item.name}...`, 'loading');
+  try {
+    let result;
+    if (item.card?.bpId) {
+      result = await ctGetPriceByBlueprintId(item.card.bpId);
+    } else {
+      result = await ctGetPrice(item.card, item.game || 'pokemon');
+    }
+    if (!result?.conditions?.length) {
+      showMsg('Prezzo di mercato non disponibile al momento. Riprova tra poco.', 'warning');
+      return;
+    }
+
+    const marketTarget = {
+      ...item,
+      manualPrice: false,
+      priceMode: item.priceMode === 'manual' ? 'min_ct' : item.priceMode,
+    };
+    const resolved = resolveCollectionItemPrice(marketTarget, result);
+    if (!resolved || !Number.isFinite(resolved.price) || resolved.price <= 0) {
+      showMsg('Nessun prezzo valido trovato per il ripristino.', 'warning');
+      return;
+    }
+
+    collection[idx].price = resolved.price;
+    collection[idx].ctPrice = resolved.ctPrice;
+    collection[idx].manualPrice = false;
+    collection[idx].priceMode = collection[idx].ctListing ? 'listing' : (resolved.ctPrice != null ? 'min_ct' : 'estimate');
+    collection[idx].priceSrc = collection[idx].ctListing ? (collection[idx].priceSrc || 'CardTrader') : (resolved.ctPrice != null ? 'CardTrader' : 'Stima');
+    collection[idx].lastPriceUpdate = new Date().toISOString();
+
+    persistLocalCollection();
+    if (dlsUser) saveCloudCollection();
+    onCollectionChanged();
+    showMsg(`Prezzo di mercato ripristinato per ${item.name}: ${fmt(resolved.price)}.`, 'success');
+  } catch {
+    showMsg('Errore durante il ripristino del prezzo di mercato.', 'error');
+  }
 }
 
 function bindCollectionActions() {
@@ -5527,6 +5829,20 @@ function bindCollectionActions() {
       e.preventDefault();
       e.stopPropagation();
       removeItem(Number(removeBtn.dataset.removeIdx));
+      return;
+    }
+    const manualEditBtn = e.target.closest('[data-manual-edit-idx]');
+    if (manualEditBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      editCollectionItemManualPrice(Number(manualEditBtn.dataset.manualEditIdx));
+      return;
+    }
+    const manualResetBtn = e.target.closest('[data-manual-reset-idx]');
+    if (manualResetBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      resetCollectionItemManualPrice(Number(manualResetBtn.dataset.manualResetIdx));
       return;
     }
     const row = e.target.closest('[data-open-idx]');
@@ -5543,7 +5859,10 @@ function bindCollectionActions() {
 
 document.getElementById('clearBtn')?.addEventListener('click', () => {
   const before = collection.length;
+  const editedIdx = resolveCollectionEditIndex();
+  const editedGame = editedIdx >= 0 ? (collection[editedIdx]?.game || 'pokemon') : null;
   collection = collection.filter(item => (item.game || 'pokemon') !== activeGame);
+  if (editedGame && editedGame === activeGame) clearCollectionEdit();
   persistLocalCollection();
   if (dlsUser) saveCloudCollection();
   if (collection.length === before) return;
@@ -5833,6 +6152,7 @@ function tcgRenderNameSuggestions(gameKey, bps) {
 
 async function tcgDoSearch(gameKey) {
   const cfg = CT_TCG_CONFIG[gameKey];
+  clearCollectionEdit();
   const name = $(`${cfg.prefix}CardName`)?.value?.trim() || '';
   const num  = $(`${cfg.prefix}CardNumber`)?.value?.trim() || '';
   if (!name && !num) { tcgShowMsg(gameKey, 'Inserisci il nome o il numero della carta', 'warn'); return; }
@@ -5981,6 +6301,7 @@ function tcgRenderResult(gameKey, bp, prices) {
   const qKey = $(cfg.condField)?.value || 'NM';
   const qLabel = QUALITY[qKey]?.label || qKey;
   const selPrice = getTcgUnitPrice(gameKey);
+  const isEditMode = isCollectionEditActive(cfg.game);
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const qty = parseInt($(cfg.qtyField)?.value) || 1;
   const priceHtml = !prices ? '<div class="ct-loading"><div class="spinner"></div><span>Caricamento prezzi…</span></div>'
@@ -6024,6 +6345,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           : `<div class="tcg-result-img-ph">${cfg.icon}</div>`}
       </div>
       <div class="tcg-result-body">
+        ${isEditMode ? `<div class="edit-mode-badge">✏️ Modifica carta in collezione</div>` : ''}
         <div class="tcg-result-name">${escHtml(bp.name)}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
           <span class="badge-set">${escHtml(bp.expansion?.name_en || '?')}</span>
@@ -6046,7 +6368,9 @@ function tcgRenderResult(gameKey, bp, prices) {
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span class="pill pill-set">Condizione: ${escHtml(qLabel)} (${qKey})</span>
-      <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''} ×${qty}</button>
+      <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">${isEditMode
+        ? `💾 Salva modifiche (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''}`
+        : `+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''} ×${qty}`}</button>
     </div>`;
   card.hidden = false;
   $(`${cfg.prefix}ManualPriceInput`)?.addEventListener('input', (e) => {
@@ -6092,6 +6416,8 @@ window.tcgAddToCollection = async function(gameKey) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const bp = ctTcgState[gameKey].selected;
   const prices = ctTcgState[gameKey].prices;
+  const editIdx = resolveCollectionEditIndex();
+  const isEditMode = editIdx >= 0 && (collection[editIdx]?.game || 'pokemon') === cfg.game;
   if (!bp) return;
   const qKey = $(cfg.condField)?.value || 'NM';
   const qty = Math.max(1, Math.min(99, parseInt($(cfg.qtyField)?.value) || 1));
@@ -6118,6 +6444,34 @@ window.tcgAddToCollection = async function(gameKey) {
     { manual: !!resolved?.manual, source: resolved?.source },
     listingPick,
   );
+
+  if (isEditMode) {
+    const current = collection[editIdx];
+    collection[editIdx] = {
+      ...current,
+      name: bp.name,
+      set: bp.expansion?.name_en || '?',
+      setId: bp.expansion?.code || '',
+      number: bp.collector_number || '?',
+      lang,
+      quality: qKey,
+      condition: qKey,
+      basePrice: nmMin,
+      img,
+      imgUrl: img,
+      game: cfg.game,
+      card: { name: bp.name, number: bp.collector_number, bpId: bp.id, game: cfg.game },
+      lastPriceUpdate: new Date().toISOString(),
+      ...priceFields,
+    };
+    persistLocalCollection();
+    onCollectionChanged({ scroll: true });
+    if (dlsUser) await saveCloudCollection();
+    clearCollectionEdit();
+    tcgRenderResult(gameKey, bp, ctTcgState[gameKey].prices);
+    tcgShowMsg(gameKey, `${bp.name} aggiornata in collezione (${qKey} · ${fmt(unit)}).`, 'success');
+    return;
+  }
 
   for (let i = 0; i < qty; i++) {
     pushCollectionItem({
@@ -6249,14 +6603,19 @@ function renderCollection() {
 
   collBody.innerHTML = visible.map(({ item, idx }) => {
     const ctPriceVal = item.ctPrice != null ? fmt(item.ctPrice) : (item.price ? fmt(item.price) : '—');
-    const ctClass    = item.ctPrice != null ? 'ct-price-cell updated' : 'ct-price-cell';
+    const ctClass    = item.manualPrice || item.priceMode === 'manual'
+      ? 'ct-price-cell manual'
+      : item.ctPrice != null
+        ? 'ct-price-cell updated'
+        : 'ct-price-cell';
     const lastUpd    = item.lastPriceUpdate
       ? new Date(item.lastPriceUpdate?.toDate?.() || item.lastPriceUpdate).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
       : null;
     const imgRaw = item.img || item.imgUrl;
     const img = imgRaw ? ctResolveStoredImage(imgRaw) : '';
+    const isEditingRow = item._id && item._id === collectionEditEntryId;
     return `
-    <tr class="coll-row-open" data-open-idx="${idx}" tabindex="0" title="Apri nella ricerca">
+    <tr class="coll-row-open${isEditingRow ? ' coll-row-editing' : ''}" data-open-idx="${idx}" tabindex="0" title="${isEditingRow ? 'Carta in modifica' : 'Apri nella ricerca'}">
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
           ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
@@ -6269,11 +6628,13 @@ function renderCollection() {
       <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
       <td><span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span></td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
-      <td class="${ctClass}" data-ct-price="${idx}" title="${lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi'}">
+      <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
         ${ctPriceVal}
         ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
       </td>
       <td class="td-actions">
+        <button type="button" class="btn btn-outline" data-manual-edit-idx="${idx}" title="Modifica prezzo manuale" style="padding:6px 8px;font-size:0.74rem;">€</button>
+        <button type="button" class="btn btn-outline" data-manual-reset-idx="${idx}" title="Reset prezzo manuale e ripristina mercato" style="padding:6px 8px;font-size:0.74rem;">↺</button>
         <button type="button" class="btn btn-ghost-danger" data-remove-idx="${idx}" title="Rimuovi">✕</button>
       </td>
     </tr>`;
@@ -6314,7 +6675,7 @@ const GAME_UI = {
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
-  ['authOverlay', 'profileOverlay'].forEach(id => {
+  ['authOverlay', 'profileOverlay', 'manualPriceOverlay'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('is-closed');
   });
@@ -6765,6 +7126,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('authOverlay')?.classList.contains('is-closed')) closeAuthModal();
   else if (!$('profileOverlay')?.classList.contains('is-closed')) closeProfilePanel();
+  else if (!$('manualPriceOverlay')?.classList.contains('is-closed')) closeManualPriceModal();
   else closeIosInstallSheet();
 });
 
@@ -7116,6 +7478,20 @@ document.getElementById('profileAvatarRemoveBtn')?.addEventListener('click', asy
   }
 });
 
+document.getElementById('manualPriceClose')?.addEventListener('click', closeManualPriceModal);
+document.getElementById('manualPriceCancelBtn')?.addEventListener('click', closeManualPriceModal);
+document.getElementById('manualPriceSaveBtn')?.addEventListener('click', submitManualPriceModal);
+document.getElementById('manualPriceInput')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    submitManualPriceModal();
+  }
+});
+const manualPriceOverlayEl = document.getElementById('manualPriceOverlay');
+manualPriceOverlayEl?.addEventListener('click', e => {
+  if (e.target === manualPriceOverlayEl && !manualPriceOverlayEl.classList.contains('is-closed')) closeManualPriceModal();
+});
+
 // ── Pre-caricamento dati CardTrader (in background) ───────────────────
 
 function scheduleCtPreload(game = activeGame) {
@@ -7165,9 +7541,20 @@ async function refreshAllPrices() {
   $('priceStatus').textContent = 'Aggiornamento prezzi…';
 
   let updated = 0;
+  let skippedManual = 0;
   for (let i = 0; i < collection.length; i++) {
     const item = collection[i];
     const cell = document.querySelector(`[data-ct-price="${i}"]`);
+
+    if (item.manualPrice || item.priceMode === 'manual') {
+      skippedManual++;
+      if (cell) {
+        cell.textContent = fmt(item.price);
+        cell.className = 'ct-price-cell manual';
+      }
+      continue;
+    }
+
     if (cell) cell.className = 'ct-price-cell refreshing';
     try {
       let result;
@@ -7202,7 +7589,7 @@ async function refreshAllPrices() {
 
   priceRefreshing = false;
   const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  $('priceStatus').textContent = `Aggiornato alle ${now} · ${updated} prezzi CT`;
+  $('priceStatus').textContent = `Aggiornato alle ${now} · ${updated} prezzi CT · ${skippedManual} manuali invariati`;
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Aggiorna prezzi'; }
   if (dlsUser) saveCloudCollection();
   renderCollection();
