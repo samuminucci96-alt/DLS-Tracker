@@ -641,6 +641,12 @@
       flex-shrink: 0;
     }
 
+    .choice-card img,
+    .tcg-result-img img,
+    .result-img img {
+      cursor: zoom-in;
+    }
+
     /* ─── Advanced settings toggle ───────────────────────────────── */
     .adv-toggle {
       display: inline-flex;
@@ -658,6 +664,54 @@
     .adv-toggle:hover { color: var(--text-dim); }
     .adv-toggle .chev { font-size: 0.65rem; transition: transform 0.2s; display: inline-block; }
     .adv-toggle.open .chev { transform: rotate(180deg); }
+
+    .img-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 10040;
+      background: rgba(6, 12, 22, 0.86);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+    .img-lightbox[hidden] { display: none; }
+    .img-lightbox-inner {
+      position: relative;
+      max-width: min(94vw, 720px);
+      max-height: 92vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .img-lightbox img {
+      width: auto;
+      max-width: 100%;
+      max-height: 88vh;
+      border-radius: 14px;
+      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.42);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .img-lightbox-close {
+      position: absolute;
+      top: -14px;
+      right: -14px;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px;
+      background: rgba(12, 20, 34, 0.72);
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
+    .img-lightbox-close:hover {
+      background: rgba(21, 33, 54, 0.9);
+    }
 
     .adv-body {
       max-height: 0;
@@ -2934,6 +2988,12 @@
 
   </div>
 </div>
+<div id="imgLightbox" class="img-lightbox" hidden aria-hidden="true">
+  <div class="img-lightbox-inner">
+    <button type="button" id="imgLightboxClose" class="img-lightbox-close" aria-label="Chiudi anteprima">x</button>
+    <img id="imgLightboxPic" src="" alt="Anteprima carta" loading="eager">
+  </div>
+</div>
 
 <script src="pokemon-sets.js"></script>
 <script src="onepiece-sets.js"></script>
@@ -3268,6 +3328,7 @@ let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
 let collectionEditEntryId = null;
+let maybeSeedCards = [];
 const suggCache     = new Map();
 
 // ── Utilities ────────────────────────────────────────────────────────
@@ -3698,6 +3759,60 @@ function showMsg(text, type = 'info') {
     : `<span class="msg-icon">${icons[type] || 'ℹ'}</span><span>${text}</span>`;
   box.hidden = false;
 }
+
+function openImageLightbox(src, alt = 'Anteprima carta') {
+  const box = $('imgLightbox');
+  const pic = $('imgLightboxPic');
+  if (!box || !pic || !src) return;
+  pic.src = src;
+  pic.alt = alt || 'Anteprima carta';
+  box.hidden = false;
+  box.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('auth-open');
+}
+
+function closeImageLightbox() {
+  const box = $('imgLightbox');
+  const pic = $('imgLightboxPic');
+  if (!box || !pic) return;
+  box.hidden = true;
+  box.setAttribute('aria-hidden', 'true');
+  pic.src = '';
+  if ($('authOverlay')?.classList.contains('is-closed')
+      && $('profileOverlay')?.classList.contains('is-closed')
+      && $('manualPriceOverlay')?.classList.contains('is-closed')) {
+    document.body.classList.remove('auth-open');
+  }
+}
+
+function bindPreviewImage(imgEl) {
+  if (!imgEl || imgEl.dataset.previewBound === '1') return;
+  imgEl.dataset.previewBound = '1';
+  imgEl.classList.add('previewable-img');
+  imgEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openImageLightbox(imgEl.currentSrc || imgEl.src, imgEl.alt || 'Anteprima carta');
+  });
+}
+
+$('imgLightbox')?.addEventListener('click', (e) => {
+  if (e.target.id === 'imgLightbox') closeImageLightbox();
+});
+$('imgLightboxClose')?.addEventListener('click', () => {
+  closeImageLightbox();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('imgLightbox')?.hidden) closeImageLightbox();
+});
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented) return;
+  const img = e.target?.closest?.('.result-img img, .tcg-result-img img, .choice-card img, img.previewable-img');
+  if (!img) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openImageLightbox(img.currentSrc || img.src, img.alt || 'Anteprima carta');
+}, true);
 
 function setSearchLoading(on) {
   const btn = $('searchBtn');
@@ -5021,6 +5136,25 @@ function numberSimilarityScore(query, candidate) {
   return Math.max(0, Math.round(ratio * 70));
 }
 
+function adjacentCardNumbers(number) {
+  const raw = String(number || '').trim();
+  if (!raw) return [];
+
+  const base = raw.split('/')[0];
+  const m = base.match(/\d+/);
+  if (!m) return [];
+
+  const digits = m[0];
+  const value = Number.parseInt(digits, 10);
+  if (!Number.isFinite(value)) return [];
+
+  const width = digits.length;
+  const out = [];
+  if (value > 0) out.push(String(value - 1).padStart(width, '0'));
+  out.push(String(value + 1).padStart(width, '0'));
+  return out;
+}
+
 function nameSimilarityScore(query, candidate) {
   if (!query || !candidate) return 0;
   const q = norm(query);
@@ -5063,8 +5197,44 @@ function dedupeCards(cards) {
   return [...map.values()];
 }
 
-async function findMaybeYouMeantCards(name, number, cardSet, lang, signal) {
+async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts = {}) {
   const candidates = [];
+  const seedCards = Array.isArray(opts.seedCards) ? opts.seedCards : [];
+  const fastOnly = !!opts.fastOnly;
+  const skipCtFallback = !!opts.skipCtFallback;
+  const nearNumbers = adjacentCardNumbers(number);
+  const hasNearMatch = card => nearNumbers.some(n => cardNumberMatches(n, card?.number || ''));
+
+  const quickFetchCards = async (query, pageSize) => {
+    if (!query) return [];
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 4500);
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      return await fetchCards(query, null, ctrl.signal, pageSize);
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(tid);
+      signal?.removeEventListener('abort', onAbort);
+    }
+  };
+
+  if (seedCards.length) candidates.push(...seedCards);
+
+  if (fastOnly) {
+    return dedupeCards(candidates)
+      .map(card => ({
+        card,
+        adjacent: hasNearMatch(card),
+        score: scoreMaybeCard(card, name, number, cardSet) + (hasNearMatch(card) ? 120 : 0),
+      }))
+      .filter(x => x.score >= 30)
+      .sort((a, b) => (Number(b.adjacent) - Number(a.adjacent)) || (b.score - a.score))
+      .slice(0, 8)
+      .map(x => x.card);
+  }
 
   const localWide = LOCAL_CATALOG.filter(c => {
     const n = !name || norm(c.name || '').includes(norm(name)) || nameSimilarityScore(name, c.name || '') >= 48;
@@ -5075,26 +5245,30 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal) {
   candidates.push(...localWide);
 
   if (name) {
-    try {
-      candidates.push(...await fetchCards(bfq('name', name, true), null, signal, 30));
-    } catch {}
+    candidates.push(...await quickFetchCards(bfq('name', name, true), 30));
 
     const n = norm(name).replace(/[^a-z0-9\s]/g, '').trim();
     if (n.length >= 4) {
       const shortToken = n.slice(0, Math.max(3, Math.floor(n.length * 0.6)));
-      try {
-        candidates.push(...await fetchCards(bfq('name', shortToken, true), null, signal, 20));
-      } catch {}
+      candidates.push(...await quickFetchCards(bfq('name', shortToken, true), 20));
     }
   }
 
   if (number) {
-    try {
-      candidates.push(...await fetchCards(bnq(number), null, signal, 25));
-    } catch {}
+    candidates.push(...await quickFetchCards(bnq(number), 25));
   }
 
-  if (!candidates.length && (name || number)) {
+  // Per i numeri adiacenti usiamo CardTrader: evita timeout lunghi su query
+  // troppo specifiche e intercetta promo/non presenti nel catalogo PTCG.
+  if (name && nearNumbers.length) {
+    for (const near of nearNumbers) {
+      try {
+        candidates.push(...await searchPokemonViaCardTrader(name, near, cardSet, signal));
+      } catch {}
+    }
+  }
+
+  if (!skipCtFallback && !candidates.length && (name || number)) {
     try {
       const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
       candidates.push(...ctCards);
@@ -5108,10 +5282,11 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal) {
     })
     .map(card => ({
       card,
-      score: scoreMaybeCard(card, name, number, cardSet),
+      adjacent: hasNearMatch(card),
+      score: scoreMaybeCard(card, name, number, cardSet) + (hasNearMatch(card) ? 120 : 0),
     }))
     .filter(x => x.score >= 35)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (Number(b.adjacent) - Number(a.adjacent)) || (b.score - a.score))
     .slice(0, 8)
     .map(x => x.card);
 
@@ -5161,6 +5336,7 @@ async function doSearch() {
     if (activeGame !== 'pokemon') activeGame = 'pokemon';
   }
   clearCollectionEdit();
+  maybeSeedCards = [];
 
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
@@ -5196,7 +5372,11 @@ async function doSearch() {
     const cards = await runSearch(name, number, cardSet, lang, null, searchCtrl.signal);
     if (myGen !== searchGen) return;
     if (cards.length === 0) {
-      const maybe = await findMaybeYouMeantCards(name, number, cardSet, lang, searchCtrl.signal);
+      const maybe = await findMaybeYouMeantCards(name, number, cardSet, lang, searchCtrl.signal, {
+        seedCards: maybeSeedCards,
+        fastOnly: maybeSeedCards.length > 0,
+        skipCtFallback: !!(name && number),
+      });
       if (myGen !== searchGen) return;
       if (maybe.length) {
         renderMaybeYouMeant(maybe, name, number);
@@ -5293,11 +5473,14 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   // Se l'API ha restituito match larghi (es. *9* → #90) scartali e prova CardTrader
   if (cards.length && !cards.every(c => c._fromCt)) {
     const strict = filterCardsToQuery(cards, name, number, cardSet);
+    if (!strict.length && (name || number)) {
+      maybeSeedCards = dedupeCards(cards).slice(0, 24);
+    }
     cards = strict.length ? strict : [];
   }
 
   // Set assente da Pokémon TCG API → CardTrader (anche senza set/espansione)
-  if (!cards.length && (name || number) && shouldTryCtFallback(name, number, cardSet)) {
+  if (!cards.length && !maybeSeedCards.length && !(name && number) && (name || number) && shouldTryCtFallback(name, number, cardSet)) {
     const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
     if (ctCards.length) {
       showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
@@ -5457,7 +5640,7 @@ function renderChoices(cards, opts = {}) {
 
     btn.innerHTML = `
       ${img
-        ? `<img src="${img}" alt="${card.name}" loading="lazy">`
+        ? `<img class="previewable-img" src="${img}" alt="${card.name}" loading="lazy">`
         : `<div class="choice-no-img">No img</div>`}
       <div class="choice-info">
         <strong>${card.name}</strong>
@@ -5472,6 +5655,7 @@ function renderChoices(cards, opts = {}) {
       selectCard(card);
       showMsg(`Hai selezionato: ${card.name}`, 'success');
     });
+    bindPreviewImage(btn.querySelector('img.previewable-img'));
     list.appendChild(btn);
   });
 
@@ -5549,7 +5733,7 @@ function renderResult() {
   $('resultContent').innerHTML = `
     <div class="result-layout">
       ${img
-        ? `<div class="result-img"><img src="${img}" alt="${escHtml(card.name)}"></div>`
+        ? `<div class="result-img"><img class="previewable-img" src="${img}" alt="${escHtml(card.name)}"></div>`
         : `<div class="result-img-ph">Immagine<br>n.d.</div>`}
       <div>
         ${isEditMode ? `<div class="edit-mode-badge">✏️ Modifica carta in collezione</div>` : ''}
@@ -5609,6 +5793,7 @@ function renderResult() {
   $('clearPokemonManualPriceBtn')?.addEventListener('click', clearPokemonManualPrice);
   bindPokemonCtConditionRows();
   bindPokemonCtListingRows();
+  bindPreviewImage($('resultContent')?.querySelector('img.previewable-img'));
 }
 
 // ── Collection ────────────────────────────────────────────────────────
@@ -6384,7 +6569,7 @@ function tcgShowChoices(gameKey, bps) {
     return `
     <div class="choice-card choice-card-tcg" onclick="tcgPickChoice('${gameKey}', ${i})">
       ${img
-        ? `<img class="tcg-choice-img" src="${escHtml(img)}" alt="${escHtml(bp.name)}" loading="lazy">`
+        ? `<img class="tcg-choice-img previewable-img" src="${escHtml(img)}" alt="${escHtml(bp.name)}" loading="lazy">`
         : `<div class="choice-no-img tcg-choice-img">${cfg.icon}</div>`}
       <div class="choice-info">
         <div class="choice-name">${escHtml(bp.name)}</div>
@@ -6393,6 +6578,7 @@ function tcgShowChoices(gameKey, bps) {
       </div>
     </div>`;
   }).join('');
+  $(`${cfg.prefix}ChoicesList`).querySelectorAll('img.previewable-img').forEach(bindPreviewImage);
   $(`${cfg.prefix}ChoicesCard`).hidden = false;
 }
 
@@ -6514,7 +6700,7 @@ function tcgRenderResult(gameKey, bp, prices) {
     <div class="tcg-result-layout">
       <div class="tcg-result-img">
         ${img
-          ? `<img src="${escHtml(img)}" alt="${escHtml(bp.name)}" loading="lazy">`
+          ? `<img class="previewable-img" src="${escHtml(img)}" alt="${escHtml(bp.name)}" loading="lazy">`
           : `<div class="tcg-result-img-ph">${cfg.icon}</div>`}
       </div>
       <div class="tcg-result-body">
@@ -6557,6 +6743,7 @@ function tcgRenderResult(gameKey, bp, prices) {
   });
   $(`${cfg.prefix}ApplyManualPriceBtn`)?.addEventListener('click', () => applyTcgManualPrice(gameKey));
   $(`${cfg.prefix}ClearManualPriceBtn`)?.addEventListener('click', () => clearTcgManualPrice(gameKey));
+  bindPreviewImage(card.querySelector('img.previewable-img'));
   card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
     row.addEventListener('click', () => {
       const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
