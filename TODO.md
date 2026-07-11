@@ -1,6 +1,6 @@
 # DLS Tracker — Development Roadmap
 
-## ✅ Completato (Aggiornamento 2026-07-06)
+## ✅ Completato (Aggiornamento 2026-07-12)
 
 ### Prezzi e Inserimento carte
 - [x] **Prezzo manuale prima dell'aggiunta in collezione**
@@ -13,6 +13,26 @@
 ### Ricerca e UX
 - [x] **Autocomplete ricerca** per Pokémon e TCG basati su CardTrader
 - [x] **Fallback locale catalogo** quando API non disponibile
+- [x] **Forse cercavi evoluto**
+  - Ranking suggerimenti migliorato con scoring nome/numero
+  - Supporto numeri adiacenti (es. 036 -> 035/037)
+  - Priorita ai match adiacenti quando presenti
+- [x] **Stop ricerca e anti-loop**
+  - Pulsante stop con AbortController
+  - Mitigazione fallback pesanti su ricerche nome+numero
+  - Timeout rapidi su fetch suggerimenti per evitare blocchi UI
+- [x] **Preview immagine fullscreen**
+  - Apertura fullscreen da carta selezionata e liste suggerimenti
+  - Chiusura via backdrop, pulsante X, tasto Esc
+  - Correzione CSS overlay e binding click stabile
+
+### Collezione e Prezzi
+- [x] **Edit in-place dalla collezione**
+  - Click su riga apre modalita modifica invece di aggiunta
+  - Badge visivo edit e highlight riga attiva
+- [x] **Prezzo manuale lock + reset mercato**
+  - Aggiorna prezzi non sovrascrive valori manuali
+  - Azioni per riga: modifica prezzo manuale e reset al prezzo di mercato
 
 ### Account e Sync
 - [x] **Autenticazione email/password** via Netlify Functions
@@ -36,11 +56,11 @@
   - Effort: 2-3 giorni
 
 ### UX Miglioramenti
-- [ ] **Anteprima immagine carta**
-  - Mostrare copertina carta nella modal di ricerca
-  - Lazy load per performance
-  - Fallback placeholder se immagine non disponibile
-  - Effort: 1 giorno
+- [ ] **Hardening timeout proxy ricerca**
+  - Timeout configurabili per route PokéTCG/CardTrader
+  - Retry con backoff su errori transitori
+  - Messaggistica utente uniforme su timeout vs no-results
+  - Effort: 0.5-1 giorno
 
 - [ ] **Batch import CSV/JSON**
   - Form drag-and-drop per upload file
@@ -293,7 +313,7 @@
 
 ### Sprint 1 (1 settimana)
 1. Magic TCG support + dataset
-2. Anteprima immagine carta
+2. Hardening timeout proxy ricerca
 3. Batch import CSV
 
 ### Sprint 2 (1 settimana)

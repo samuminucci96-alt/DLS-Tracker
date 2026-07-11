@@ -213,6 +213,15 @@ netlify deploy --prod
 ✅ **Responsive design** (mobile-first)  
 ✅ **Sincronizzazione cloud** (Netlify Blobs con auth)  
 ✅ **Autocomplete ricerca** con history  
+✅ **Modifica in-place dalla collezione** (click riga -> modalita modifica)  
+✅ **Badge edit + highlight riga in modifica**  
+✅ **Prezzo manuale protetto** (Aggiorna prezzi non sovrascrive i manuali)  
+✅ **Azioni prezzo per riga** (modifica manuale / reset al mercato)  
+✅ **Forse cercavi evoluto** con ranking migliorato  
+✅ **Suggerimenti numeri adiacenti** (es. 036 -> 035/037)  
+✅ **Stop ricerca** con AbortController  
+✅ **Mitigazione loop fallback** su ricerche nome+numero  
+✅ **Preview immagini fullscreen** (risultato + suggerimenti, chiusura X/Esc/backdrop)  
 ✅ **Dark mode ready** (variabili CSS)  
 
 ---
@@ -223,6 +232,7 @@ netlify deploy --prod
 - ⚠️ **Rate limiting**: PokéTCG ha limite di 100 req/s (può bloccare in caso di spike)
 - ⚠️ **Prezzi non real-time**: CardTrader aggiorna ogni ~5-10 min, non al millisecondo
 - ⚠️ **Cache Service Worker**: Aggiornamenti del dataset delle espansioni richiedono cache bust manuale (v32, v33, ecc.)
+- ⚠️ **Timeout locali su query specifiche**: in sviluppo alcune chiamate proxy possono arrivare a timeout; la UI ora evita loop e prova un fallback rapido con suggerimenti
 
 ### Troubleshooting rapido: errore "Pokémon TCG (403)"
 
