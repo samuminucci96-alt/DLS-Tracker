@@ -508,6 +508,8 @@
       display: flex;
       flex-direction: column;
       gap: 5px;
+      position: relative;
+      overflow: visible;
     }
 
     .field > label {
@@ -724,10 +726,27 @@
 
     /* ─── Autocomplete ────────────────────────────────────────────── */
     .suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 120;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      margin-top: 5px;
+      gap: 4px;
+      max-height: min(260px, 34dvh);
+      overflow-y: auto;
+      padding: 2px;
+      background: color-mix(in oklab, var(--surface-1) 99%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .suggestions[hidden] {
+      display: none !important;
     }
 
     .sugg-item {
@@ -2811,8 +2830,7 @@
             <div class="field">
               <label for="opLang">Lingua</label>
               <select id="opLang">
-                <option value="">Qualsiasi</option>
-                <option value="it" selected>🇮🇹 Italiano</option>
+                <option value="" selected>Qualsiasi</option>
                 <option value="en">🇬🇧 Inglese</option>
                 <option value="ja">🇯🇵 Giapponese</option>
               </select>
@@ -2828,7 +2846,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="opQty">Qtà</label>
+              <label for="opQty">Quantità</label>
               <input id="opQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
@@ -2867,7 +2885,6 @@
               <select id="rbLang">
                 <option value="">Qualsiasi</option>
                 <option value="en" selected>🇬🇧 Inglese</option>
-                <option value="it">🇮🇹 Italiano</option>
               </select>
             </div>
             <div class="field">
@@ -2881,7 +2898,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="rbQty">Qtà</label>
+              <label for="rbQty">Quantità</label>
               <input id="rbQty" type="number" min="1" max="99" value="1">
             </div>
           </div>
@@ -3364,6 +3381,7 @@ let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
+let suggLastNames   = [];
 let deferredPrompt  = null;
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
@@ -3375,11 +3393,20 @@ const suggCache     = new Map();
 const pokemonQueryCache = new Map();
 const pokemonSetCache = new Map();
 const pokemonSetPreloadInFlight = new Map();
+const NAME_SUGG_DEBOUNCE_MS = 80;
+const NAME_SUGG_PAGE_SIZE = 12;
+const TCG_NAME_SUGG_DEBOUNCE_MS = 90;
 const POKEMON_QUERY_CACHE_TTL_MS = 2 * 60 * 1000;
 const POKEMON_QUERY_CACHE_MAX = 180;
 const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const POKEMON_SET_CACHE_MAX = 6;
 const POKEMON_SET_CACHE_STORAGE_KEY = 'dls_pokemon_set_cache_v1';
+const CT_DEBUG = true;
+
+function ctDebug(...args) {
+  if (!CT_DEBUG) return;
+  console.log('[CT-DEBUG]', ...args);
+}
 
 // ── Utilities ────────────────────────────────────────────────────────
 function fmt(v) {
@@ -3717,17 +3744,29 @@ function resolveCollectionItemPrice(item, ctResult) {
 // Lingue UI → codice API CardTrader (GET /marketplace/products?language=en)
 const CT_LANGUAGE_BY_UI = {
   '': '',
+  Qualsiasi: '',
   English: 'en',
+  Inglese: 'en',
   Italian: 'it',
+  Italiano: 'it',
   Spanish: 'es',
+  Espanol: 'es',
+  Spagnolo: 'es',
   German: 'de',
+  Tedesco: 'de',
   French: 'fr',
+  Francese: 'fr',
   Japanese: 'ja',
+  Giapponese: 'ja',
   Portuguese: 'pt',
+  Portoghese: 'pt',
   Korean: 'ko',
+  Coreano: 'ko',
 };
 
 const SEARCH_LANG_CODES = {
+  inglese: 'en', italiano: 'it', spagnolo: 'es', tedesco: 'de',
+  francese: 'fr', giapponese: 'ja', portoghese: 'pt', coreano: 'ko',
   english: 'en', italian: 'it', spanish: 'es', german: 'de',
   french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
   en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', pt: 'pt', ko: 'ko',
@@ -3738,7 +3777,10 @@ function ctLanguageApiCode(lang) {
   if (CT_LANGUAGE_BY_UI[lang]) return CT_LANGUAGE_BY_UI[lang];
   const n = norm(lang);
   for (const [ui, code] of Object.entries(CT_LANGUAGE_BY_UI)) {
-    if (ui && (n === norm(ui) || n.includes(norm(ui)))) return code;
+    const u = norm(ui);
+    if (!u) continue;
+    if (n === u) return code;
+    if (n.startsWith(`${u} `) || n.endsWith(` ${u}`) || n.includes(` ${u} `)) return code;
   }
   return normalizeSearchLang(lang);
 }
@@ -3746,8 +3788,10 @@ function ctLanguageApiCode(lang) {
 function normalizeSearchLang(lang) {
   if (!lang) return '';
   const n = norm(lang);
-  for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
-    if (n === name || n.includes(name) || n === code) return code;
+  if (SEARCH_LANG_CODES[n]) return SEARCH_LANG_CODES[n];
+  const tokens = n.split(/[^a-z]+/).filter(Boolean);
+  for (const t of tokens) {
+    if (SEARCH_LANG_CODES[t]) return SEARCH_LANG_CODES[t];
   }
   return n.slice(0, 2);
 }
@@ -3781,9 +3825,11 @@ function listingMatchesLanguage(listing, lang) {
 function ctMarketplaceProductsPath(blueprintId, lang = searchLangFilter) {
   const id = encodeURIComponent(String(blueprintId));
   const code = ctLanguageApiCode(lang);
-  return code
+  const path = code
     ? `/marketplace/products?blueprint_id=${id}&language=${encodeURIComponent(code)}`
     : `/marketplace/products?blueprint_id=${id}`;
+  ctDebug('marketplace path', { blueprintId, lang, code, path });
+  return path;
 }
 
 function ctLanguageLabel(lang) {
@@ -4770,6 +4816,16 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
     .filter(x => Number.isFinite(x.price) && x.price > 0)
     .filter(x => !langFilter || listingMatchesLanguage(x.listing, langFilter));
 
+  if (langFilter) {
+    ctDebug('language filter stats', {
+      langFilter,
+      mapped: ctLanguageApiCode(langFilter),
+      totalListings: listings.length,
+      validAfterFilter: valid.length,
+      sampleLanguages: listings.slice(0, 8).map(l => ctListingLanguageRaw(l) || '?'),
+    });
+  }
+
   const eur = valid.filter(x => x.currency === 'EUR');
   const priced = eur.length ? eur : valid;
   const byCondition = {};
@@ -5116,29 +5172,64 @@ document.getElementById('pokemonName')?.addEventListener('input', () => {
   const name = $('pokemonName').value.trim();
   clearTimeout(suggTimer);
   if (name.length < 1) { hideSuggestions(); return; }
-  suggTimer = setTimeout(() => loadSuggestions(name), 180);
+
+  const fast = getFastSuggestions(name);
+  if (fast.length) renderSugg(fast);
+
+  suggTimer = setTimeout(() => loadSuggestions(name), NAME_SUGG_DEBOUNCE_MS);
 });
 
 document.getElementById('pokemonName')?.addEventListener('focus', () => {
   const name = $('pokemonName').value.trim();
-  if (name.length >= 1) loadSuggestions(name);
+  if (name.length >= 1) {
+    const fast = getFastSuggestions(name);
+    if (fast.length) renderSugg(fast);
+    loadSuggestions(name);
+  }
 });
+
+function getFastSuggestions(name) {
+  const q = String(name || '').trim().toLowerCase();
+  if (!q) return [];
+  if (suggCache.has(q)) return (suggCache.get(q) || []).slice(0, 10);
+
+  const out = new Set();
+  const addIfMatch = (n) => {
+    if (!n) return;
+    const lo = n.toLowerCase();
+    if (lo.includes(q)) out.add(n);
+  };
+
+  suggLastNames.forEach(addIfMatch);
+
+  for (const [k, arr] of suggCache.entries()) {
+    if (!(k.startsWith(q) || q.startsWith(k))) continue;
+    (arr || []).forEach(addIfMatch);
+    if (out.size >= 10) break;
+  }
+
+  return [...out].slice(0, 10);
+}
 
 async function loadSuggestions(name) {
   const key = name.toLowerCase();
-  if (suggCache.has(key)) { renderSugg(suggCache.get(key)); return; }
+  if (suggCache.has(key)) {
+    const hit = suggCache.get(key);
+    suggLastNames = hit || [];
+    renderSugg(hit || []);
+    return;
+  }
   if (suggCtrl) suggCtrl.abort();
   suggCtrl = new AbortController();
   try {
-    // pageSize=15: solo i nomi ci servono, non tutti i dati
-    const cards = await fetchCards(`name:*${escQ(name)}*`, null, suggCtrl.signal, 15);
+    const cards = await fetchCards(`name:*${escNameQ(name)}*`, null, suggCtrl.signal, NAME_SUGG_PAGE_SIZE);
     const names = [...new Set(cards.map(c => c.name))].sort().slice(0, 10);
     suggCache.set(key, names);
+    suggLastNames = names;
     renderSugg(names);
   } catch (e) {
     if (e.name !== 'AbortError') {
       console.warn('Suggerimenti non disponibili:', networkFetchErrorMessage(e, e.message));
-      hideSuggestions();
     }
   }
 }
@@ -5147,7 +5238,7 @@ function renderSugg(names) {
   const box = $('nameSuggestions');
   if (!names.length) { hideSuggestions(); return; }
   const query = $('pokemonName').value.trim().toLowerCase();
-  const key = names.join('|');
+  const key = `${query}::${names.join('|')}`;
   if (box.dataset.suggKey === key) return;
   box.dataset.suggKey = key;
   box.innerHTML = names.map(n => {
@@ -6732,8 +6823,8 @@ const CT_TCG_CONFIG = {
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
 };
 
 function tcgManualPriceUnit(gameKey) {
@@ -6857,7 +6948,7 @@ function setupTcgSetAutocomplete(gameKey) {
   });
 }
 
-async function tcgLoadNameSuggestions(gameKey, name) {
+async function tcgLoadNameSuggestions(gameKey, name, genToken = null) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const setText = $(`${cfg.prefix}CardSet`)?.value?.trim() || '';
   const prefixFromSet = detectTcgCardNumberPrefix(setText);
@@ -6870,8 +6961,19 @@ async function tcgLoadNameSuggestions(gameKey, name) {
       cardNum: usePrefix ? prefixFromSet : '',
       limit: usePrefix ? 60 : (set.ctId || set.id ? 30 : 15),
     }), name, usePrefix ? prefixFromSet : '');
+    if (genToken != null && genToken !== ctTcgState[gameKey].suggGen) return;
     tcgRenderNameSuggestions(gameKey, bps);
   } catch {}
+}
+
+function getFastTcgNameSuggestions(gameKey, name) {
+  const q = normCardName(name);
+  if (!q) return [];
+  const seed = ctTcgState[gameKey]?._sugg || [];
+  if (!seed.length) return [];
+  return seed
+    .filter(bp => normCardName(bp?.name || '').includes(q))
+    .slice(0, 10);
 }
 
 async function tcgRunSearch(gameKey, name, num) {
@@ -6959,6 +7061,8 @@ function tcgRenderNameSuggestions(gameKey, bps) {
           $(`${cfg.prefix}CardSetCtId`).value = String(match.ctId || '');
         }
       }
+      clearTimeout(ctTcgState[gameKey].suggTimer);
+      ctTcgState[gameKey].suggGen++;
       box.hidden = true;
       tcgDoSearch(gameKey);
     });
@@ -6973,6 +7077,8 @@ async function tcgDoSearch(gameKey) {
   if (!name && !num) { tcgShowMsg(gameKey, 'Inserisci il nome o il numero della carta', 'warn'); return; }
 
   const searchGen = ++ctTcgState[gameKey].searchGen;
+  clearTimeout(ctTcgState[gameKey].suggTimer);
+  ctTcgState[gameKey].suggGen++;
   tcgSetLoading(gameKey, true);
   $(`${cfg.prefix}ChoicesCard`).hidden = true;
   $(`${cfg.prefix}ResultCard`).hidden = true;
@@ -7048,6 +7154,9 @@ window.tcgPickChoice = function(gameKey, index) {
 async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].searchGen) {
   const cfg = CT_TCG_CONFIG[gameKey];
   bp.imgUrl = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
+  clearTimeout(ctTcgState[gameKey].suggTimer);
+  ctTcgState[gameKey].suggGen++;
+  $(`${cfg.prefix}NameSuggestions`).hidden = true;
   $(`${cfg.prefix}ChoicesCard`).hidden = true;
   if (gameKey === 'onepiece') $('onepieceResults').hidden = false;
   if (gameKey === 'riftbound') $('riftboundResults').hidden = false;
@@ -7060,10 +7169,27 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
 
   try {
     const lang = $(cfg.langField)?.value?.trim() || '';
-    const data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
+    const marketplacePath = ctMarketplaceProductsPath(bp.id, lang);
+    ctDebug('tcgSelectCard start', {
+      gameKey,
+      bpId: bp.id,
+      bpName: bp.name,
+      uiLang: lang,
+      langCode: ctLanguageApiCode(lang),
+      marketplacePath,
+    });
+    const data = await ctFetch(marketplacePath);
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     const listings = Object.values(data).flat();
     const { conditions } = ctAverageConditions(listings, lang);
+    ctDebug('tcgSelectCard prices', {
+      gameKey,
+      bpId: bp.id,
+      listings: listings.length,
+      conditions: conditions.length,
+      firstCondition: conditions[0]?.key || null,
+      firstPrice: conditions[0]?.minPrice || conditions[0]?.price || null,
+    });
     ctTcgState[gameKey].prices = {
       conditions,
       total: listings.length,
@@ -7072,6 +7198,12 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
     };
   } catch (e) {
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
+    ctDebug('tcgSelectCard error', {
+      gameKey,
+      bpId: bp?.id,
+      err: e?.message || String(e),
+      status: e?.status || null,
+    });
     ctTcgState[gameKey].prices = { error: e.message || 'Errore prezzi CT' };
   }
   tcgRenderResult(gameKey, bp, ctTcgState[gameKey].prices);
@@ -7348,7 +7480,22 @@ function initCtTcgGame(gameKey) {
     const name = $(`${cfg.prefix}CardName`).value.trim();
     clearTimeout(ctTcgState[gameKey].suggTimer);
     if (name.length < 2) { $(`${cfg.prefix}NameSuggestions`).hidden = true; return; }
-    ctTcgState[gameKey].suggTimer = setTimeout(() => tcgLoadNameSuggestions(gameKey, name), 220);
+
+    const fast = getFastTcgNameSuggestions(gameKey, name);
+    if (fast.length) tcgRenderNameSuggestions(gameKey, fast);
+
+    const myGen = ++ctTcgState[gameKey].suggGen;
+    ctTcgState[gameKey].suggTimer = setTimeout(() => tcgLoadNameSuggestions(gameKey, name, myGen), TCG_NAME_SUGG_DEBOUNCE_MS);
+  });
+  $(`${cfg.prefix}CardName`)?.addEventListener('focus', () => {
+    const name = $(`${cfg.prefix}CardName`).value.trim();
+    if (name.length < 2) return;
+
+    const fast = getFastTcgNameSuggestions(gameKey, name);
+    if (fast.length) tcgRenderNameSuggestions(gameKey, fast);
+
+    const myGen = ++ctTcgState[gameKey].suggGen;
+    tcgLoadNameSuggestions(gameKey, name, myGen);
   });
   $(`${cfg.prefix}CardName`)?.addEventListener('blur', () => {
     setTimeout(() => { $(`${cfg.prefix}NameSuggestions`).hidden = true; }, 200);
