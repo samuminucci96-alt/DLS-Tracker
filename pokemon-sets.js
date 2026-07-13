@@ -29,12 +29,20 @@ const POKEMON_SETS = [
     "text": "Chaos Rising – Caos Ascendente (me4) · 2026"
   },
   {
+    "id": "me3",
+    "text": "Perfect Order (me3) · mar 2026"
+  },
+  {
+    "id": "me1",
+    "text": "Megaevoluzione (me1) · set 2025"
+  },
+  {
     "id": "me02.5",
     "text": "Megaevoluzione – Ascesa Eroica (me02.5) · gen 2026"
   },
   {
     "id": "me02",
-    "text": "Megaevoluzione (me02) · set 2025"
+    "text": "Megaevoluzione - Fiamme Spettrali(me02) · Dic 2025"
   },
   {
     "id": "sv9pt5",

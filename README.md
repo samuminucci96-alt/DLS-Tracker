@@ -276,6 +276,29 @@ Campi coinvolti per riga:
 - Mantieni coerenti i messaggi utente (live/stima/manuale) tra schermata risultato e conferma aggiunta
 - In test E2E, copri almeno un flusso con override manuale attivo
 
+### Memo repo finale (cleanup)
+
+File locali/debug non necessari al runtime da escludere dalla repo finale:
+- .tmp-set-check.js
+- test_api.py
+- tools/probe-bp-images.mjs
+- tools/probe-chaos.mjs
+- tools/probe-ct.mjs
+- tools/probe-st21.mjs
+- tools/test-ct-flow.mjs
+- tools/pokemon-sets.txt
+- dls-tracker-deploy.zip
+- PokèSearch.zip
+
+File tools utili da mantenere:
+- tools/generate-tcg-sets.mjs
+- tools/extract-sets.mjs
+- tools/generate-icons.mjs
+
+Nota operativa:
+- Questi file non sono usati dal runtime app (index.html + Netlify Functions), ma solo per test/probe o artefatti locali.
+- Valutare l'aggiunta in .gitignore delle voci sopra per evitare commit accidentali nella repository finale.
+
 ---
 
 ## 🤝 Contribution

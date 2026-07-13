@@ -74,7 +74,7 @@
   - Messaggi utente più dettagliati sui casi offline/online
   - Effort: 1-2 giorni
 
-- [ ] **Storico modifiche prezzo**
+- [x] **Storico modifiche prezzo**
   - Tracciare se il prezzo è live, stimato o manuale per ogni riga
   - Audit trail minimo (timestamp e valore precedente)
   - Effort: 1 giorno
