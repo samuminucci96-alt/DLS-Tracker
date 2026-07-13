@@ -1726,6 +1726,7 @@
     .ct-msg.info  { color: var(--text-muted); }
 
     .ct-market-menu {
+      position: relative;
       margin-top: 10px;
       border-top: 1px solid var(--border);
       padding-top: 10px;
@@ -1748,6 +1749,28 @@
       max-height: 210px;
       overflow: auto;
       padding-right: 2px;
+    }
+    .ct-market-overlay {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 45;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .ct-market-overlay[hidden] {
+      display: none !important;
+    }
+    .ct-market-toggle {
+      padding: 5px 10px;
+      font-size: 0.72rem;
+      min-height: auto;
     }
     .ct-listing-row {
       display: grid;
@@ -3125,7 +3148,19 @@ function bindPokemonCtConditionRows() {
 
 function bindPokemonCtListingRows() {
   $('resultContent')?.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
-    row.addEventListener('click', () => selectCtListing(row.dataset.condKey, Number(row.dataset.listingIndex)));
+    row.addEventListener('click', () => {
+      pokemonCtMarketMenuOpen = false;
+      selectCtListing(row.dataset.condKey, Number(row.dataset.listingIndex));
+    });
+  });
+}
+
+function bindPokemonCtMarketToggle() {
+  const btn = $('resultContent')?.querySelector('button.ct-market-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    pokemonCtMarketMenuOpen = !pokemonCtMarketMenuOpen;
+    if (selectedCard) renderResult();
   });
 }
 
@@ -3382,6 +3417,7 @@ let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
 let suggLastNames   = [];
+let suggReqSeq      = 0;
 let deferredPrompt  = null;
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
@@ -3389,13 +3425,14 @@ let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
 let collectionEditEntryId = null;
 let maybeSeedCards = [];
+let pokemonCtMarketMenuOpen = false;
 const suggCache     = new Map();
 const pokemonQueryCache = new Map();
 const pokemonSetCache = new Map();
 const pokemonSetPreloadInFlight = new Map();
-const NAME_SUGG_DEBOUNCE_MS = 80;
+const NAME_SUGG_DEBOUNCE_MS = 45;
 const NAME_SUGG_PAGE_SIZE = 12;
-const TCG_NAME_SUGG_DEBOUNCE_MS = 90;
+const TCG_NAME_SUGG_DEBOUNCE_MS = 55;
 const POKEMON_QUERY_CACHE_TTL_MS = 2 * 60 * 1000;
 const POKEMON_QUERY_CACHE_MAX = 180;
 const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -5049,7 +5086,7 @@ async function ctGetPrice(card, game = 'pokemon') {
   }
 }
 
-function renderCtMarketMenu(d, condKey, selectedListing = null) {
+function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
   const cond = (d.conditions || []).find(c => c.key === condKey) || d.conditions?.[0];
   if (!cond) return '';
   const rows = (cond.listings || []).map((l, idx) => {
@@ -5067,13 +5104,17 @@ function renderCtMarketMenu(d, condKey, selectedListing = null) {
   }).join('');
 
   return `
-    <div class="ct-market-menu">
+    <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
       <div class="ct-market-title">
         <span>Annunci caricati su CT · ${escHtml(cond.label)}</span>
-        <span>${cond.count || 0} annunci · tocca per scegliere il prezzo</span>
+        <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
+          ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${cond.count || 0}
+        </button>
       </div>
-      <div class="ct-listing-list">
-        ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+      <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
+        <div class="ct-listing-list">
+          ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+        </div>
       </div>
     </div>`;
 }
@@ -5159,7 +5200,7 @@ function renderCtSection() {
       <div class="ct-cond-grid">
         ${condRows || '<p class="ct-msg warn">Nessuna condizione disponibile</p>'}
       </div>
-      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing)}
+      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen)}
       <div class="ct-footer-row">
         <span class="ct-chip">${d.total} listino${d.total > 1 ? 'i' : ''} totali</span>
         <a class="ct-link" href="${d.url}" target="_blank">↗ Vedi su CardTrader</a>
@@ -5202,6 +5243,11 @@ function getFastSuggestions(name) {
 
   suggLastNames.forEach(addIfMatch);
 
+  const activeSetId = getSelectedSetId();
+  if (activeSetId) {
+    getPokemonSetCards(activeSetId).forEach(card => addIfMatch(card?.name));
+  }
+
   for (const [k, arr] of suggCache.entries()) {
     if (!(k.startsWith(q) || q.startsWith(k))) continue;
     (arr || []).forEach(addIfMatch);
@@ -5213,10 +5259,13 @@ function getFastSuggestions(name) {
 
 async function loadSuggestions(name) {
   const key = name.toLowerCase();
+  const reqSeq = ++suggReqSeq;
   if (suggCache.has(key)) {
     const hit = suggCache.get(key);
     suggLastNames = hit || [];
-    renderSugg(hit || []);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === key) {
+      renderSugg(hit || []);
+    }
     return;
   }
   if (suggCtrl) suggCtrl.abort();
@@ -5226,7 +5275,9 @@ async function loadSuggestions(name) {
     const names = [...new Set(cards.map(c => c.name))].sort().slice(0, 10);
     suggCache.set(key, names);
     suggLastNames = names;
-    renderSugg(names);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === key) {
+      renderSugg(names);
+    }
   } catch (e) {
     if (e.name !== 'AbortError') {
       console.warn('Suggerimenti non disponibili:', networkFetchErrorMessage(e, e.message));
@@ -5251,15 +5302,17 @@ function renderSugg(names) {
     return `<button type="button" class="sugg-item" data-name="${n}">${highlighted}</button>`;
   }).join('');
   box.hidden = false;
-  box.querySelectorAll('button').forEach(btn => {
-    // mousedown + preventDefault() previene il blur dell'input prima della selezione
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-name]');
+      if (!btn) return;
       e.preventDefault();
       $('pokemonName').value = btn.dataset.name;
       hideSuggestions();
       $('pokemonName').focus();
     });
-  });
+  }
 }
 
 // Chiudi suggerimenti cliccando fuori
@@ -5269,6 +5322,10 @@ document.addEventListener('mousedown', e => {
   }
   if (!$('cardSet').contains(e.target) && !$('setSuggestions').contains(e.target)) {
     hideSetSuggestions();
+  }
+  if (pokemonCtMarketMenuOpen && !e.target.closest('.ct-market-menu')) {
+    pokemonCtMarketMenuOpen = false;
+    if (selectedCard) renderResult();
   }
 });
 
@@ -5408,12 +5465,15 @@ function renderSetSuggestions(sets) {
       <span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:2px;">ID: ${escHtml(s.id)}</span>
     </button>`).join('');
   box.hidden = false;
-  box.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-set-id]');
+      if (!btn) return;
       e.preventDefault();
       selectSetOption(btn.dataset.setId, btn.dataset.setText);
     });
-  });
+  }
 }
 
 async function preloadPokemonSetCards(setId, opts = {}) {
@@ -6327,6 +6387,7 @@ function renderResult() {
   $('clearPokemonManualPriceBtn')?.addEventListener('click', clearPokemonManualPrice);
   bindPokemonCtConditionRows();
   bindPokemonCtListingRows();
+  bindPokemonCtMarketToggle();
   bindPreviewImage($('resultContent')?.querySelector('img.previewable-img'));
 }
 
@@ -6823,8 +6884,8 @@ const CT_TCG_CONFIG = {
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '' },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '' },
 };
 
 function tcgManualPriceUnit(gameKey) {
@@ -7047,8 +7108,11 @@ function tcgRenderNameSuggestions(gameKey, bps) {
   `).join('');
   ctTcgState[gameKey]._sugg = bps;
   box.hidden = false;
-  box.querySelectorAll('.sugg-item').forEach(btn => {
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-idx]');
+      if (!btn) return;
       e.preventDefault();
       const bp = ctTcgState[gameKey]._sugg[Number(btn.dataset.idx)];
       if (!bp) return;
@@ -7066,7 +7130,7 @@ function tcgRenderNameSuggestions(gameKey, bps) {
       box.hidden = true;
       tcgDoSearch(gameKey);
     });
-  });
+  }
 }
 
 async function tcgDoSearch(gameKey) {
@@ -7084,6 +7148,7 @@ async function tcgDoSearch(gameKey) {
   $(`${cfg.prefix}ResultCard`).hidden = true;
   ctTcgState[gameKey].selected = null;
   ctTcgState[gameKey].prices = null;
+  ctTcgState[gameKey].marketMenuOpen = false;
   ctTcgState[gameKey].manualPrice = null;
   ctTcgState[gameKey].manualPriceRaw = '';
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
@@ -7163,6 +7228,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   ctTcgState[gameKey].selected = bp;
   ctTcgState[gameKey].prices = null;
   ctTcgState[gameKey].selectedListing = null;
+  ctTcgState[gameKey].marketMenuOpen = false;
   ctTcgState[gameKey].manualPrice = null;
   ctTcgState[gameKey].manualPriceRaw = '';
   tcgRenderResult(gameKey, bp, null);
@@ -7278,7 +7344,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           </button>`;
         }).join('')}
       </div>
-      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing)}
+      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen)}
       <div class="ct-footer-row">
         <span class="ct-chip">${prices.total} annunci totali</span>
         <a class="ct-link" href="${prices.url}" target="_blank" rel="noopener noreferrer">↗ Vedi su CardTrader</a>
@@ -7342,6 +7408,10 @@ function tcgRenderResult(gameKey, bp, prices) {
       tcgRenderResult(gameKey, bp, prices);
     });
   });
+  card.querySelector('button.ct-market-toggle')?.addEventListener('click', () => {
+    ctTcgState[gameKey].marketMenuOpen = !ctTcgState[gameKey].marketMenuOpen;
+    tcgRenderResult(gameKey, bp, prices);
+  });
   card.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
     row.addEventListener('click', () => {
       const condKey = row.dataset.condKey;
@@ -7356,6 +7426,7 @@ function tcgRenderResult(gameKey, bp, prices) {
         seller: listing.seller || '',
         listing,
       };
+      ctTcgState[gameKey].marketMenuOpen = false;
       tcgRenderResult(gameKey, bp, prices);
     });
   });
@@ -7503,6 +7574,17 @@ function initCtTcgGame(gameKey) {
 }
 
 Object.keys(CT_TCG_CONFIG).forEach(initCtTcgGame);
+
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.ct-market-menu')) return;
+  Object.keys(CT_TCG_CONFIG).forEach((gameKey) => {
+    if (!ctTcgState[gameKey]?.marketMenuOpen) return;
+    ctTcgState[gameKey].marketMenuOpen = false;
+    if (ctTcgState[gameKey].selected && activeGame === gameKey) {
+      tcgRenderResult(gameKey, ctTcgState[gameKey].selected, ctTcgState[gameKey].prices);
+    }
+  });
+});
 
 function getCollectionStatsByGame() {
   const games = [
