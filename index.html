@@ -3099,7 +3099,9 @@ const SET_ALIASES = {
 const CT_SET_CODE_MAP = {
   me025: 'asc', me02pt5: 'asc', me02_5: 'asc', 'me02.5': 'asc',
   me02: 'msh', me02p: 'msh',
+  me3: 'por', me03: 'por',
   me4: 'cri', me04: 'cri',
+  perfectorder: 'por',
   ascesaeroica: 'asc', ascendedheroes: 'asc',
   chaosrising: 'cri', caosascendente: 'cri',
   ossidianainfuocata: 'obf', obsidianflames: 'obf', obf: 'obf',
@@ -3330,6 +3332,14 @@ let manualPokemonPriceRaw = '';
 let collectionEditEntryId = null;
 let maybeSeedCards = [];
 const suggCache     = new Map();
+const pokemonQueryCache = new Map();
+const pokemonSetCache = new Map();
+const pokemonSetPreloadInFlight = new Map();
+const POKEMON_QUERY_CACHE_TTL_MS = 2 * 60 * 1000;
+const POKEMON_QUERY_CACHE_MAX = 180;
+const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const POKEMON_SET_CACHE_MAX = 6;
+const POKEMON_SET_CACHE_STORAGE_KEY = 'dls_pokemon_set_cache_v1';
 
 // ── Utilities ────────────────────────────────────────────────────────
 function fmt(v) {
@@ -3339,6 +3349,114 @@ function fmt(v) {
 function norm(v) {
   return String(v || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 }
+
+function slimPokemonCard(card) {
+  return {
+    id: card?.id,
+    name: card?.name,
+    number: card?.number,
+    rarity: card?.rarity,
+    hp: card?.hp,
+    types: card?.types,
+    set: card?.set ? {
+      id: card.set.id,
+      name: card.set.name,
+      series: card.set.series,
+      ptcgoCode: card.set.ptcgoCode,
+      releaseDate: card.set.releaseDate,
+    } : undefined,
+    images: card?.images,
+    cardmarket: card?.cardmarket,
+    tcgplayer: card?.tcgplayer,
+    language: card?.language,
+  };
+}
+
+function prunePokemonQueryCache() {
+  if (pokemonQueryCache.size <= POKEMON_QUERY_CACHE_MAX) return;
+  const oldest = [...pokemonQueryCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+  oldest.slice(0, Math.max(1, oldest.length - POKEMON_QUERY_CACHE_MAX)).forEach(([k]) => pokemonQueryCache.delete(k));
+}
+
+function getPokemonQueryCache(key) {
+  const hit = pokemonQueryCache.get(key);
+  if (!hit) return null;
+  if ((Date.now() - hit.ts) > POKEMON_QUERY_CACHE_TTL_MS) {
+    pokemonQueryCache.delete(key);
+    return null;
+  }
+  hit.ts = Date.now();
+  return hit.cards;
+}
+
+function setPokemonQueryCache(key, cards) {
+  pokemonQueryCache.set(key, { ts: Date.now(), cards });
+  prunePokemonQueryCache();
+}
+
+function persistPokemonSetCache() {
+  try {
+    const data = [...pokemonSetCache.entries()].map(([setId, entry]) => ({
+      setId,
+      ts: entry.ts,
+      cards: entry.cards,
+    }));
+    localStorage.setItem(POKEMON_SET_CACHE_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function prunePokemonSetCache() {
+  const now = Date.now();
+  [...pokemonSetCache.entries()].forEach(([setId, entry]) => {
+    if (!entry?.ts || (now - entry.ts) > POKEMON_SET_CACHE_TTL_MS) {
+      pokemonSetCache.delete(setId);
+    }
+  });
+  if (pokemonSetCache.size > POKEMON_SET_CACHE_MAX) {
+    const oldest = [...pokemonSetCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    oldest.slice(0, Math.max(1, oldest.length - POKEMON_SET_CACHE_MAX)).forEach(([setId]) => pokemonSetCache.delete(setId));
+  }
+}
+
+function loadPokemonSetCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem(POKEMON_SET_CACHE_STORAGE_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return;
+    list.forEach(entry => {
+      const setId = String(entry?.setId || '').trim();
+      if (!setId || !Array.isArray(entry?.cards)) return;
+      pokemonSetCache.set(setId, {
+        ts: Number(entry?.ts) || Date.now(),
+        cards: entry.cards,
+      });
+    });
+    prunePokemonSetCache();
+  } catch {}
+}
+
+function setPokemonSetCache(setId, cards) {
+  if (!setId) return;
+  pokemonSetCache.set(setId, {
+    ts: Date.now(),
+    cards: cards.map(slimPokemonCard),
+  });
+  prunePokemonSetCache();
+  persistPokemonSetCache();
+}
+
+function getPokemonSetCards(setId) {
+  const id = String(setId || '').trim();
+  if (!id) return [];
+  prunePokemonSetCache();
+  const hit = pokemonSetCache.get(id);
+  if (!hit) return [];
+  hit.ts = Date.now();
+  return hit.cards || [];
+}
+
+loadPokemonSetCacheFromStorage();
 
 function parseManualPrice(raw) {
   const val = String(raw || '').trim();
@@ -3913,7 +4031,15 @@ async function fetchWithTimeout(url, opts = {}, ms = 15000) {
   }
 }
 
-async function fetchCards(query, _unused, signal, pageSize = 20) {
+async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
+  const page = Math.max(1, parseInt(options?.page || '1', 10) || 1);
+  const skipQueryCache = !!options?.skipQueryCache;
+  const queryCacheKey = `${query}|p=${page}|ps=${pageSize}`;
+  if (!skipQueryCache) {
+    const hit = getPokemonQueryCache(queryCacheKey);
+    if (hit) return hit;
+  }
+
   const opts = {
     headers: { Accept: 'application/json' },
     signal,
@@ -3922,6 +4048,7 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
   };
   const proxyUrl = new URL('/api/pokemontcg', location.origin);
   proxyUrl.searchParams.set('q', query);
+  proxyUrl.searchParams.set('page', String(page));
   proxyUrl.searchParams.set('pageSize', String(pageSize));
   const netErrFallback = 'Connessione non disponibile. Verifica internet e riprova.';
 
@@ -3929,7 +4056,9 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
     const res = await fetchWithTimeout(proxyUrl.href, opts).catch(err => {
       rethrowNetworkError(err, netErrFallback);
     });
-    return await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
+    const cards = await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
+    if (!skipQueryCache) setPokemonQueryCache(queryCacheKey, cards);
+    return cards;
   } catch (e) {
     if (e.name === 'AbortError') throw e;
     if (e.status && e.status !== 404) throw e;
@@ -3938,11 +4067,14 @@ async function fetchCards(query, _unused, signal, pageSize = 20) {
   // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
   const directUrl = new URL(API_BASE);
   directUrl.searchParams.set('q', query);
+  directUrl.searchParams.set('page', String(page));
   directUrl.searchParams.set('pageSize', String(pageSize));
   const directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
     rethrowNetworkError(err, netErrFallback);
   });
-  return parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
+  const cards = await parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
+  if (!skipQueryCache) setPokemonQueryCache(queryCacheKey, cards);
+  return cards;
 }
 
 // ── CardTrader API (proxy server-side: /api/cardtrader) ───────────────
@@ -4910,20 +5042,102 @@ function getSelectedSetId() {
   const q = norm(text);
   const exact = POKEMON_SETS.find(s => norm(s.id) === q || norm(s.id).replace(/[\.\-]/g, '') === q.replace(/[\.\-]/g, ''));
   if (exact) return exact.id;
+
+  // Se l'utente incolla il nome completo set (es. "Megaevoluzione (me1) · set 2025")
+  // prova prima un match testuale stretto o l'ID tra parentesi.
+  const byBracketId = text.match(/\(([a-z0-9.\-]+)\)/i)?.[1]?.trim();
+  if (byBracketId) {
+    const byId = POKEMON_SETS.find(s => norm(s.id) === norm(byBracketId));
+    if (byId) return byId.id;
+  }
+
+  const qNorm = normalizeSetSearchText(text);
+  const qCompact = qNorm.replace(/[^a-z0-9]/g, '');
+  const byText = POKEMON_SETS.find(s => {
+    const sNorm = normalizeSetSearchText(s.text || '');
+    if (!sNorm) return false;
+    if (sNorm === qNorm) return true;
+    const sCompact = sNorm.replace(/[^a-z0-9]/g, '');
+    return !!qCompact && sCompact === qCompact;
+  });
+  if (byText) return byText.id;
+
   const inferredPromo = inferPromoSetIdFromText(text);
   if (inferredPromo) return inferredPromo;
   const matches = filterSetSuggestions(text);
-  return matches.length === 1 ? matches[0].id : '';
+  if (matches.length === 1) return matches[0].id;
+  if (matches.length > 1) {
+    const scoreSetSuggestion = (queryText, setRow) => {
+      const qNorm = normalizeSetSearchText(queryText);
+      const setNormText = normalizeSetSearchText(`${setRow.id} ${setRow.text}`);
+      let score = nameSimilarityScore(qNorm, setNormText);
+
+      const year = qNorm.match(/(?:19|20)\d{2}/)?.[0];
+      if (year && setNormText.includes(year)) score += 20;
+
+      if (/\bset\b/.test(qNorm) && /\bset\b/.test(setNormText)) score += 10;
+
+      const qPromo = /promo|black\s*star|\bmep\b|\bsvp\b|\bswshp\b/.test(qNorm);
+      const sPromo = /promo|black\s*star/.test(setNormText);
+      if (qPromo && sPromo) score += 12;
+      if (!qPromo && sPromo) score -= 14;
+
+      const qMega = /mega\s*evol|megaevol/.test(qNorm);
+      const sMega = /mega\s*evol|megaevol/.test(setNormText);
+      if (qMega && sMega) score += 10;
+
+      // Preferisce il set ufficiale PokéTCG (me1) quando l'utente cerca
+      // "Mega Evolution" dell'anno 2025 senza indicare promo.
+      if (qMega && year === '2025' && setRow.id === 'me1' && !qPromo) score += 16;
+
+      return score;
+    };
+
+    const ranked = matches
+      .map(s => ({
+        id: s.id,
+        score: scoreSetSuggestion(text, s),
+      }))
+      .sort((a, b) => b.score - a.score);
+    const best = ranked[0];
+    const second = ranked[1];
+    if (best && best.score >= 55 && (!second || best.score - second.score >= 8)) return best.id;
+  }
+  return '';
+}
+
+function normalizeSetSearchText(v) {
+  let t = norm(v || '');
+  // Normalizza varianti comuni inserite dagli utenti (es. "sett2025", "megaevoluzioni").
+  t = t
+    .replace(/\bsett(?=\d)/g, 'set')
+    .replace(/\bsett\b/g, 'set')
+    .replace(/megaevoluzioni/g, 'megaevoluzione')
+    .replace(/mega evoluzioni/g, 'mega evoluzione')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t;
 }
 
 function filterSetSuggestions(query) {
-  const q = norm(query);
+  const q = normalizeSetSearchText(query);
   if (!q) return [];
+  const qCompact = q.replace(/[^a-z0-9]/g, '');
   const tokens = q.split(/\s+/).filter(t => t.length > 1);
   return POKEMON_SETS.filter(s => {
-    const hay = norm(`${s.id} ${s.text}`);
+    const hay = normalizeSetSearchText(`${s.id} ${s.text}`);
+    const hayCompact = hay.replace(/[^a-z0-9]/g, '');
     if (hay.includes(q)) return true;
-    return tokens.length && tokens.every(t => hay.includes(t));
+    if (qCompact && hayCompact.includes(qCompact)) return true;
+    if (!tokens.length) return false;
+
+    const hayTokens = hay.split(/\s+/).filter(Boolean);
+    return tokens.every(t => {
+      if (hay.includes(t)) return true;
+      const tCompact = t.replace(/[^a-z0-9]/g, '');
+      if (tCompact && hayCompact.includes(tCompact)) return true;
+      return hayTokens.some(ht => nameSimilarityScore(t, ht) >= 88);
+    });
   }).slice(0, 10);
 }
 
@@ -4955,12 +5169,49 @@ function renderSetSuggestions(sets) {
   });
 }
 
+async function preloadPokemonSetCards(setId, opts = {}) {
+  const id = String(setId || '').trim();
+  if (!id) return [];
+  const force = !!opts.force;
+  const existing = getPokemonSetCards(id);
+  if (!force && existing.length) return existing;
+  if (pokemonSetPreloadInFlight.has(id)) return pokemonSetPreloadInFlight.get(id);
+
+  const task = (async () => {
+    const q = `set.id:"${escQ(id)}"`;
+    const pageSize = 250;
+    const maxPages = 4;
+    const all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const batch = await fetchCards(q, null, null, pageSize, { page, skipQueryCache: false });
+      if (!batch.length) break;
+      all.push(...batch);
+      if (batch.length < pageSize) break;
+    }
+    const deduped = dedupeCards(all);
+    if (deduped.length) {
+      setPokemonSetCache(id, deduped);
+      console.log(`[PTCG] Set pre-caricato ${id}: ${deduped.length} carte`);
+    }
+    return deduped;
+  })().catch(err => {
+    console.warn('[PTCG] Preload set fallito:', id, err?.message || err);
+    return [];
+  }).finally(() => {
+    pokemonSetPreloadInFlight.delete(id);
+  });
+
+  pokemonSetPreloadInFlight.set(id, task);
+  return task;
+}
+
 function selectSetOption(id, text) {
   $('cardSet').value = text;
   $('cardSetId').value = id;
   hideSetSuggestions();
   $('cardSet').focus();
   ctPreloadBlueprintsForSet(id);
+  preloadPokemonSetCards(id);
 }
 
 function hideSetSuggestions() {
@@ -4980,7 +5231,12 @@ document.getElementById('cardSet')?.addEventListener('input', () => {
   clearTimeout(setSuggTimer);
   const v = $('cardSet').value.trim();
   if (v.length < 1) { hideSetSuggestions(); return; }
-  setSuggTimer = setTimeout(() => renderSetSuggestions(filterSetSuggestions(v)), 150);
+  setSuggTimer = setTimeout(() => {
+    renderSetSuggestions(filterSetSuggestions(v));
+    const resolved = getSelectedSetId();
+    $('cardSetId').value = resolved || '';
+    if (resolved) preloadPokemonSetCards(resolved);
+  }, 150);
 });
 
 document.getElementById('cardSet')?.addEventListener('focus', () => {
@@ -5084,11 +5340,25 @@ function shouldTryCtFallback(name, number, cardSet) {
   return false;
 }
 
+function cardMatchesSelectedSet(card, cardSetId) {
+  if (!cardSetId) return true;
+  const wanted = norm(cardSetId);
+  if (!wanted) return true;
+
+  const cardSetIdNorm = norm(card?.set?.id || '');
+  if (cardSetIdNorm && cardSetIdNorm === wanted) return true;
+
+  const ctCode = resolveCtCodeForPokemonSet(cardSetId, card?.set?.name || '');
+  if (ctCode && cardSetIdNorm && cardSetIdNorm === norm(ctCode)) return true;
+
+  return false;
+}
+
 function filterCardsToQuery(cards, name, number, cardSet) {
   if (!cards.length) return cards;
   let out = cards;
   if (number) out = out.filter(c => cardNumberMatches(number, c.number));
-  if (cardSet) out = out.filter(c => norm(c.set?.id || '') === norm(cardSet));
+  if (cardSet) out = out.filter(c => cardMatchesSelectedSet(c, cardSet));
   if (name) out = out.filter(c => norm(c.name || '').includes(norm(name)));
   return out;
 }
@@ -5239,8 +5509,9 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   const localWide = LOCAL_CATALOG.filter(c => {
     const n = !name || norm(c.name || '').includes(norm(name)) || nameSimilarityScore(name, c.name || '') >= 48;
     const num = !number || numberSimilarityScore(number, c.number || '') >= 45;
+    const s = !cardSet || cardMatchesSelectedSet(c, cardSet);
     const l = !lang || cardMatchesSearchLanguage(c, lang);
-    return n && num && l;
+    return n && num && s && l;
   });
   candidates.push(...localWide);
 
@@ -5278,6 +5549,7 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   const filtered = dedupeCards(candidates)
     .filter(c => {
       if (lang && !c._fromCt && !cardMatchesSearchLanguage(c, lang)) return false;
+      if (cardSet && !cardMatchesSelectedSet(c, cardSet)) return false;
       return true;
     })
     .map(card => ({
@@ -5341,7 +5613,9 @@ async function doSearch() {
   const name    = $('pokemonName').value.trim();
   const number  = $('cardNumber').value.trim();
   const cardSet = getSelectedSetId();
+  if ($('cardSetId')) $('cardSetId').value = cardSet || '';
   const lang    = $('cardLanguage').value.trim();
+  if (cardSet) preloadPokemonSetCards(cardSet);
   if (!name && !number) {
     showMsg('Inserisci almeno il nome del Pokémon o il numero della carta.', 'error');
     return;
@@ -5417,6 +5691,21 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   const nn = norm(name), nnum = norm(number);
   let cards = [], blocked = false;
 
+  // Fast-path locale: se il set e' stato pre-caricato, prova prima il filtro locale.
+  if (cardSet) {
+    const setCards = getPokemonSetCards(cardSet);
+    if (setCards.length) {
+      let localHits = filterCardsToQuery(setCards, name, number, cardSet);
+      if (lang && localHits.length) {
+        const byLang = localHits.filter(c => cardMatchesSearchLanguage(c, lang));
+        if (byLang.length) localHits = byLang;
+      }
+      if (localHits.length) {
+        return localHits;
+      }
+    }
+  }
+
   // Scegli pageSize in base alla specificità della query:
   // più campi → risultati attesi minori → pageSize ridotto → risposta più veloce
   const specificity = (name ? 1 : 0) + (number ? 1 : 0) + (cardSet ? 1 : 0);
@@ -5451,17 +5740,6 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
       blocked = true;
       showMsg('API non disponibile — uso il catalogo locale.', 'warning');
     } else throw e;
-  }
-
-  // If set filter returned 0 results, retry without set constraint
-  if (!blocked && cards.length === 0 && cardSet && (name || number)) {
-    const fb = [];
-    if (name)   fb.push(bfq('name', name, true));
-    if (number) fb.push(bnq(number));
-    if (fb.length) {
-      cards = await fetchCards(fb.join(' '), apiKey, signal);
-      if (cards.length) showMsg(`Nessuna carta trovata nel set selezionato — mostro tutti i risultati.`, 'warning');
-    }
   }
 
   // Local fallback
