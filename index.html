@@ -2154,6 +2154,31 @@
     .ct-price-cell.manual    { color: var(--warning); }
     .ct-price-cell.locked    { color: var(--text-dim); }
     .ct-price-cell.no-data   { color: var(--text-muted); font-weight: 400; }
+    .price-origin-tag {
+      display: inline-block;
+      margin-top: 3px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 0.63rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      border: 1px solid transparent;
+    }
+    .price-origin-tag.live {
+      color: #065f46;
+      background: rgba(16, 185, 129, 0.14);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .price-origin-tag.estimate {
+      color: #92400e;
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.28);
+    }
+    .price-origin-tag.manual {
+      color: #7c2d12;
+      background: rgba(251, 146, 60, 0.20);
+      border-color: rgba(251, 146, 60, 0.32);
+    }
 
     /* ─── Firebase setup banner ─────────────────────────────────── */
     .firebase-banner {
@@ -3121,6 +3146,21 @@ const CT_SET_CODE_MAP = {
   mepblackstarpromos: 'mep',
 };
 
+// Mappa id set locali -> id set Pokemon TCG API quando differiscono.
+const POKEMON_API_SET_ID_MAP = {
+  jungle: 'base2',
+  fossil: 'base3',
+  rocket: 'base5',
+  lc: 'base6',
+};
+
+function resolvePokemonApiSetId(setId) {
+  const raw = String(setId || '').trim();
+  if (!raw) return '';
+  const key = raw.toLowerCase();
+  return POKEMON_API_SET_ID_MAP[key] || raw;
+}
+
 const CT_PROMO_EXPANSION_CODES = new Set(['mep', 'svpromo', 'swshbs', 'smbs', 'xybsp', 'bwbsp']);
 
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
@@ -3543,6 +3583,100 @@ function buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick)
   };
 }
 
+const PRICE_HISTORY_MAX = 40;
+
+function canonicalPriceMode(itemOrMode, maybeManual = false) {
+  const mode = typeof itemOrMode === 'string'
+    ? itemOrMode
+    : (itemOrMode?.priceMode || '');
+  const manual = typeof itemOrMode === 'string'
+    ? maybeManual
+    : !!itemOrMode?.manualPrice;
+
+  if (manual || mode === 'manual') return 'manual';
+  if (mode === 'listing' || mode === 'min_ct') return 'live';
+  if (mode === 'estimate') return 'estimate';
+  return mode || 'estimate';
+}
+
+function priceModeMeta(item) {
+  const mode = canonicalPriceMode(item);
+  if (mode === 'manual') return { key: 'manual', label: 'MANUALE' };
+  if (mode === 'live') return { key: 'live', label: 'LIVE' };
+  return { key: 'estimate', label: 'STIMA' };
+}
+
+function ensurePriceHistory(item) {
+  if (!Array.isArray(item.priceHistory)) item.priceHistory = [];
+  return item.priceHistory;
+}
+
+function appendPriceHistory(item, payload = {}) {
+  if (!item) return false;
+  const history = ensurePriceHistory(item);
+  const round = (v) => (Number.isFinite(Number(v)) ? parseFloat(Number(v).toFixed(2)) : null);
+
+  const prevPrice = payload.prevPrice === null ? null : round(payload.prevPrice);
+  const nextPrice = payload.nextPrice === null ? null : round(payload.nextPrice);
+  const prevMode = payload.prevMode || null;
+  const nextMode = payload.nextMode || null;
+  const changed = payload.force || prevPrice !== nextPrice || prevMode !== nextMode;
+  if (!changed) return false;
+
+  history.push({
+    ts: payload.ts || new Date().toISOString(),
+    reason: payload.reason || 'update',
+    prevPrice,
+    nextPrice,
+    prevMode,
+    nextMode,
+  });
+
+  if (history.length > PRICE_HISTORY_MAX) {
+    history.splice(0, history.length - PRICE_HISTORY_MAX);
+  }
+  return true;
+}
+
+function trackPricePatch(item, patch, reason = 'update') {
+  if (!item || !patch || typeof patch !== 'object') return item;
+  const prevPrice = Number.isFinite(Number(item.price)) ? Number(item.price) : null;
+  const prevMode = canonicalPriceMode(item);
+
+  Object.assign(item, patch);
+
+  const nextPrice = Number.isFinite(Number(item.price)) ? Number(item.price) : null;
+  const nextMode = canonicalPriceMode(item);
+  appendPriceHistory(item, {
+    reason,
+    prevPrice,
+    nextPrice,
+    prevMode,
+    nextMode,
+  });
+  return item;
+}
+
+function ensureItemPriceTracking(item) {
+  if (!item) return item;
+  if (!item.priceMode) {
+    item.priceMode = item.manualPrice ? 'manual' : (item.ctListing ? 'listing' : (item.ctPrice != null ? 'min_ct' : 'estimate'));
+  }
+  ensurePriceHistory(item);
+  if (!item.priceHistory.length) {
+    appendPriceHistory(item, {
+      reason: 'seed',
+      prevPrice: null,
+      nextPrice: item.price,
+      prevMode: null,
+      nextMode: canonicalPriceMode(item),
+      ts: item.lastPriceUpdate || item.addedAt || new Date().toISOString(),
+      force: true,
+    });
+  }
+  return item;
+}
+
 function resolveCollectionItemPrice(item, ctResult) {
   if (item.manualPrice || item.priceMode === 'manual') {
     return { price: item.price, ctPrice: item.ctPrice, updated: false };
@@ -3737,7 +3871,12 @@ function sortTcgSearchResults(bps, name, cardPrefix) {
 }
 
 function normCardName(v) {
-  return norm(v).replace(/[.\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  return norm(v)
+    .replace(/[♀♂]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[.\-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function collectionEntryId() {
@@ -3785,6 +3924,7 @@ function clearCollectionEdit() {
 
 function pushCollectionItem(item) {
   if (!item._id) item._id = collectionEntryId();
+  ensureItemPriceTracking(item);
   collection.push(item);
   return item;
 }
@@ -3848,11 +3988,23 @@ function escHtml(v) {
   }[ch]));
 }
 
-function escQ(v)   { return String(v || '').trim().replace(/[[\]{}()+\-!^~"*?:/\\]/g, ''); }
+function escQ(v)   {
+  return String(v || '')
+    .replace(/[♀♂]/g, '')
+    .trim()
+    .replace(/[[\]{}()+\-!^~"*?:/\\]/g, '');
+}
+
+function escNameQ(v) {
+  return String(v || '')
+    .replace(/[♀♂]/g, '')
+    .trim()
+    .replace(/[\[\]{}()+!^~"*?:/\\]/g, '');
+}
 function escNum(v) { return String(v || '').trim().replace(/["\\+\-!(){}\[\]^~*?:]/g, ''); }
 
 function bfq(field, value, wild = false) {
-  const v = escQ(value);
+  const v = field === 'name' ? escNameQ(value) : escQ(value);
   if (!v) return '';
   if (wild) return v.split(/\s+/).filter(Boolean).map(t => `${field}:*${t}*`).join(' ');
   return `${field}:"${v.replace(/"/g, '')}"`;
@@ -3995,13 +4147,17 @@ function apiFetchError(res, fallback) {
     let msg = fallback;
     try {
       const j = JSON.parse(body);
-      if (j.error) msg = j.error;
+          if (j?.error) {
+            if (typeof j.error === 'string') msg = j.error;
+            else if (typeof j.error?.message === 'string' && j.error.message.trim()) msg = j.error.message;
+            else msg = JSON.stringify(j.error);
+          }
     } catch {}
+        if (msg && typeof msg !== 'string') msg = String(msg);
     const err = Object.assign(new Error(msg), { status: res.status });
     throw err;
   });
 }
-
 async function parsePokemonTcgResponse(res, fallbackMsg) {
   if (!res.ok) {
     if (res.status === 404) {
@@ -5178,7 +5334,8 @@ async function preloadPokemonSetCards(setId, opts = {}) {
   if (pokemonSetPreloadInFlight.has(id)) return pokemonSetPreloadInFlight.get(id);
 
   const task = (async () => {
-    const q = `set.id:"${escQ(id)}"`;
+    const apiSetId = resolvePokemonApiSetId(id);
+    const q = `set.id:"${escQ(apiSetId)}"`;
     const pageSize = 250;
     const maxPages = 4;
     const all = [];
@@ -5348,6 +5505,9 @@ function cardMatchesSelectedSet(card, cardSetId) {
   const cardSetIdNorm = norm(card?.set?.id || '');
   if (cardSetIdNorm && cardSetIdNorm === wanted) return true;
 
+  const wantedApi = norm(resolvePokemonApiSetId(cardSetId));
+  if (cardSetIdNorm && wantedApi && cardSetIdNorm === wantedApi) return true;
+
   const ctCode = resolveCtCodeForPokemonSet(cardSetId, card?.set?.name || '');
   if (ctCode && cardSetIdNorm && cardSetIdNorm === norm(ctCode)) return true;
 
@@ -5359,7 +5519,10 @@ function filterCardsToQuery(cards, name, number, cardSet) {
   let out = cards;
   if (number) out = out.filter(c => cardNumberMatches(number, c.number));
   if (cardSet) out = out.filter(c => cardMatchesSelectedSet(c, cardSet));
-  if (name) out = out.filter(c => norm(c.name || '').includes(norm(name)));
+  if (name) {
+    const qName = normCardName(name);
+    out = out.filter(c => normCardName(c.name || '').includes(qName));
+  }
   return out;
 }
 
@@ -5716,7 +5879,8 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   if (name)    parts.push(bfq('name', name, true));
   if (number)  parts.push(bnq(number));
   if (cardSet) {
-    parts.push(`set.id:"${escQ(cardSet)}"`);
+    const apiSetId = resolvePokemonApiSetId(cardSet);
+    parts.push(`set.id:"${escQ(apiSetId)}"`);
   }
 
   try {
@@ -5771,7 +5935,8 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
     cards = cards.filter(c => cardNumberMatches(number, c.number));
   }
   if (name && cards.length) {
-    cards = cards.filter(c => norm(c.name || '').includes(nn));
+    const qName = normCardName(name);
+    cards = cards.filter(c => normCardName(c.name || '').includes(qName));
   }
   if (lang && cards.length) {
     const byLang = cards.filter(c => c._fromCt || cardMatchesSearchLanguage(c, lang));
@@ -6099,6 +6264,8 @@ async function addToCollection() {
 
   if (isEditMode) {
     const current = collection[editIdx];
+    const prevPrice = current?.price;
+    const prevMode = canonicalPriceMode(current);
     collection[editIdx] = {
       ...current,
       name: selectedCard.name,
@@ -6121,6 +6288,14 @@ async function addToCollection() {
       lastPriceUpdate: new Date().toISOString(),
       ...priceFields,
     };
+    appendPriceHistory(collection[editIdx], {
+      reason: 'edit_card',
+      prevPrice,
+      nextPrice: collection[editIdx].price,
+      prevMode,
+      nextMode: canonicalPriceMode(collection[editIdx]),
+    });
+    ensureItemPriceTracking(collection[editIdx]);
     persistLocalCollection();
     onCollectionChanged({ scroll: true });
     if (dlsUser) await saveCloudCollection();
@@ -6394,12 +6569,14 @@ function submitManualPriceModal() {
     return;
   }
 
-  collection[idx].price = parsed;
-  collection[idx].manualPrice = true;
-  collection[idx].priceMode = 'manual';
-  collection[idx].ctPrice = null;
-  collection[idx].priceSrc = 'Manuale';
-  collection[idx].lastPriceUpdate = new Date().toISOString();
+  trackPricePatch(collection[idx], {
+    price: parsed,
+    manualPrice: true,
+    priceMode: 'manual',
+    ctPrice: null,
+    priceSrc: 'Manuale',
+    lastPriceUpdate: new Date().toISOString(),
+  }, 'manual_set');
   persistLocalCollection();
   if (dlsUser) saveCloudCollection();
   closeManualPriceModal();
@@ -6439,12 +6616,14 @@ async function resetCollectionItemManualPrice(idx) {
       return;
     }
 
-    collection[idx].price = resolved.price;
-    collection[idx].ctPrice = resolved.ctPrice;
-    collection[idx].manualPrice = false;
-    collection[idx].priceMode = collection[idx].ctListing ? 'listing' : (resolved.ctPrice != null ? 'min_ct' : 'estimate');
-    collection[idx].priceSrc = collection[idx].ctListing ? (collection[idx].priceSrc || 'CardTrader') : (resolved.ctPrice != null ? 'CardTrader' : 'Stima');
-    collection[idx].lastPriceUpdate = new Date().toISOString();
+    trackPricePatch(collection[idx], {
+      price: resolved.price,
+      ctPrice: resolved.ctPrice,
+      manualPrice: false,
+      priceMode: collection[idx].ctListing ? 'listing' : (resolved.ctPrice != null ? 'min_ct' : 'estimate'),
+      priceSrc: collection[idx].ctListing ? (collection[idx].priceSrc || 'CardTrader') : (resolved.ctPrice != null ? 'CardTrader' : 'Stima'),
+      lastPriceUpdate: new Date().toISOString(),
+    }, 'manual_reset_to_market');
 
     persistLocalCollection();
     if (dlsUser) saveCloudCollection();
@@ -7085,6 +7264,8 @@ window.tcgAddToCollection = async function(gameKey) {
 
   if (isEditMode) {
     const current = collection[editIdx];
+    const prevPrice = current?.price;
+    const prevMode = canonicalPriceMode(current);
     collection[editIdx] = {
       ...current,
       name: bp.name,
@@ -7102,6 +7283,14 @@ window.tcgAddToCollection = async function(gameKey) {
       lastPriceUpdate: new Date().toISOString(),
       ...priceFields,
     };
+    appendPriceHistory(collection[editIdx], {
+      reason: 'edit_card',
+      prevPrice,
+      nextPrice: collection[editIdx].price,
+      prevMode,
+      nextMode: canonicalPriceMode(collection[editIdx]),
+    });
+    ensureItemPriceTracking(collection[editIdx]);
     persistLocalCollection();
     onCollectionChanged({ scroll: true });
     if (dlsUser) await saveCloudCollection();
@@ -7240,7 +7429,9 @@ function renderCollection() {
   }
 
   collBody.innerHTML = visible.map(({ item, idx }) => {
+    ensureItemPriceTracking(item);
     const ctPriceVal = item.ctPrice != null ? fmt(item.ctPrice) : (item.price ? fmt(item.price) : '—');
+    const modeMeta = priceModeMeta(item);
     const ctClass    = item.manualPrice || item.priceMode === 'manual'
       ? 'ct-price-cell manual'
       : item.ctPrice != null
@@ -7268,6 +7459,7 @@ function renderCollection() {
       <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
       <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
         ${ctPriceVal}
+        <div class="price-origin-tag ${modeMeta.key}">${modeMeta.label}</div>
         ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
       </td>
       <td class="td-actions">
@@ -7387,6 +7579,10 @@ function initApp() {
   resetModalLocks();
   const saved = localStorage.getItem('dls_collection');
   if (saved) try { collection = JSON.parse(saved); } catch {}
+  if (Array.isArray(collection) && collection.length) {
+    collection.forEach(ensureItemPriceTracking);
+    persistLocalCollection();
+  }
   if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
   restoreSessionLocal();
@@ -8206,9 +8402,11 @@ async function refreshAllPrices() {
       if (result.conditions?.length) {
         const resolved = resolveCollectionItemPrice(item, result);
         if (resolved.updated) {
-          collection[i].price = resolved.price;
-          collection[i].ctPrice = resolved.ctPrice;
-          collection[i].lastPriceUpdate = new Date().toISOString();
+          trackPricePatch(collection[i], {
+            price: resolved.price,
+            ctPrice: resolved.ctPrice,
+            lastPriceUpdate: new Date().toISOString(),
+          }, 'refresh_market');
           persistLocalCollection();
           if (cell) { cell.textContent = fmt(resolved.price); cell.className = 'ct-price-cell updated'; }
           updated++;
