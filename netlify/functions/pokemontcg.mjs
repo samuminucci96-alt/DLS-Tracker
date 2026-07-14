@@ -58,12 +58,14 @@ async function ptFetchWithRetry(ptUrl, headers) {
     const timer = setTimeout(() => ctrl.abort(), PT_TIMEOUT_MS);
     try {
       const res = await fetch(ptUrl, { headers, signal: ctrl.signal });
+      const contentType = res.headers.get("Content-Type") || "application/json";
+      const body = await res.text();
+      
       if (PT_RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
-        // Consuma il body prima del retry per evitare stream pendenti.
-        try { await res.arrayBuffer(); } catch {}
+        // Body è già consumato, continua al retry
         continue;
       }
-      return { res, attempts: attempt };
+      return { body, status: res.status, contentType, attempts: attempt };
     } catch (err) {
       lastError = err;
       if (!isRetryableFetchError(err) || attempt >= maxAttempts) {
@@ -114,20 +116,20 @@ export default async (req) => {
     ptInflight.set(cacheKey, ptFetchWithRetry(ptUrl, headers));
   }
 
-  const { res: ptRes, error } = await ptInflight.get(cacheKey);
+  const { body, status, contentType: resContentType, error } = await ptInflight.get(cacheKey);
   ptInflight.delete(cacheKey);
-  if (ptRes) {
-    const body = await ptRes.text();
-    const contentType = ptRes.headers.get("Content-Type") || "application/json";
-    if (ptRes.status >= 200 && ptRes.status < 300) {
+  
+  if (body !== undefined) {
+    const contentType = resContentType || "application/json";
+    if (status >= 200 && status < 300) {
       setCachedEntry(cacheKey, {
-        status: ptRes.status,
+        status,
         contentType,
         body,
       });
     }
     return new Response(body, {
-      status: ptRes.status,
+      status,
       headers: {
         ...cors,
         "Content-Type": contentType,
