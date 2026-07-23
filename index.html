@@ -6,7 +6,7 @@
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
   <meta name="theme-color" content="#2454a9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#2454a9">
-  <link rel="manifest" href="manifest.json?v=42">
+  <link rel="manifest" href="manifest.json?v=43">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
@@ -334,8 +334,17 @@
       overflow: hidden;
     }
 
-    html.is-standalone .auth-overlay,
-    html.is-standalone .auth-overlay.is-closed {
+    html.is-standalone .auth-overlay.is-closed,
+    html.is-standalone #authOverlay.is-closed,
+    html.is-standalone #profileOverlay.is-closed {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    html.is-standalone .auth-overlay:not(.is-closed) {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
@@ -350,6 +359,7 @@
     html.is-standalone .install-banner,
     html.is-standalone #installBanner {
       display: none !important;
+      pointer-events: none !important;
     }
 
     html.is-standalone #installIosSheet,
@@ -2798,15 +2808,23 @@
 <script src="onepiece-sets.js"></script>
 <script src="riftbound-sets.js"></script>
 <script>
-window.onerror = function(message, source, lineno) {
-  console.error('[DLS]', message, source, lineno);
+window.onerror = function(message, source, lineno, colno, error) {
+  try {
+    alert('🚨 CRASH JS:\n' + message + '\nRiga: ' + lineno + '\nFile: ' + source);
+  } catch (_) {}
+  console.error('[DLS]', message, source, lineno, error);
   return false;
 };
 window.addEventListener('unhandledrejection', function(event) {
+  try {
+    alert('🚨 PROMISE FALLITA:\n' + event.reason);
+  } catch (_) {}
   console.error('[DLS] Promise rejected:', event.reason);
 });
 
 const $ = (id) => document.getElementById(id);
+// Deve stare PRIMA di initViewport: in PWA standalone syncInstalledState la usa subito
+let deferredPrompt = null;
 const CT_DEBUG = /(?:\?|&)ctdebug=1(?:&|$)/.test(location.search);
 function ctLog(...args) { if (CT_DEBUG) console.log(...args); }
 
@@ -2821,7 +2839,9 @@ function ctLog(...args) { if (CT_DEBUG) console.log(...args); }
     const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
     root.classList.toggle('is-mobile', mobile);
-    if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
+    if (standalone && typeof syncInstalledState === 'function') {
+      try { syncInstalledState(); } catch (err) { console.warn('[PWA] syncInstalledState:', err); }
+    }
   };
   sync();
   window.addEventListener('resize', () => {
@@ -3117,7 +3137,6 @@ let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
-let deferredPrompt  = null;
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
@@ -6347,11 +6366,16 @@ const GAME_UI = {
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
+  document.body.style.overflow = '';
   ['authOverlay', 'profileOverlay'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.classList.add('is-closed');
+    if (!el) return;
+    el.classList.add('is-closed');
+    el.style.display = 'none';
+    el.style.pointerEvents = 'none';
   });
   document.getElementById('installIosSheet')?.remove();
+  document.querySelectorAll('.install-ios-overlay, .install-banner').forEach(el => el.remove());
 }
 
 function bindAccountButton() {
@@ -6969,7 +6993,11 @@ function openProfilePanel() {
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
   const overlay = $('profileOverlay');
-  if (overlay) overlay.classList.remove('is-closed');
+  if (overlay) {
+    overlay.classList.remove('is-closed');
+    overlay.style.display = '';
+    overlay.style.pointerEvents = '';
+  }
   document.body.classList.add('auth-open');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
@@ -6981,7 +7009,12 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  $('profileOverlay')?.classList.add('is-closed');
+  const overlay = $('profileOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
+  }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -7044,11 +7077,18 @@ function openAuthModal() {
   const overlay = $('authOverlay');
   if (!overlay) return;
   overlay.classList.remove('is-closed');
+  overlay.style.display = '';
+  overlay.style.pointerEvents = '';
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  $('authOverlay')?.classList.add('is-closed');
+  const overlay = $('authOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
+  }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -7280,7 +7320,7 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=42').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=43').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
         if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         reg.addEventListener('updatefound', () => {
@@ -7496,7 +7536,14 @@ window.addEventListener('load', () => {
 
 bindGameTabs();
 bindAccountButton();
-initApp();
+try {
+  resetModalLocks();
+  initApp();
+} catch (err) {
+  console.error('[DLS] initApp fallita:', err);
+  try { alert('🚨 Init fallita:\n' + (err?.message || err)); } catch (_) {}
+  try { resetModalLocks(); bindGameTabs(); bindAccountButton(); } catch (_) {}
+}
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
 
