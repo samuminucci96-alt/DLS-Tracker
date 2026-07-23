@@ -25,8 +25,12 @@ const POKEMON_SETS = [
     "text": "BW Black Star Promos – Black & White Promos (bwp)"
   },
   {
+    "id": "me5",
+    "text": "Pitch Black – Buio Pesto (me5) · lug 2026"
+  },
+  {
     "id": "me4",
-    "text": "Chaos Rising – Caos Ascendente (me4) · 2026"
+    "text": "Chaos Rising – Caos Nascente (me4) · 2026"
   },
   {
     "id": "me02.5",
