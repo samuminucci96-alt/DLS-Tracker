@@ -513,6 +513,9 @@
       color: var(--text-dim);
       letter-spacing: 0.04em;
       text-transform: uppercase;
+      pointer-events: none;
+      user-select: none;
+      cursor: default;
     }
 
     input, select {
@@ -3276,7 +3279,8 @@ function bindPokemonCtMarketToggle() {
 // Mappa set PokéTCG → codici espansione CardTrader
 const CT_SET_CODE_MAP = {
   me025: 'asc', me02pt5: 'asc', me02_5: 'asc', 'me02.5': 'asc',
-  me02: 'msh', me02p: 'msh',
+  me02: 'pfl', me02p: 'pfl',
+  me1: 'meg', me01: 'meg', megaevoluzione: 'meg', megaevolution: 'meg',
   me3: 'por', me03: 'por',
   me4: 'cri', me04: 'cri',
   perfectorder: 'por',
@@ -3309,6 +3313,9 @@ const POKEMON_API_SET_ID_MAP = {
   fossil: 'base3',
   rocket: 'base5',
   lc: 'base6',
+  // Megaevoluzione local ids differiscono dagli id pubblicati da PokéTCG API.
+  'me02.5': 'me2pt5',
+  me02: 'me2',
 };
 
 function resolvePokemonApiSetId(setId) {
@@ -3523,7 +3530,6 @@ let bgAnimPaused    = false;
 let suggTimer       = null;
 let suggLastNames   = [];
 let suggReqSeq      = 0;
-let deferredPrompt  = null;
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, sealed: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
@@ -3585,7 +3591,6 @@ const POKEMON_QUERY_CACHE_MAX = 180;
 const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const POKEMON_SET_CACHE_MAX = 6;
 const POKEMON_SET_CACHE_STORAGE_KEY = 'dls_pokemon_set_cache_v1';
-const CT_DEBUG = true;
 
 function ctDebug(...args) {
   if (!CT_DEBUG) return;
@@ -4472,6 +4477,11 @@ async function fetchWithTimeout(url, opts = {}, ms = 15000) {
   }
 }
 
+function isTransientPokemonStatus(status) {
+  const s = Number(status || 0);
+  return s === 408 || s === 425 || s === 429 || s === 500 || s === 502 || s === 503 || s === 504;
+}
+
 async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
   const page = Math.max(1, parseInt(options?.page || '1', 10) || 1);
   const skipQueryCache = !!options?.skipQueryCache;
@@ -4497,12 +4507,19 @@ async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
     const res = await fetchWithTimeout(proxyUrl.href, opts).catch(err => {
       rethrowNetworkError(err, netErrFallback);
     });
+    if (!res.ok && res.status >= 500) {
+      throw Object.assign(new Error(`Proxy Pokémon TCG (${res.status})`), { status: res.status });
+    }
     const cards = await parsePokemonTcgResponse(res, `Errore Pokémon TCG (${res.status})`);
     if (!skipQueryCache) setPokemonQueryCache(queryCacheKey, cards);
     return cards;
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    if (e.status && e.status !== 404) throw e;
+    const status = Number(e?.status || 0);
+    // Per errori transitori del proxy (5xx/429/timeout), prova il fallback diretto.
+    if (status && status !== 404 && !isTransientPokemonStatus(status)) {
+      throw e;
+    }
   }
 
   // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
@@ -4510,10 +4527,26 @@ async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
   directUrl.searchParams.set('q', query);
   directUrl.searchParams.set('page', String(page));
   directUrl.searchParams.set('pageSize', String(pageSize));
-  const directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
+  let directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
     rethrowNetworkError(err, netErrFallback);
   });
-  const cards = await parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
+  if (!directRes.ok && directRes.status >= 500) {
+    await new Promise(resolve => setTimeout(resolve, 220));
+    directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
+      rethrowNetworkError(err, netErrFallback);
+    });
+  }
+  let cards;
+  try {
+    cards = await parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    if (isTransientPokemonStatus(e?.status)) {
+      console.warn('[Pokemon] upstream transient error, fallback to empty result', e?.status, e?.message || e);
+      return [];
+    }
+    throw e;
+  }
   if (!skipQueryCache) setPokemonQueryCache(queryCacheKey, cards);
   return cards;
 }
@@ -5568,14 +5601,31 @@ function renderSugg(names) {
   }
 }
 
+function closeAllSuggestionDropdownsForTarget(target) {
+  const inPokemonName = $('pokemonName')?.contains(target) || $('nameSuggestions')?.contains(target);
+  const inPokemonSet = $('cardSet')?.contains(target) || $('setSuggestions')?.contains(target);
+  if (!inPokemonName) hideSuggestions();
+  if (!inPokemonSet) hideSetSuggestions();
+
+  if (typeof CT_TCG_CONFIG === 'undefined') return;
+  for (const gameKey of Object.keys(CT_TCG_CONFIG)) {
+    const cfg = CT_TCG_CONFIG[gameKey];
+    const nameInput = $(`${cfg.prefix}CardName`);
+    const nameBox = $(`${cfg.prefix}NameSuggestions`);
+    const setInput = $(`${cfg.prefix}CardSet`);
+    const setBox = $(`${cfg.prefix}SetSuggestions`);
+
+    const inTcgName = (nameInput && nameInput.contains(target)) || (nameBox && nameBox.contains(target));
+    const inTcgSet = (setInput && setInput.contains(target)) || (setBox && setBox.contains(target));
+
+    if (!inTcgName && nameBox) nameBox.hidden = true;
+    if (!inTcgSet && setBox) setBox.hidden = true;
+  }
+}
+
 // Chiudi suggerimenti cliccando fuori
 document.addEventListener('mousedown', e => {
-  if (!$('pokemonName').contains(e.target) && !$('nameSuggestions').contains(e.target)) {
-    hideSuggestions();
-  }
-  if (!$('cardSet').contains(e.target) && !$('setSuggestions').contains(e.target)) {
-    hideSetSuggestions();
-  }
+  closeAllSuggestionDropdownsForTarget(e.target);
   if (pokemonCtMarketMenuOpen && !e.target.closest('.ct-market-menu')) {
     pokemonCtMarketMenuOpen = false;
     if (selectedCard) renderResult();
@@ -5596,6 +5646,13 @@ function getSelectedSetId() {
   if (hidden) return hidden;
   const text = $('cardSet')?.value?.trim();
   if (!text) return '';
+
+  const euCode = text.match(/\bEU\s*[:=]\s*([a-z0-9.\-]+)/i)?.[1]?.trim();
+  if (euCode) {
+    const byEu = POKEMON_SETS.find(s => norm(s.id) === norm(euCode));
+    if (byEu) return byEu.id;
+  }
+
   const q = norm(text);
   const exact = POKEMON_SETS.find(s => norm(s.id) === q || norm(s.id).replace(/[\.\-]/g, '') === q.replace(/[\.\-]/g, ''));
   if (exact) return exact.id;
@@ -5611,7 +5668,7 @@ function getSelectedSetId() {
   const qNorm = normalizeSetSearchText(text);
   const qCompact = qNorm.replace(/[^a-z0-9]/g, '');
   const byText = POKEMON_SETS.find(s => {
-    const sNorm = normalizeSetSearchText(s.text || '');
+    const sNorm = normalizeSetSearchText(`${s.text || ''} ${formatPokemonSetLabel(s)}`);
     if (!sNorm) return false;
     if (sNorm === qNorm) return true;
     const sCompact = sNorm.replace(/[^a-z0-9]/g, '');
@@ -5626,7 +5683,7 @@ function getSelectedSetId() {
   if (matches.length > 1) {
     const scoreSetSuggestion = (queryText, setRow) => {
       const qNorm = normalizeSetSearchText(queryText);
-      const setNormText = normalizeSetSearchText(`${setRow.id} ${setRow.text}`);
+      const setNormText = normalizeSetSearchText(`${setRow.id} ${setRow.text} ${formatPokemonSetLabel(setRow)}`);
       let score = nameSimilarityScore(qNorm, setNormText);
 
       const year = qNorm.match(/(?:19|20)\d{2}/)?.[0];
@@ -5676,13 +5733,85 @@ function normalizeSetSearchText(v) {
   return t;
 }
 
+// Nomi e sigle verificati online (Pokémon TCG API + CardTrader) per set Mega.
+const POKEMON_SET_NAME_OVERRIDES = {
+  me1: { en: 'Mega Evolution', it: 'Megaevoluzione' },
+  'me02.5': { en: 'Ascended Heroes', it: 'Ascesa Eroica' },
+  me02: { en: 'Phantasmal Flames', it: 'Fiamme Spettrali' },
+  me3: { en: 'Perfect Order', it: 'Equilibrio Perfetto' },
+  me4: { en: 'Chaos Rising', it: 'Caos Nascente' },
+  me5: { en: 'Pitch Black', it: 'Buio Pesto' },
+};
+
+const POKEMON_SET_CODE_OVERRIDES = {
+  me1: 'MEG',
+  'me02.5': 'ASC',
+  me02: 'PFL',
+  me3: 'POR',
+  me4: 'CRI',
+  me5: 'PBL',
+};
+
+function looksItalianSetName(v) {
+  const raw = String(v || '').trim();
+  if (!raw) return false;
+  if (/[àèéìòù]/i.test(raw)) return true;
+  const n = norm(raw);
+  return /\b(di|del|della|delle|degli|degli|da|nel|nella|nelle|con|per|e|ascesa|eroica|buio|pesto|nascente|predestinati|avventure|insieme|evoluzioni|paldea|scarlatto|violetto|crepuscolo|mascherato|cronoforze|ossidiana|infuocata|fiamme|spettrali)\b/.test(n);
+}
+
+function looksEnglishSetName(v) {
+  const n = norm(v || '');
+  if (!n) return false;
+  return /\b(the|and|of|with|for|to|in|on|from|pitch|black|chaos|rising|perfect|order|destined|rivals|journey|together|surging|sparks|stellar|crown|twilight|masquerade|temporal|forces|paradox|rift|obsidian|flames|paldean|evolved|fates|lost|origin|silver|tempest|zenith|heroes|ascended)\b/.test(n);
+}
+
+function splitPokemonSetNames(setText) {
+  const base = stripPokemonSetLabel(setText || '');
+  const parts = base.split(/\s+[–—-]\s+/).map(p => p.trim()).filter(Boolean);
+  if (!parts.length) return { en: '', it: '' };
+  if (parts.length === 1) return { en: parts[0], it: parts[0] };
+
+  const a = parts[0];
+  const b = parts[1];
+  const aIt = looksItalianSetName(a);
+  const bIt = looksItalianSetName(b);
+  const aEn = looksEnglishSetName(a);
+  const bEn = looksEnglishSetName(b);
+
+  if (aIt && !bIt) return { en: b, it: a };
+  if (bIt && !aIt) return { en: a, it: b };
+  if (aEn && !bEn) return { en: a, it: b };
+  if (bEn && !aEn) return { en: b, it: a };
+  return { en: a, it: b };
+}
+
+function formatPokemonSetLabel(setRow) {
+  if (!setRow) return '';
+  const id = String(setRow.id || '').trim();
+  const override = POKEMON_SET_NAME_OVERRIDES[id.toLowerCase()];
+  const { en, it } = override || splitPokemonSetNames(setRow.text || id);
+  const name = en && it && norm(en) !== norm(it)
+    ? `${en} / ${it}`
+    : (en || it || id);
+  const euCode = String(
+    POKEMON_SET_CODE_OVERRIDES[id.toLowerCase()]
+    || resolveCtCodeForPokemonSet(id, setRow.text || '')
+    || resolvePokemonApiSetId(id)
+    || id
+  ).toUpperCase();
+  const jpCode = id.toUpperCase();
+  return `${name} [EU:${euCode} / JP:${jpCode}]`;
+}
+
 function filterSetSuggestions(query) {
   const q = normalizeSetSearchText(query);
   if (!q) return [];
   const qCompact = q.replace(/[^a-z0-9]/g, '');
   const tokens = q.split(/\s+/).filter(t => t.length > 1);
   return POKEMON_SETS.filter(s => {
-    const hay = normalizeSetSearchText(`${s.id} ${s.text}`);
+    const display = formatPokemonSetLabel(s);
+    const hay = normalizeSetSearchText(`${s.id} ${s.text} ${display}`);
     const hayCompact = hay.replace(/[^a-z0-9]/g, '');
     if (hay.includes(q)) return true;
     if (qCompact && hayCompact.includes(qCompact)) return true;
@@ -5713,9 +5842,8 @@ function renderSetSuggestions(sets) {
   if (!sets.length) { hideSetSuggestions(); return; }
   const query = $('cardSet').value.trim();
   box.innerHTML = sets.map(s => `
-    <button type="button" class="sugg-item" data-set-id="${escHtml(s.id)}" data-set-text="${escHtml(s.text)}">
-      ${highlightMatch(s.text, query)}
-      <span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:2px;">ID: ${escHtml(s.id)}</span>
+    <button type="button" class="sugg-item" data-set-id="${escHtml(s.id)}">
+      ${highlightMatch(formatPokemonSetLabel(s), query)}
     </button>`).join('');
   box.hidden = false;
   if (!box.dataset.bound) {
@@ -5724,7 +5852,7 @@ function renderSetSuggestions(sets) {
       const btn = e.target.closest('.sugg-item[data-set-id]');
       if (!btn) return;
       e.preventDefault();
-      selectSetOption(btn.dataset.setId, btn.dataset.setText);
+      selectSetOption(btn.dataset.setId);
     });
   }
 }
@@ -5766,9 +5894,10 @@ async function preloadPokemonSetCards(setId, opts = {}) {
   return task;
 }
 
-function selectSetOption(id, text) {
-  $('cardSet').value = text;
-  $('cardSetId').value = id;
+function selectSetOption(id) {
+  const setRow = POKEMON_SETS.find(s => norm(s.id) === norm(id));
+  $('cardSet').value = setRow ? formatPokemonSetLabel(setRow) : (id || '');
+  $('cardSetId').value = setRow?.id || id;
   hideSetSuggestions();
   $('cardSet').focus();
   ctPreloadBlueprintsForSet(id);
@@ -6356,6 +6485,9 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
     } else if (e?.status === 403) {
       blocked = true;
       showMsg('API bloccata — uso il catalogo locale.', 'warning');
+    } else if (isTransientPokemonStatus(e?.status)) {
+      blocked = true;
+      showMsg('API temporaneamente instabile — uso il catalogo locale.', 'warning');
     } else if (e.status === 404 || e.message?.includes('non disponibile')) {
       blocked = true;
       showMsg('API non disponibile — uso il catalogo locale.', 'warning');
@@ -6899,7 +7031,7 @@ function fillPokemonSearchFromItem(item) {
     ? POKEMON_SETS.find(s => norm(s.id) === norm(setId))
     : null;
   if ($('cardSetId')) $('cardSetId').value = setId;
-  if ($('cardSet')) $('cardSet').value = setRow?.text || item.set || '';
+  if ($('cardSet')) $('cardSet').value = setRow ? formatPokemonSetLabel(setRow) : (item.set || '');
 }
 
 function fillTcgSearchFromItem(gameKey, item) {
@@ -7627,9 +7759,6 @@ function setupTcgSetAutocomplete(gameKey) {
     renderTcgSetSuggestions(gameKey);
   });
   input.addEventListener('focus', () => renderTcgSetSuggestions(gameKey));
-  document.addEventListener('click', e => {
-    if (!input.contains(e.target) && !box.contains(e.target)) box.hidden = true;
-  });
 }
 
 async function tcgLoadNameSuggestions(gameKey, name, genToken = null) {

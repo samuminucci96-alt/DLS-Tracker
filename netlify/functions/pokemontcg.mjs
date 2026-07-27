@@ -3,6 +3,7 @@ import { corsHeaders } from "./_lib/jwt.mjs";
 const PT_BASE = "https://api.pokemontcg.io/v2/cards";
 const PT_TIMEOUT_MS = Math.max(3000, Number.parseInt(process.env.POKEMON_TCG_TIMEOUT_MS || "12000", 10) || 12000);
 const PT_RETRY_ATTEMPTS = Math.max(0, Number.parseInt(process.env.POKEMON_TCG_RETRY_ATTEMPTS || "1", 10) || 1);
+const PT_RETRY_BASE_DELAY_MS = Math.max(50, Number.parseInt(process.env.POKEMON_TCG_RETRY_DELAY_MS || "180", 10) || 180);
 const PT_RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 const PT_CACHE_TTL_MS = Math.max(1000, Number.parseInt(process.env.POKEMON_TCG_CACHE_TTL_MS || "90000", 10) || 90000);
 const PT_CACHE_MAX_ENTRIES = Math.max(10, Number.parseInt(process.env.POKEMON_TCG_CACHE_MAX_ENTRIES || "250", 10) || 250);
@@ -49,6 +50,11 @@ function isRetryableFetchError(err) {
   );
 }
 
+async function retryBackoff(attempt) {
+  const ms = PT_RETRY_BASE_DELAY_MS * attempt;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function ptFetchWithRetry(ptUrl, headers) {
   const maxAttempts = 1 + PT_RETRY_ATTEMPTS;
   let lastError = null;
@@ -62,7 +68,8 @@ async function ptFetchWithRetry(ptUrl, headers) {
       const body = await res.text();
       
       if (PT_RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
-        // Body è già consumato, continua al retry
+        // Body è già consumato, attendi un backoff breve e continua col retry.
+        await retryBackoff(attempt);
         continue;
       }
       return { body, status: res.status, contentType, attempts: attempt };
@@ -71,6 +78,7 @@ async function ptFetchWithRetry(ptUrl, headers) {
       if (!isRetryableFetchError(err) || attempt >= maxAttempts) {
         return { error: err, attempts: attempt };
       }
+      await retryBackoff(attempt);
     } finally {
       clearTimeout(timer);
     }
