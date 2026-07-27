@@ -23,7 +23,7 @@ Una **Progressive Web App** (PWA) moderna, installabile su smartphone senza App 
 
 Usa il prezzo manuale quando:
 - il prezzo live non è disponibile (API temporaneamente non raggiungibile)
-- vuoi allineare il valore alla tua valutazione reale (carta gradita, comprata in blocco, promozione)
+- vuoi allineare il valore alla tua valutazione reale (carta graduata, comprata in blocco, promozione)
 - desideri mantenere coerenza con un marketplace specifico non coperto
 
 Comportamento in app:
