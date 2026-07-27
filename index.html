@@ -448,13 +448,20 @@
       gap: 20px;
       align-items: start;
       min-width: 0;
+      position: relative;
+      isolation: isolate;
     }
 
     .panel {
       display: flex;
       flex-direction: column;
       gap: 16px;
+      position: relative;
+      z-index: 1;
     }
+
+    /* Il pannello ricerca deve stare sopra la collezione per menu/autocomplete overlay */
+    .main-grid > .panel:first-child { z-index: 3; }
 
     /* ─── Card box ───────────────────────────────────────────────── */
     .card {
@@ -2737,11 +2744,11 @@
       <div class="game-tabs">
         <button type="button" class="game-tab active" data-game="pokemon">
           <span class="tab-icon tab-icon-img"><img src="pikachu-tab.png?v=3" alt="" width="30" height="30" draggable="false"></span>
-          Pokémon TCG
+          Pokémon
         </button>
         <button type="button" class="game-tab" data-game="onepiece">
           <span class="tab-icon">☠️</span>
-          One Piece TCG
+          One Piece
         </button>
         <button type="button" class="game-tab" data-game="riftbound">
           <span class="tab-icon">⚔️</span>
@@ -2772,7 +2779,7 @@
       <!-- Search form -->
       <div class="card">
         <div class="card-header">
-          <h2>Ricerca Carta</h2>
+          <h2 id="searchPanelTitle">Ricerca Carta</h2>
           <span class="tag" id="gameTag">Pokémon TCG</span>
         </div>
 
@@ -2936,8 +2943,8 @@
                 <option value="" selected>Qualsiasi</option>
                 <option value="en">🇬🇧 Inglese</option>
                 <option value="ja">🇯🇵 Giapponese</option>
-                <option value="it">🇮🇹 Italiano</option>
-                <option value="fr">🇫🇷 Francese</option>
+                <option value="zh">🇨🇳 Cinese (Semplificato)</option>
+                <option value="ko">🇰🇷 Coreano</option>
               </select>
             </div>
             <div class="field">
@@ -2992,7 +2999,6 @@
                 <option value="en">🇬🇧 Inglese</option>
                 <option value="fr">🇫🇷 Francese</option>
                 <option value="zh">🇨🇳 Cinese</option>
-                <option value="it">🇮🇹 Italiano</option>
               </select>
             </div>
             <div class="field">
@@ -3299,7 +3305,11 @@ const CT_SET_CODE_MAP = {
   smp: 'smbs',
   xyp: 'xybsp',
   bwp: 'bwbsp',
+  np: 'nbsp',
+  nbsp: 'nbsp',
   scarletvioletblackstarpromos: 'svpromo',
+  nintendoblackstarpromos: 'nbsp',
+  nintendopromos: 'nbsp',
   svblackstarpromos: 'svpromo',
   blackstarpromos: 'svpromo',
   mepblackstarpromos: 'mep',
@@ -3325,7 +3335,7 @@ function resolvePokemonApiSetId(setId) {
   return POKEMON_API_SET_ID_MAP[key] || raw;
 }
 
-const CT_PROMO_EXPANSION_CODES = new Set(['mep', 'svpromo', 'swshbs', 'smbs', 'xybsp', 'bwbsp']);
+const CT_PROMO_EXPANSION_CODES = new Set(['mep', 'svpromo', 'swshbs', 'smbs', 'xybsp', 'bwbsp', 'nbsp']);
 
 const CT_SET_ID_CONFLICTS = new Set(['sv1','sv2','sv3','sv4','sv5','sv6','sv7','sv8','sv9']);
 
@@ -3349,6 +3359,7 @@ function ctPromoEraKey(setId) {
   if (id.startsWith('sm')) return 'sm';
   if (id.startsWith('xy')) return 'xy';
   if (id.startsWith('bw') || id === 'bwp') return 'bw';
+  if (id === 'np' || id === 'nbsp') return 'np';
   return id.replace(/[^a-z0-9]/g, '').slice(0, 4);
 }
 
@@ -3363,6 +3374,7 @@ function ctExpansionPromoEra(exp) {
     if (/sun|moon|^sm/.test(n)) return 'sm';
     if (/xy/.test(n)) return 'xy';
     if (/bw|blackwhite/.test(n)) return 'bw';
+    if (/nintendo/.test(n)) return 'np';
     return 'generic';
   }
   return null;
@@ -3413,6 +3425,7 @@ function inferPromoSetIdFromText(text) {
   if (/\bsmp\b/.test(t) || compact.includes('smblackstar')) return 'smp';
   if (/\bxyp\b/.test(t) || compact.includes('xyblackstar')) return 'xyp';
   if (/\bbwp\b/.test(t) || compact.includes('bwblackstar')) return 'bwp';
+  if (/\bnp\b|\bnbsp\b/.test(t) || compact.includes('nintendoblackstar') || compact.includes('nintendopromo')) return 'np';
   return '';
 }
 
@@ -3951,14 +3964,17 @@ const CT_LANGUAGE_BY_UI = {
   Portoghese: 'pt',
   Korean: 'ko',
   Coreano: 'ko',
+  Chinese: 'zh',
+  Cinese: 'zh',
 };
 
 const SEARCH_LANG_CODES = {
   inglese: 'en', italiano: 'it', spagnolo: 'es', tedesco: 'de',
-  francese: 'fr', giapponese: 'ja', portoghese: 'pt', coreano: 'ko',
+  francese: 'fr', giapponese: 'ja', portoghese: 'pt', coreano: 'ko', cinese: 'zh',
   english: 'en', italian: 'it', spanish: 'es', german: 'de',
-  french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
-  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', jp: 'ja', pt: 'pt', ko: 'ko',
+  french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko', chinese: 'zh',
+  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', jp: 'ja', pt: 'pt', ko: 'ko', zh: 'zh',
+  zhs: 'zh', chs: 'zh', cn: 'zh',
   jpn: 'ja', eng: 'en', ita: 'it',
 };
 
@@ -3972,6 +3988,7 @@ const CT_LANG_ALIASES = {
   fr: ['fr', 'fra', 'french', 'francais'],
   pt: ['pt', 'por', 'portuguese'],
   ko: ['ko', 'kr', 'kor', 'korean'],
+  zh: ['zh', 'zhs', 'chs', 'cn', 'chinese', 'simplifiedchinese'],
 };
 
 function ctLanguageApiCode(lang) {
@@ -4622,7 +4639,12 @@ function ctBpImageUrl(bp, size = 'show') {
     return bp.image_url.replace('https://cardtrader.com', CT_IMG_BASE);
   }
   const img = bp.image;
-  if (!img || typeof img !== 'object') return '';
+  if (!img) return '';
+  if (typeof img === 'string') {
+    if (/^https?:\/\//i.test(img)) return img.replace('https://cardtrader.com', CT_IMG_BASE);
+    return CT_IMG_BASE + (img.startsWith('/') ? img : `/${img}`);
+  }
+  if (typeof img !== 'object') return '';
   const pick = size === 'thumb'
     ? (img.preview?.url || img.url || img.show?.url)
     : (img.show?.url || img.preview?.url || img.url);
@@ -5020,6 +5042,37 @@ async function ctFindBlueprint(card, expansionId, token) {
   return null;
 }
 
+function ctRankBlueprintCandidates(card, blueprints = []) {
+  return blueprints
+    .map((bp) => ({ bp, score: scoreBlueprintForCard(card, bp) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.bp);
+}
+
+async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = null, token = null) {
+  if (!card || !expansion?.id) return null;
+  const all = await ctGetBlueprints(expansion.id, token);
+  const ranked = ctRankBlueprintCandidates(card, all);
+  if (!ranked.length) return null;
+
+  const tried = new Set();
+  if (preferredBpId) tried.add(String(preferredBpId));
+
+  // Limita il probing per non rallentare troppo le ricerche.
+  for (const bp of ranked.slice(0, 8)) {
+    const id = String(bp?.id || '');
+    if (!id || tried.has(id)) continue;
+    tried.add(id);
+
+    const probe = await ctGetPriceByBlueprintId(id);
+    if (probe && !probe.error && !probe.authError && !probe.corsError && Array.isArray(probe.conditions) && probe.conditions.length) {
+      return { bp, probe };
+    }
+  }
+  return null;
+}
+
 // Mappa condizioni CardTrader → etichetta app
 const CT_COND_MAP = {
   'near mint':         { key: 'NM',     label: 'Near Mint',      mult: 1.00 },
@@ -5292,10 +5345,12 @@ async function ctGetPrice(card, game = 'pokemon') {
     let bp = null;
     let expansionName = '';
     let setMatchWarning = null;
+    let matchedExpansion = null;
 
     // ── Approccio 1 (primario): espansione → blueprints/export
     const expansion = await ctMatchExpansion(card, null, game);
     if (expansion) {
+      matchedExpansion = expansion;
       bp = await ctFindBlueprint(card, expansion.id, null);
       expansionName = ctExpName(expansion);
       ctLog('[CT] Blueprint via espansione:', bp?.name, '|', expansionName);
@@ -5322,27 +5377,63 @@ async function ctGetPrice(card, game = 'pokemon') {
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
 
-    if (!listings.length) return {
-      error: 'Nessun venditore attivo su CardTrader al momento',
-      blueprintId: bp.id,
-      url: `https://www.cardtrader.com/en/cards/${bp.id}`
-    };
+    if (!listings.length) {
+      const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
+      if (alt?.probe) {
+        return {
+          ...alt.probe,
+          blueprintId: alt.bp.id,
+          expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${alt.bp.id}`,
+        };
+      }
+      return {
+        error: 'Nessun venditore attivo su CardTrader al momento',
+        blueprintId: bp.id,
+        url: `https://www.cardtrader.com/en/cards/${bp.id}`
+      };
+    }
 
     const filterErr = ctListingFilterError(listings);
-    if (filterErr) return {
-      error: filterErr,
-      blueprintId: bp.id,
-      url: `https://www.cardtrader.com/en/cards/${bp.id}`,
-    };
+    if (filterErr) {
+      const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
+      if (alt?.probe) {
+        return {
+          ...alt.probe,
+          blueprintId: alt.bp.id,
+          expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${alt.bp.id}`,
+        };
+      }
+      return {
+        error: filterErr,
+        blueprintId: bp.id,
+        url: `https://www.cardtrader.com/en/cards/${bp.id}`,
+      };
+    }
 
     const { conditions, lowestAny } = ctAverageConditions(listings);
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
 
-    if (!nm) return {
-      error: 'Nessun prezzo valido trovato su CardTrader',
-      blueprintId: bp.id,
-      url: `https://www.cardtrader.com/en/cards/${bp.id}`
-    };
+    if (!nm) {
+      const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
+      if (alt?.probe) {
+        return {
+          ...alt.probe,
+          blueprintId: alt.bp.id,
+          expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${alt.bp.id}`,
+        };
+      }
+      return {
+        error: 'Nessun prezzo valido trovato su CardTrader',
+        blueprintId: bp.id,
+        url: `https://www.cardtrader.com/en/cards/${bp.id}`
+      };
+    }
 
     return {
       price:       nm.minPrice,
@@ -6020,7 +6111,7 @@ function shouldTryCtPromoSearch(cardSet) {
   const setText = $('cardSet')?.value?.trim() || '';
   return isPromoSetId(cardSet)
     || !!inferPromoSetIdFromText(setText)
-    || /promo|black\s*star|\bmep\b|\bsvp\b|mega\s*evolution/i.test(`${setText} ${cardSet || ''}`);
+    || /promo|black\s*star|\bmep\b|\bsvp\b|\bnp\b|\bnbsp\b|nintendo|mega\s*evolution/i.test(`${setText} ${cardSet || ''}`);
 }
 
 function shouldTryCtFallback(name, number, cardSet) {
@@ -7761,6 +7852,130 @@ function setupTcgSetAutocomplete(gameKey) {
   input.addEventListener('focus', () => renderTcgSetSuggestions(gameKey));
 }
 
+function tcgCatalogRowsByGame(gameKey) {
+  if (gameKey === 'onepiece') return (typeof ONE_PIECE_CARDS !== 'undefined' ? ONE_PIECE_CARDS : []);
+  if (gameKey === 'riftbound') return (typeof RIFTBOUND_CARDS !== 'undefined' ? RIFTBOUND_CARDS : []);
+  if (gameKey === 'sealed') return (typeof POKEMON_SEALED_CARDS !== 'undefined' ? POKEMON_SEALED_CARDS : []);
+  return [];
+}
+
+function toCatalogBlueprint(card, gameKey) {
+  const id = Number(card?.id || 0) || 0;
+  const num = String(card?.number || '').trim();
+  const code = String(card?.setCode || card?.setId || '').trim();
+  return {
+    id,
+    name: String(card?.name || '').trim(),
+    collector_number: num,
+    category_name: String(card?.rarity || '').trim(),
+    fixed_properties: { collector_number: num },
+    expansion: {
+      id: card?.setCtId || '',
+      code,
+      name_en: String(card?.setName || code || '?').trim(),
+    },
+    image: card?.img || '',
+    _catalogPriceNm: Number.isFinite(Number(card?.priceNm)) ? Number(card.priceNm) : null,
+    _catalogPriceMin: Number.isFinite(Number(card?.priceMin)) ? Number(card.priceMin) : null,
+    _catalogListings: Number(card?.listings || 0) || 0,
+    _catalogPricesByLang: card?.pricesByLang || null,
+    _sealedType: gameKey === 'sealed' ? (card?.type || null) : null,
+    _fromCatalog: true,
+    _catalogGame: gameKey,
+    imgUrl: card?.img || '',
+  };
+}
+
+function tcgCatalogPriceForLang(bp, lang) {
+  const nm = Number.isFinite(Number(bp?._catalogPriceNm)) ? Number(bp._catalogPriceNm) : null;
+  const min = Number.isFinite(Number(bp?._catalogPriceMin)) ? Number(bp._catalogPriceMin) : null;
+  const byLang = bp?._catalogPricesByLang;
+  if (!byLang || typeof byLang !== 'object') return nm ?? min;
+
+  const want = ctLanguageApiCode(lang || '');
+  if (!want) return nm ?? min;
+
+  const pick = (entry) => {
+    if (!entry || typeof entry !== 'object') return null;
+    const vNm = Number.isFinite(Number(entry.nm)) ? Number(entry.nm) : null;
+    const vMin = Number.isFinite(Number(entry.min)) ? Number(entry.min) : null;
+    return vNm ?? vMin;
+  };
+
+  const direct = pick(byLang[want]);
+  if (direct != null) return direct;
+
+  const aliases = new Set(CT_LANG_ALIASES[want] || [want]);
+  if (want === 'ja') aliases.add('jp');
+  if (want === 'jp') aliases.add('ja');
+  for (const a of aliases) {
+    const hit = pick(byLang[a]);
+    if (hit != null) return hit;
+  }
+
+  return nm ?? min;
+}
+
+function searchTcgLocalCatalog(gameKey, name, num, setId = '', setCtId = '', limit = 24, typeFilter = '') {
+  const rows = tcgCatalogRowsByGame(gameKey);
+  if (!rows.length) return [];
+
+  const safeLimit = Math.max(1, Number(limit || 24) || 24);
+  const qName = normCardName(name || '');
+  const qTokens = qName.split(' ').filter(t => t.length > 1);
+  const qNum = normalizeTcgCardPrefix(num || '');
+  const qSetId = normalizeTcgSetCode(setId || '');
+  const qSetCtId = String(setCtId || '').trim();
+  const qType = String(typeFilter || '').trim().toLowerCase();
+  const sealedParsed = gameKey === 'sealed' ? parseSealedSearchQuery(name, typeFilter) : null;
+
+  const scored = [];
+  for (const row of rows) {
+    if (!row?.name) continue;
+
+    if (qSetCtId && String(row.setCtId || '') !== qSetCtId) continue;
+    if (qSetId) {
+      const rowSet = normalizeTcgSetCode(row.setId || row.setCode || '');
+      if (!rowSet || (rowSet !== qSetId && !rowSet.includes(qSetId) && !qSetId.includes(rowSet))) continue;
+    }
+    if (qType && String(row.type || '').toLowerCase() !== qType) continue;
+
+    let score = 0;
+    if (gameKey === 'sealed') {
+      score = scoreSealedCatalogCard(row, sealedParsed || parseSealedSearchQuery(name, typeFilter));
+      if (score < 0) continue;
+    } else {
+      const hay = normCardName(`${row.name || ''} ${row.setName || ''} ${row.setCode || ''} ${row.setId || ''}`);
+      if (qTokens.length) {
+        const hits = qTokens.filter(t => hay.includes(t)).length;
+        if (!hits) continue;
+        const need = qTokens.length <= 2 ? qTokens.length : Math.ceil(qTokens.length * 0.7);
+        if (hits < need) continue;
+        score += hits * 45;
+        if (hits === qTokens.length) score += 70;
+      }
+
+      if (qNum) {
+        const rowNum = normalizeTcgCardPrefix(row.number || '');
+        if (!rowNum) continue;
+        if (rowNum === qNum) score += 140;
+        else if (rowNum.includes(qNum) || qNum.includes(rowNum)) score += 85;
+        else continue;
+      }
+
+      if (!qTokens.length && !qNum && (qSetId || qSetCtId)) score += 25;
+      if (Number(row.listings || 0) > 0) score += 15;
+    }
+
+    scored.push({ row, score });
+  }
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, safeLimit)
+    .map(({ row }) => toCatalogBlueprint(row, gameKey));
+}
+
 async function tcgLoadNameSuggestions(gameKey, name, genToken = null) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const setText = $(`${cfg.prefix}CardSet`)?.value?.trim() || '';
@@ -8105,7 +8320,7 @@ window.tcgPickChoice = function(gameKey, index) {
 
 async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].searchGen) {
   const cfg = CT_TCG_CONFIG[gameKey];
-  bp.imgUrl = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
+  bp.imgUrl = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
   clearTimeout(ctTcgState[gameKey].suggTimer);
   ctTcgState[gameKey].suggGen++;
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
@@ -8749,7 +8964,7 @@ function dlBlob(content, type, name) {
 // ── Game switcher ─────────────────────────────────────────────────────
 const GAME_UI = {
   pokemon:   { label: 'Pokémon TCG',   tagBg: '',                          tagColor: '' },
-  sealed:    { label: 'Sealed Pokémon', tagBg: 'rgba(100,116,139,0.18)',  tagColor: '#94a3b8' },
+  sealed:    { label: 'Sealed Pokémon BETA', tagBg: 'rgba(100,116,139,0.18)',  tagColor: '#94a3b8' },
   onepiece:  { label: 'One Piece TCG', tagBg: 'rgba(192,57,43,0.12)',    tagColor: '#c0392b' },
   riftbound: { label: 'Riftbound',     tagBg: 'rgba(201,146,10,0.15)',    tagColor: '#c9920a' },
 };
@@ -8820,6 +9035,10 @@ function switchActiveGame(game, opts = {}) {
       tag.textContent = ui.label;
       tag.style.background = ui.tagBg;
       tag.style.color = ui.tagColor;
+    }
+    const searchTitle = $('searchPanelTitle');
+    if (searchTitle) {
+      searchTitle.textContent = game === 'sealed' ? 'Ricerca Prodotto' : 'Ricerca Carta';
     }
     renderCollection();
     scheduleCtPreload(game);
