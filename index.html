@@ -2832,9 +2832,9 @@
             <div class="field">
               <label for="condSelect">Condizione</label>
               <select id="condSelect">
-                <option value="NM">NM — Near Mint (100%)</option>
-                <option value="EX">EX — Excellent (85%)</option>
-                <option value="GOOD">GOOD — Good (70%)</option>
+                <option value="NM">NM — Mint (100%)</option>
+                <option value="EX">EX — Slightly Played (85%)</option>
+                <option value="GOOD">GOOD — Moderately Played (70%)</option>
                 <option value="PLAYED">PLAYED — Played (50%)</option>
                 <option value="POOR">POOR — Poor (30%)</option>
               </select>
@@ -2950,9 +2950,9 @@
             <div class="field">
               <label for="opCondSearch">Condizione</label>
               <select id="opCondSearch">
-                <option value="NM">NM — Near Mint</option>
-                <option value="EX">EX — Excellent</option>
-                <option value="GOOD">GOOD — Good</option>
+                <option value="NM">NM — Mint</option>
+                <option value="EX">EX — Slightly Played</option>
+                <option value="GOOD">GOOD — Moderately Played</option>
                 <option value="PLAYED">PLAYED — Played</option>
                 <option value="POOR">POOR — Poor</option>
               </select>
@@ -3004,9 +3004,9 @@
             <div class="field">
               <label for="rbCondSearch">Condizione</label>
               <select id="rbCondSearch">
-                <option value="NM">NM — Near Mint</option>
-                <option value="EX">EX — Excellent</option>
-                <option value="GOOD">GOOD — Good</option>
+                <option value="NM">NM — Mint</option>
+                <option value="EX">EX — Slightly Played</option>
+                <option value="GOOD">GOOD — Moderately Played</option>
                 <option value="PLAYED">PLAYED — Played</option>
                 <option value="POOR">POOR — Poor</option>
               </select>
@@ -3221,9 +3221,9 @@ function ctLog(...args) { if (CT_DEBUG) console.log(...args); }
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
 
 const QUALITY = {
-  NM:     { label: 'Near Mint',  short: 'NM',     coeff: 1.00 },
-  EX:     { label: 'Excellent',  short: 'EX',     coeff: 0.85 },
-  GOOD:   { label: 'Good',       short: 'GOOD',   coeff: 0.70 },
+  NM:     { label: 'Mint',              short: 'NM',     coeff: 1.00 },
+  EX:     { label: 'Slightly Played',   short: 'EX',     coeff: 0.85 },
+  GOOD:   { label: 'Moderately Played', short: 'GOOD',   coeff: 0.70 },
   PLAYED: { label: 'Played',     short: 'PLAYED', coeff: 0.50 },
   POOR:   { label: 'Poor',       short: 'POOR',   coeff: 0.30 }
 };
@@ -5075,17 +5075,17 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
 
 // Mappa condizioni CardTrader → etichetta app
 const CT_COND_MAP = {
-  'near mint':         { key: 'NM',     label: 'Near Mint',      mult: 1.00 },
-  'mint':              { key: 'NM',     label: 'Near Mint',      mult: 1.00 },
-  'excellent':         { key: 'EX',     label: 'Excellent',      mult: 0.85 },
-  'slightly played':   { key: 'EX',     label: 'Exc. (Slight)',  mult: 0.85 },
-  'lightly played':    { key: 'EX',     label: 'Exc. (Light)',   mult: 0.85 },
-  'good':              { key: 'GOOD',   label: 'Good',           mult: 0.70 },
-  'played':            { key: 'GOOD',   label: 'Good (Played)',  mult: 0.70 },
-  'moderately played': { key: 'GOOD',   label: 'Good (Played)',  mult: 0.70 },
-  'heavily played':    { key: 'PLAYED', label: 'Heavily Played', mult: 0.50 },
-  'poor':              { key: 'POOR',   label: 'Poor / Damaged', mult: 0.30 },
-  'damaged':           { key: 'POOR',   label: 'Poor / Damaged', mult: 0.30 },
+  'near mint':         { key: 'NM',     label: 'Mint',              mult: 1.00 },
+  'mint':              { key: 'NM',     label: 'Mint',              mult: 1.00 },
+  'excellent':         { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'slightly played':   { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'lightly played':    { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'good':              { key: 'GOOD',   label: 'Moderately Played', mult: 0.70 },
+  'moderately played': { key: 'GOOD',   label: 'Moderately Played', mult: 0.70 },
+  'played':            { key: 'PLAYED', label: 'Played',            mult: 0.50 },
+  'heavily played':    { key: 'PLAYED', label: 'Played',            mult: 0.50 },
+  'poor':              { key: 'POOR',   label: 'Poor',              mult: 0.30 },
+  'damaged':           { key: 'POOR',   label: 'Poor',              mult: 0.30 },
 };
 
 function ctCondKey(raw) {
@@ -5462,8 +5462,24 @@ async function ctGetPrice(card, game = 'pokemon') {
 }
 
 function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
-  const cond = (d.conditions || []).find(c => c.key === condKey) || d.conditions?.[0];
-  if (!cond) return '';
+  const cond = (d.conditions || []).find(c => c.key === condKey);
+  const condLabel = QUALITY[qualityKeyFromCtCond(condKey)]?.label || condKey;
+  if (!cond) {
+    return `
+      <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
+        <div class="ct-market-title">
+          <span>Annunci caricati su CT · ${escHtml(condLabel)}</span>
+          <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
+            ${isOpen ? 'Chiudi menu' : 'Apri menu'} · 0
+          </button>
+        </div>
+        <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
+          <div class="ct-listing-list">
+            <p class="ct-msg info">Nessun annuncio per questa condizione.</p>
+          </div>
+        </div>
+      </div>`;
+  }
   const rows = (cond.listings || []).map((l, idx) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
@@ -5544,16 +5560,25 @@ function renderCtSection() {
   const selectedCtCond = CT_QUALITY_TO_COND[selectedQuality] || 'NM';
   const priceView = getSelectedUnitPrice();
   const nmCond = (d.conditions || []).find(c => c.key === 'NM') || d.conditions?.[0];
-  const condRows = (d.conditions || []).map(c => {
-    const foilMark = c.foil ? ' ✨' : '';
-    const editionMark = c.firstEdition ? ' · 1ª' : '';
-    const isSelected = c.key === selectedCtCond;
+  const condRows = Object.keys(CT_QUALITY_TO_COND).map(qualityKey => {
+    const ctCondKey = CT_QUALITY_TO_COND[qualityKey];
+    const liveCond = (d.conditions || []).find(c => c.key === ctCondKey);
+    const resolved = liveCond
+      ? { unit: liveCond.minPrice || liveCond.price, fromCt: true }
+      : resolveCtConditionPrice(d, qualityKey, d.price || basePrice || 0);
+    const label = QUALITY[qualityKey]?.label || liveCond?.label || qualityKey;
+    const foilMark = liveCond?.foil ? ' ✨' : '';
+    const editionMark = liveCond?.firstEdition ? ' · 1ª' : '';
+    const isSelected = ctCondKey === selectedCtCond;
+    const count = liveCond?.count || 0;
+    const meta = liveCond ? `Min CT${foilMark}${editionMark}` : 'Stima';
+    const countMeta = liveCond ? `Min. Cardmarket · ${count} ann.` : 'Nessun annuncio';
     return `
-      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
-        <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
-        <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
-        <span class="ct-cond-meta">Min CT${foilMark}${editionMark}</span>
-        <span class="ct-cond-count">Min. Cardmarket · ${c.count} ann.</span>
+      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(ctCondKey)}" aria-pressed="${isSelected}">
+        <span class="ct-cond-label">${escHtml(label)}${isSelected ? ' ← selezionata' : ''}</span>
+        <span class="ct-cond-price">${fmt(resolved.unit || 0)}</span>
+        <span class="ct-cond-meta">${meta}</span>
+        <span class="ct-cond-count">${countMeta}</span>
       </button>`;
   }).join('');
 
