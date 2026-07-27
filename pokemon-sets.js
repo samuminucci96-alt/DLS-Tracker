@@ -25,6 +25,10 @@ const POKEMON_SETS = [
     "text": "BW Black Star Promos – Black & White Promos (bwp)"
   },
   {
+    "id": "np",
+    "text": "Nintendo Black Star Promos – Nintendo Promos (np)"
+  },
+  {
     "id": "me5",
     "text": "Pitch Black – Buio Pesto (me5) · lug 2026"
   },
