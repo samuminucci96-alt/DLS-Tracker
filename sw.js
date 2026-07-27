@@ -1,6 +1,8 @@
-const CACHE = 'dls-tracker-v41';
+const CACHE = 'dls-tracker-v43';
 
-// Solo asset statici per installabilità PWA — nessun fetch handler (API/login/ricerca passano dal browser)
+// Solo asset statici per installabilità PWA.
+// NESSUN fetch handler: API/login/ricerca/HTML passano dal browser
+// (un fetch handler ha già bloccato i tap/ricerca nella PWA installata).
 const PRECACHE = [
   './manifest.json',
   './icon-192.png',

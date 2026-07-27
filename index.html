@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
-  <meta name="theme-color" content="#e8f4fc">
-  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2454a9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2454a9">
+  <link rel="manifest" href="manifest.json?v=43">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- black-translucent = contenuto sotto la status bar (tacca/isola) su iOS -->
@@ -171,11 +172,6 @@
       display: none;
     }
 
-    /* legacy wrapper kept for compat */
-    .header-logo {
-      display: none;
-    }
-
     .header-nav {
       justify-self: center;
       display: flex;
@@ -338,8 +334,17 @@
       overflow: hidden;
     }
 
-    html.is-standalone .auth-overlay,
-    html.is-standalone .auth-overlay.is-closed {
+    html.is-standalone .auth-overlay.is-closed,
+    html.is-standalone #authOverlay.is-closed,
+    html.is-standalone #profileOverlay.is-closed {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    html.is-standalone .auth-overlay:not(.is-closed) {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
@@ -354,6 +359,7 @@
     html.is-standalone .install-banner,
     html.is-standalone #installBanner {
       display: none !important;
+      pointer-events: none !important;
     }
 
     html.is-standalone #installIosSheet,
@@ -433,17 +439,6 @@
       height: 100%;
       object-fit: contain;
       image-rendering: auto;
-    }
-
-    .badge-soon {
-      font-size: 0.62rem;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 5px;
-      background: rgba(251,191,36,0.12);
-      color: #fbbf24;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
     }
 
     /* ─── Layout ─────────────────────────────────────────────────── */
@@ -723,7 +718,6 @@
     }
     .adv-body.open { max-height: 220px; opacity: 1; }
     .adv-inner { padding-top: 11px; }
-
     /* ─── Autocomplete ────────────────────────────────────────────── */
     .suggestions {
       position: absolute;
@@ -1014,9 +1008,7 @@
     .price-lbl { color: var(--text-muted); }
     .price-val { font-weight: 600; color: var(--success); }
     .price-val.lg { font-size: 1.12rem; font-weight: 700; }
-    .price-src { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
-
-    /* ─── Condition select ───────────────────────────────────────── */
+/* ─── Condition select ───────────────────────────────────────── */
     .cond-row {
       display: flex;
       gap: 13px;
@@ -1037,6 +1029,68 @@
     .cond-GOOD   { background: var(--gold-dim); color: var(--warning); }
     .cond-PLAYED { background: rgba(251,146,60,0.12); color: #fdba74; }
     .cond-POOR   { background: rgba(248,113,113,0.12); color: #fca5a5; }
+    .graded-badge {
+      display: inline-block;
+      margin-left: 5px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: var(--gold-dim);
+      color: var(--gold);
+      vertical-align: middle;
+    }
+    .graded-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+    }
+    .graded-check input {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--gold);
+      cursor: pointer;
+    }
+    .graded-check:has(input:checked) {
+      color: var(--gold);
+      border-color: color-mix(in srgb, var(--gold) 45%, var(--border));
+      background: var(--gold-dim);
+    }
+    .graded-score {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      white-space: nowrap;
+    }
+    .graded-score[hidden] { display: none !important; }
+    .graded-score select {
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-2, var(--bg));
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
 
     /* ─── Collection table ───────────────────────────────────────── */
     .stats-row {
@@ -1134,9 +1188,7 @@
 
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:hover td { background: rgba(36, 84, 169, 0.04); }
-
-    .td-price { font-weight: 700; color: var(--success); }
-    .td-actions { text-align: right; padding: 6px 6px; }
+.td-actions { text-align: right; padding: 6px 6px; }
 
     .tbl-empty {
       text-align: center;
@@ -1168,32 +1220,6 @@
     .total-label { font-size: 1.1rem; font-weight: 700; }
 
     .export-btns { display: flex; gap: 8px; }
-
-    /* ─── Coming soon ─────────────────────────────────────────────── */
-    .coming-soon {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      padding: 44px 24px;
-      text-align: center;
-    }
-    .cs-icon { font-size: 2.8rem; opacity: 0.55; }
-    .coming-soon h3 { font-size: 1.15rem; font-weight: 600; margin: 0; }
-    .coming-soon p { font-size: 0.88rem; color: var(--text-muted); max-width: 300px; line-height: 1.6; margin: 0; }
-    .cs-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 16px;
-      border-radius: 20px;
-      background: rgba(251,191,36,0.1);
-      color: var(--warning);
-      font-size: 0.82rem;
-      font-weight: 600;
-      border: 1px solid rgba(251,191,36,0.18);
-    }
 
     /* ─── Responsive ─────────────────────────────────────────────── */
     @media (max-width: 900px) {
@@ -1262,15 +1288,21 @@
       z-index: 50;
     }
 
+    .game-tab,
+    .user-btn,
+    .btn,
+    .choice-card,
+    .ct-listing-row,
+    .ct-cond-row,
+    tr.coll-row-open {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
     .game-tab .tab-icon,
     .game-tab img {
       pointer-events: none;
-    }
-
-    .game-tab,
-    .user-btn {
-      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-      cursor: pointer;
     }
 
     @media (max-width: 1100px) {
@@ -1726,6 +1758,7 @@
     .ct-msg.info  { color: var(--text-muted); }
 
     .ct-market-menu {
+      position: relative;
       margin-top: 10px;
       border-top: 1px solid var(--border);
       padding-top: 10px;
@@ -1748,6 +1781,28 @@
       max-height: 210px;
       overflow: auto;
       padding-right: 2px;
+    }
+    .ct-market-overlay {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 45;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .ct-market-overlay[hidden] {
+      display: none !important;
+    }
+    .ct-market-toggle {
+      padding: 5px 10px;
+      font-size: 0.72rem;
+      min-height: auto;
     }
     .ct-listing-row {
       display: grid;
@@ -1862,19 +1917,6 @@
       background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .auth-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px; }
-    .auth-tabs {
-      display: flex; gap: 4px; margin-bottom: 20px;
-      background: var(--surface-2); border-radius: 10px; padding: 4px;
-    }
-    .auth-tab {
-      flex: 1; padding: 8px; border: none; border-radius: 7px;
-      background: transparent; color: var(--text-muted);
-      cursor: pointer; font-size: 0.85rem; font-weight: 600;
-      transition: all .15s;
-    }
-    .auth-tab.active {
-      background: var(--accent); color: #fff;
-    }
     .auth-field { margin-bottom: 12px; }
     .auth-field label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
     .auth-field input {
@@ -2197,19 +2239,6 @@
       color: #7c2d12;
       background: rgba(251, 146, 60, 0.20);
       border-color: rgba(251, 146, 60, 0.32);
-    }
-
-    /* ─── Firebase setup banner ─────────────────────────────────── */
-    .firebase-banner {
-      background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(79,142,247,0.08));
-      border: 1px solid rgba(251,191,36,0.25);
-      border-radius: 14px; padding: 14px 16px;
-      font-size: 0.83rem; line-height: 1.6;
-    }
-    .firebase-banner strong { color: var(--warning); }
-    .firebase-banner code {
-      background: var(--surface-3); padding: 1px 5px;
-      border-radius: 4px; font-size: 0.78rem;
     }
 
     /* ─── Search loading bar ────────────────────────────────────── */
@@ -2601,7 +2630,7 @@
     <div class="auth-sub" id="authSub">La tua collezione sincronizzata su tutti i dispositivi</div>
 
     <!-- Email panel -->
-    <div id="panelEmail">
+    <div>
       <div class="auth-field" id="displayNameField" style="display:none">
         <label>Nome (opzionale)</label>
         <input id="authDisplayName" type="text" placeholder="Es. Marco" autocomplete="name">
@@ -2610,7 +2639,7 @@
         <label>Email</label>
         <input id="authEmail" type="email" placeholder="nome@esempio.it" autocomplete="email">
       </div>
-      <div class="auth-field" id="emailPwField">
+      <div class="auth-field">
         <label>Password</label>
         <input id="authPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="current-password">
       </div>
@@ -2715,6 +2744,10 @@
           <span class="tab-icon">⚔️</span>
           Riftbound
         </button>
+        <button type="button" class="game-tab" data-game="sealed">
+          <span class="tab-icon">📦</span>
+          Sealed
+        </button>
       </div>
     </nav>
 
@@ -2734,7 +2767,7 @@
     <div class="panel">
 
       <!-- Search form -->
-      <div class="card" id="searchCard">
+      <div class="card">
         <div class="card-header">
           <h2>Ricerca Carta</h2>
           <span class="tag" id="gameTag">Pokémon TCG</span>
@@ -2742,7 +2775,7 @@
 
         <!-- Pokémon form -->
         <div id="pokemonSearch">
-        <div class="form-grid" id="pokemonForm">
+        <div class="form-grid">
 
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
@@ -2763,7 +2796,7 @@
             </div>
           </div>
 
-          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px;">
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px;">
             <div class="field">
               <label for="cardLanguage">Lingua</label>
               <select id="cardLanguage">
@@ -2779,6 +2812,14 @@
               </select>
             </div>
             <div class="field">
+              <label for="cardEdition">Edizione</label>
+              <select id="cardEdition">
+                <option value="">Qualsiasi</option>
+                <option value="1st">1ª edizione</option>
+                <option value="unlimited">Unlimited</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="condSelect">Condizione</label>
               <select id="condSelect">
                 <option value="NM">NM — Near Mint (100%)</option>
@@ -2789,7 +2830,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="cardQty">Quantità</label>
+              <label for="cardQty">Qtà</label>
               <input id="cardQty" type="number" min="1" max="99" value="1" placeholder="1">
             </div>
           </div>
@@ -2802,7 +2843,66 @@
           </button>
           <div id="searchProgressBar"></div>
         </div>
-        <div id="msgBox" hidden></div>
+        <div id="msgBox" hidden>        </div>
+        </div>
+
+        <!-- Pokémon Sealed Form -->
+        <div id="sealedSearch" hidden>
+        <div id="sealedForm" class="form-grid">
+          <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="field" style="position:relative">
+              <label for="slCardName">Nome prodotto</label>
+              <input id="slCardName" type="text" placeholder="Es. ETB Buio Pesto, Fiamme Spettrali, Ossidiana…" autocomplete="off">
+              <div id="slNameSuggestions" class="suggestions" hidden></div>
+            </div>
+            <div class="field">
+              <label for="slSealedType">Tipo sealed</label>
+              <select id="slSealedType">
+                <option value="">Tutti</option>
+                <option value="box">Box</option>
+                <option value="etb">ETB (bundle)</option>
+                <option value="blister">Blister</option>
+                <option value="boxset">Box set</option>
+                <option value="pack">Bustine singole</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="slCardSet">Set / Espansione</label>
+            <input id="slCardSet" type="text" placeholder="Es. Buio Pesto, Fiamme Spettrali, Surging Sparks…" autocomplete="off">
+            <input type="hidden" id="slCardSetId" value="">
+            <input type="hidden" id="slCardSetCtId" value="">
+            <div id="slSetSuggestions" class="suggestions" hidden></div>
+          </div>
+          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px;">
+            <div class="field">
+              <label for="slLang">Lingua</label>
+              <select id="slLang">
+                <option value="" selected>Qualsiasi</option>
+                <option value="en">🇬🇧 Inglese</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="ja">🇯🇵 Giapponese</option>
+                <option value="fr">🇫🇷 Francese</option>
+                <option value="de">🇩🇪 Tedesco</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="slCondSearch">Condizione</label>
+              <select id="slCondSearch">
+                <option value="NM">NM — Sealed / Near Mint</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="slQty">Qtà</label>
+              <input id="slQty" type="number" min="1" max="99" value="1">
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="slSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('sealed')">
+            <span id="slSearchBtnInner">🔍 &nbsp;Cerca Sealed</span>
+          </button>
+          <div id="slProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#64748b,#94a3b8,#64748b);"></div>
+          <div id="slMsgBox" hidden style="margin-top:8px"></div>
+        </div>
         </div>
 
         <!-- One Piece TCG Form -->
@@ -2833,6 +2933,8 @@
                 <option value="" selected>Qualsiasi</option>
                 <option value="en">🇬🇧 Inglese</option>
                 <option value="ja">🇯🇵 Giapponese</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="fr">🇫🇷 Francese</option>
               </select>
             </div>
             <div class="field">
@@ -2883,8 +2985,11 @@
             <div class="field">
               <label for="rbLang">Lingua</label>
               <select id="rbLang">
-                <option value="">Qualsiasi</option>
-                <option value="en" selected>🇬🇧 Inglese</option>
+                <option value="" selected>Qualsiasi</option>
+                <option value="en">🇬🇧 Inglese</option>
+                <option value="fr">🇫🇷 Francese</option>
+                <option value="zh">🇨🇳 Cinese</option>
+                <option value="it">🇮🇹 Italiano</option>
               </select>
             </div>
             <div class="field">
@@ -2957,6 +3062,17 @@
 
       <!-- Riftbound: selected result -->
       <div class="card" id="rbResultCard" hidden style="padding:18px 20px"></div>
+      </div>
+
+      <div id="sealedResults" hidden>
+      <div class="card" id="slChoicesCard" hidden>
+        <div class="choices-bar">
+          <h3>📦 Scegli il prodotto Sealed</h3>
+          <span class="badge-pill" id="slChoicesCount"></span>
+        </div>
+        <div class="choice-list" id="slChoicesList"></div>
+      </div>
+      <div class="card" id="slResultCard" hidden style="padding:18px 20px"></div>
       </div>
 
     </div>
@@ -3039,17 +3155,31 @@
 
 <script src="pokemon-sets.js"></script>
 <script src="onepiece-sets.js"></script>
+<script src="onepiece-cards.js"></script>
+<script src="riftbound-cards.js"></script>
 <script src="riftbound-sets.js"></script>
+<script src="pokemon-sealed-sets.js"></script>
+<script src="pokemon-sealed-cards.js"></script>
 <script>
 window.onerror = function(message, source, lineno, colno, error) {
-  alert("🚨 CRASH JS:\n" + message + "\nRiga: " + lineno + "\nFile: " + source);
+  try {
+    alert('🚨 CRASH JS:\n' + message + '\nRiga: ' + lineno + '\nFile: ' + source);
+  } catch (_) {}
+  console.error('[DLS]', message, source, lineno, error);
   return false;
 };
 window.addEventListener('unhandledrejection', function(event) {
-  alert("🚨 PROMISE FALLITA:\n" + event.reason);
+  try {
+    alert('🚨 PROMISE FALLITA:\n' + event.reason);
+  } catch (_) {}
+  console.error('[DLS] Promise rejected:', event.reason);
 });
 
 const $ = (id) => document.getElementById(id);
+// Deve stare PRIMA di initViewport: in PWA standalone syncInstalledState la usa subito
+let deferredPrompt = null;
+const CT_DEBUG = /(?:\?|&)ctdebug=1(?:&|$)/.test(location.search);
+function ctLog(...args) { if (CT_DEBUG) console.log(...args); }
 
 (function initViewport() {
   const root = document.documentElement;
@@ -3062,7 +3192,9 @@ const $ = (id) => document.getElementById(id);
     const mobile = window.matchMedia('(max-width: 680px)').matches;
     root.classList.toggle('is-standalone', standalone);
     root.classList.toggle('is-mobile', mobile);
-    if (standalone && typeof syncInstalledState === 'function') syncInstalledState();
+    if (standalone && typeof syncInstalledState === 'function') {
+      try { syncInstalledState(); } catch (err) { console.warn('[PWA] syncInstalledState:', err); }
+    }
   };
   sync();
   window.addEventListener('resize', () => {
@@ -3125,17 +3257,21 @@ function bindPokemonCtConditionRows() {
 
 function bindPokemonCtListingRows() {
   $('resultContent')?.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
-    row.addEventListener('click', () => selectCtListing(row.dataset.condKey, Number(row.dataset.listingIndex)));
+    row.addEventListener('click', () => {
+      pokemonCtMarketMenuOpen = false;
+      selectCtListing(row.dataset.condKey, Number(row.dataset.listingIndex));
+    });
   });
 }
 
-// Alias mantenuto per compatibilità con il catalogo locale
-const SET_ALIASES = {
-  obf:               { id: 'sv3',    name: 'Obsidian Flames' },
-  ossidianainfuocata:{ id: 'sv3',    name: 'Obsidian Flames' },
-  obsidianflames:    { id: 'sv3',    name: 'Obsidian Flames' },
-  ascesaeroica:      { id: 'me02.5', name: 'Ascesa Eroica' },
-};
+function bindPokemonCtMarketToggle() {
+  const btn = $('resultContent')?.querySelector('button.ct-market-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    pokemonCtMarketMenuOpen = !pokemonCtMarketMenuOpen;
+    if (selectedCard) renderResult();
+  });
+}
 
 // Mappa set PokéTCG → codici espansione CardTrader
 const CT_SET_CODE_MAP = {
@@ -3144,11 +3280,13 @@ const CT_SET_CODE_MAP = {
   me3: 'por', me03: 'por',
   me4: 'cri', me04: 'cri',
   perfectorder: 'por',
+  me5: 'pbl', me05: 'pbl', pbl: 'pbl',
   ascesaeroica: 'asc', ascendedheroes: 'asc',
-  chaosrising: 'cri', caosascendente: 'cri',
+  chaosrising: 'cri', caosnascente: 'cri', caosascendente: 'cri',
+  pitchblack: 'pbl', buiopesto: 'pbl', megaevoluzionebuiopesto: 'pbl',
   ossidianainfuocata: 'obf', obsidianflames: 'obf', obf: 'obf',
   sv1: 'sv1', sv2: 'pal', sv3: 'obf', sv3pt5: '151', sv4: 'par', sv4pt5: 'paf',
-  sv5: 'tef', sv6: 'twm', sv6pt5: 'shf', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
+  sv5: 'tef', sv6: 'twm', sv6pt5: 'sfa', sv7: 'scr', sv8: 'ssp', sv8pt5: 'pre',
   sv9: 'jtg', sv9pt5: 'dri',
   scintillefolgoranti: 'ssp', surgingsparks: 'ssp',
   mep: 'mep',
@@ -3161,6 +3299,8 @@ const CT_SET_CODE_MAP = {
   svblackstarpromos: 'svpromo',
   blackstarpromos: 'svpromo',
   mepblackstarpromos: 'mep',
+  shroudedfable: 'sfa', segretofiabesco: 'sfa',
+  twilightmasquerade: 'twm', crepuscolomascherato: 'twm',
 };
 
 // Mappa id set locali -> id set Pokemon TCG API quando differiscono.
@@ -3373,29 +3513,73 @@ let priceSrc        = '';
 let collection      = [];
 let activeGame      = 'pokemon';
 let dlsUser         = null;
-let syncTimer       = null;
 let searchCtrl      = null;   // AbortController for main search
 let searchGen       = 0;
 let searchLangFilter = '';
+let searchEditionFilter = '';
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
 let bgAnimPaused    = false;
 let suggTimer       = null;
 let suggLastNames   = [];
+let suggReqSeq      = 0;
 let deferredPrompt  = null;
-let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false };
+let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, sealed: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
 let collectionEditEntryId = null;
 let maybeSeedCards = [];
+let pokemonCtMarketMenuOpen = false;
+let pokemonGraded = false;
+let pokemonGradeScore = 10;
+
+function normalizeGradeScore(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 10) return null;
+  return n;
+}
+
+function gradeScoreOptionsHtml(selected) {
+  const sel = normalizeGradeScore(selected) || 10;
+  return Array.from({ length: 10 }, (_, i) => i + 1)
+    .map(n => `<option value="${n}"${n === sel ? ' selected' : ''}>${n}</option>`)
+    .join('');
+}
+
+function gradedControlsHtml({ checkId, selectId, graded, score }) {
+  const on = !!graded;
+  return `
+    <label class="graded-check" for="${escHtml(checkId)}" title="Segna la carta come gradata (PSA/CGC/BGS…)">
+      <input type="checkbox" id="${escHtml(checkId)}" ${on ? 'checked' : ''}>
+      <span>Gradata</span>
+    </label>
+    <label class="graded-score" for="${escHtml(selectId)}" ${on ? '' : 'hidden'} title="Voto di gradazione">
+      <span>Voto</span>
+      <select id="${escHtml(selectId)}" ${on ? '' : 'disabled'}>
+        ${gradeScoreOptionsHtml(score)}
+      </select>
+    </label>`;
+}
+
+function gradedLabel(graded, score) {
+  if (!graded) return '';
+  const n = normalizeGradeScore(score);
+  return n != null ? ` · gradata ${n}` : ' · gradata';
+}
+
+function gradedBadgeHtml(item) {
+  if (!item?.graded) return '';
+  const n = normalizeGradeScore(item.gradeScore);
+  return `<span class="graded-badge">GRAD${n != null ? ` ${n}` : ''}</span>`;
+}
 const suggCache     = new Map();
 const pokemonQueryCache = new Map();
 const pokemonSetCache = new Map();
 const pokemonSetPreloadInFlight = new Map();
-const NAME_SUGG_DEBOUNCE_MS = 80;
+const NAME_SUGG_DEBOUNCE_MS = 45;
 const NAME_SUGG_PAGE_SIZE = 12;
-const TCG_NAME_SUGG_DEBOUNCE_MS = 90;
+const TCG_NAME_SUGG_DEBOUNCE_MS = 55;
 const POKEMON_QUERY_CACHE_TTL_MS = 2 * 60 * 1000;
 const POKEMON_QUERY_CACHE_MAX = 180;
 const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -3769,7 +3953,20 @@ const SEARCH_LANG_CODES = {
   francese: 'fr', giapponese: 'ja', portoghese: 'pt', coreano: 'ko',
   english: 'en', italian: 'it', spanish: 'es', german: 'de',
   french: 'fr', japanese: 'ja', portuguese: 'pt', korean: 'ko',
-  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', pt: 'pt', ko: 'ko',
+  en: 'en', it: 'it', es: 'es', de: 'de', fr: 'fr', ja: 'ja', jp: 'ja', pt: 'pt', ko: 'ko',
+  jpn: 'ja', eng: 'en', ita: 'it',
+};
+
+// Alias CT: One Piece usa `jp`, Pokémon spesso `ja` — vanno trattati come la stessa lingua
+const CT_LANG_ALIASES = {
+  ja: ['ja', 'jp', 'jpn', 'japanese'],
+  en: ['en', 'eng', 'english'],
+  it: ['it', 'ita', 'italian'],
+  es: ['es', 'spa', 'spanish', 'espanol'],
+  de: ['de', 'deu', 'german', 'deutsch'],
+  fr: ['fr', 'fra', 'french', 'francais'],
+  pt: ['pt', 'por', 'portuguese'],
+  ko: ['ko', 'kr', 'kor', 'korean'],
 };
 
 function ctLanguageApiCode(lang) {
@@ -3815,11 +4012,43 @@ function listingMatchesLanguage(listing, lang) {
   if (!want) return true;
   const raw = norm(ctListingLanguageRaw(listing));
   if (!raw || raw === '?' || raw === 'any') return false;
+  const aliases = CT_LANG_ALIASES[want] || [want];
+  if (aliases.some(a => raw === a || raw.startsWith(a))) return true;
   if (raw === want || raw.startsWith(want)) return true;
   for (const [name, code] of Object.entries(SEARCH_LANG_CODES)) {
-    if (code === want && (raw.includes(name) || raw === code)) return true;
+    if (code === want && (raw.includes(name) || raw === code || aliases.includes(raw))) return true;
   }
   return false;
+}
+
+function ctListingIsFirstEdition(listing) {
+  const ph = listing?.properties_hash || listing?.properties || {};
+  if (listing?.firstEdition === true || listing?.first_edition === true) return true;
+  return ph.first_edition === true
+    || ph.pokemon_first_edition === true
+    || ph['1st_edition'] === true;
+}
+
+function listingMatchesEdition(listing, editionFilter = searchEditionFilter) {
+  if (!editionFilter) return true;
+  const is1st = ctListingIsFirstEdition(listing);
+  if (editionFilter === '1st') return is1st;
+  if (editionFilter === 'unlimited') return !is1st;
+  return true;
+}
+
+function ctEditionLabel(filter = searchEditionFilter) {
+  if (filter === '1st') return '1ª edizione';
+  if (filter === 'unlimited') return 'Unlimited';
+  return 'Qualsiasi';
+}
+
+function resolveCollectionEdition(listingPick, listing) {
+  if (listing && typeof listing.firstEdition === 'boolean') return listing.firstEdition;
+  if (listingPick?.firstEdition != null) return !!listingPick.firstEdition;
+  if (searchEditionFilter === '1st') return true;
+  if (searchEditionFilter === 'unlimited') return false;
+  return null;
 }
 
 function ctMarketplaceProductsPath(blueprintId, lang = searchLangFilter) {
@@ -3847,7 +4076,7 @@ function cardMatchesSearchLanguage(card, lang) {
   const setName = norm(card.set?.name || '');
   const markers = {
     it: ['it', 'ita', 'italian', 'italiano'],
-    ja: ['ja', 'jpn', 'japanese'],
+    ja: ['ja', 'jp', 'jpn', 'japanese'],
     de: ['de', 'deu', 'german', 'deutsch'],
     fr: ['fr', 'fra', 'french', 'francais'],
     es: ['es', 'spa', 'spanish', 'espanol'],
@@ -3900,16 +4129,36 @@ function tcgBpMatchesCardPrefix(bp, prefix) {
 function sortTcgSearchResults(bps, name, cardPrefix) {
   const q = normCardName(name);
   const pNorm = normalizeTcgCardPrefix(cardPrefix);
+  const numSet = String(cardPrefix || '').toUpperCase().match(/^([A-Z]{2,4}\d{1,3})/)?.[1] || '';
+  const numSetNorm = numSet ? normalizeTcgSetCode(numSet) : '';
+
   return [...bps].sort((a, b) => {
     const score = bp => {
       let s = 0;
       const bpNum = normalizeTcgCardPrefix(ctBpCollectorNumber(bp));
       if (pNorm && bpNum === pNorm) s += 200;
-      if (cardPrefix && tcgBpMatchesCardPrefix(bp, cardPrefix)) s += 100;
+      else if (cardPrefix && tcgBpMatchesCardPrefix(bp, cardPrefix)) s += 100;
+
       const bpName = normCardName(bp.name || '');
       if (q && bpName.includes(q)) s += 40;
       if (q && q.split(' ').every(t => t.length > 1 && bpName.includes(t))) s += 20;
-      if (/promo|magazine/i.test(bp.expansion?.name_en || '')) s += 5;
+
+      const expName = bp.expansion?.name_en || bp.expansion?.name || '';
+      const expCode = normalizeTcgSetCode(bp.expansion?.code || '');
+
+      // Preferisci il set ufficiale che corrisponde al prefisso numero (ST21 → st21 / ST-21)
+      if (numSetNorm) {
+        if (expCode === numSetNorm || (expCode && (expCode.includes(numSetNorm) || numSetNorm.includes(expCode)))) {
+          s += 160;
+        }
+        const setLoose = numSet.replace(/([A-Z]+)(\d+)/, '$1-?$2');
+        if (new RegExp(setLoose, 'i').test(expName)) s += 140;
+      }
+
+      // I reprint promo condividono il collector number ma non sono il set principale
+      if (/promo|magazine|chinese exclusive|demo deck|learn together|gift|store championship/i.test(expName)) {
+        s -= 90;
+      }
       return s;
     };
     return score(b) - score(a);
@@ -4002,12 +4251,6 @@ function mergeCollections(...lists) {
 
 function persistLocalCollection() {
   localStorage.setItem('dls_collection', JSON.stringify(collection));
-}
-
-function apiHeaders(userToken = null) {
-  const h = {};
-  if (userToken) h['X-DLS-Session'] = userToken;
-  return h;
 }
 
 function resolveTcgSetFromInput(text, sets) {
@@ -4164,10 +4407,6 @@ function resolveApiBaseUrl() {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
-
-function apiUrl(path) {
-  return `${API_BASE_URL}${path}`;
-}
 
 // ── API calls ────────────────────────────────────────────────────────
 function apiUrl(path) {
@@ -4365,9 +4604,15 @@ function ctResolveStoredImage(url) {
   return CT_IMG_BASE + (url.startsWith('/') ? url : `/${url}`);
 }
 
-// game = 'pokemon' | 'onepiece'
+// Sealed condivide game_id / espansioni Pokémon su CardTrader
+function ctResolveGameKey(game = 'pokemon') {
+  return game === 'sealed' ? 'pokemon' : game;
+}
+
+// game = 'pokemon' | 'onepiece' | 'riftbound' | 'sealed'
 async function ctGetGameId(token, game = 'pokemon') {
-  if (ctCache.gameIds[game] != null) return ctCache.gameIds[game];
+  const cacheKey = ctResolveGameKey(game);
+  if (ctCache.gameIds[cacheKey] != null) return ctCache.gameIds[cacheKey];
   const games = ctParseList(await ctFetch('/games'));
   const gameText = g => norm([
     g?.name, g?.display_name, g?.localized_name, g?.slug, g?.code, g?.label
@@ -4376,23 +4621,24 @@ async function ctGetGameId(token, game = 'pokemon') {
     pokemon: text => text.includes('pokemon') || text.includes('poke mon'),
     onepiece: text => text.includes('one piece') || text.includes('onepiece'),
     riftbound: text => text.includes('riftbound'),
-  }[game];
+  }[cacheKey];
   const g = games.find(x => matcher?.(gameText(x)));
-  ctCache.gameIds[game] = g?.id ?? null;
-  console.log(`[CT] gameId(${game}):`, ctCache.gameIds[game]);
-  return ctCache.gameIds[game];
+  ctCache.gameIds[cacheKey] = g?.id ?? null;
+  ctLog(`[CT] gameId(${game}/${cacheKey}):`, ctCache.gameIds[cacheKey]);
+  return ctCache.gameIds[cacheKey];
 }
 
 async function ctGetExpansions(token, game = 'pokemon') {
-  if (ctCache.expansions[game]) return ctCache.expansions[game];
+  const cacheKey = ctResolveGameKey(game);
+  if (ctCache.expansions[cacheKey]) return ctCache.expansions[cacheKey];
   const gameId = await ctGetGameId(token, game);
   if (!gameId) return [];
   const data = await ctFetch(`/expansions?game_id=${gameId}`);
   const all = ctParseList(data);
-  ctCache.expansions[game] = all.filter(e => !e.game_id || e.game_id === gameId);
-  console.log(`[CT] Espansioni ${game} (${ctCache.expansions[game].length}):`,
-    ctCache.expansions[game].slice(-5).map(e => `${e.code}→${ctExpName(e)}`));
-  return ctCache.expansions[game];
+  ctCache.expansions[cacheKey] = all.filter(e => !e.game_id || e.game_id === gameId);
+  ctLog(`[CT] Espansioni ${cacheKey} (${ctCache.expansions[cacheKey].length}):`,
+    ctCache.expansions[cacheKey].slice(-5).map(e => `${e.code}→${ctExpName(e)}`));
+  return ctCache.expansions[cacheKey];
 }
 
 // Ricerca blueprint per nome dentro le espansioni già caricate (fallback lento)
@@ -4648,13 +4894,13 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
   const setNorm = norm(setName);
   const enName  = norm(pokemonSetEnglishName(card.set?.id, setName));
 
-  console.log(`[CT] Cerco espansione per set: id="${setId}" name="${setName}" en="${enName}"`);
+  ctLog(`[CT] Cerco espansione per set: id="${setId}" name="${setName}" en="${enName}"`);
 
   const mappedCode = resolveCtCodeForPokemonSet(card.set?.id, setName)
     || CT_SET_CODE_MAP[setId] || CT_SET_CODE_MAP[setNorm.replace(/\s+/g, '')];
   if (mappedCode) {
     const m0 = expansions.find(e => norm(e.code) === norm(mappedCode));
-    if (m0) { console.log('[CT] Match codice mappato:', m0.code, ctExpName(m0)); return m0; }
+    if (m0) { ctLog('[CT] Match codice mappato:', m0.code, ctExpName(m0)); return m0; }
   }
 
   if (isPokemonPromoSet(card)) {
@@ -4663,7 +4909,7 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
       const expEra = ctExpansionPromoEra(e);
       return expEra && (expEra === era || (era === 'sv' && expEra === 'sv'));
     }) || expansions.find(e => ctExpansionPromoEra(e) === 'generic');
-    if (promoMatch) { console.log('[CT] Match promo set:', ctExpName(promoMatch)); return promoMatch; }
+    if (promoMatch) { ctLog('[CT] Match promo set:', ctExpName(promoMatch)); return promoMatch; }
   }
 
   if (enName) {
@@ -4672,18 +4918,18 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
         const en = norm(ctExpName(e));
         return en.length >= 4 && (enName.includes(en) || en.includes(enName));
       });
-    if (mEn) { console.log('[CT] Match nome EN catalogo:', ctExpName(mEn)); return mEn; }
+    if (mEn) { ctLog('[CT] Match nome EN catalogo:', ctExpName(mEn)); return mEn; }
   }
 
   let m = expansions.find(e => norm(ctExpName(e)) === setNorm);
-  if (m) { console.log('[CT] Match nome esatto:', ctExpName(m)); return m; }
+  if (m) { ctLog('[CT] Match nome esatto:', ctExpName(m)); return m; }
 
   m = expansions.find(e => norm(e.name_en || '') === setNorm || norm(e.name_it || '') === setNorm);
-  if (m) { console.log('[CT] Match nome legacy:', ctExpName(m)); return m; }
+  if (m) { ctLog('[CT] Match nome legacy:', ctExpName(m)); return m; }
 
   if (!CT_SET_ID_CONFLICTS.has(setId)) {
     m = expansions.find(e => (e.code || '').toLowerCase().replace(/[\.\-\s]/g, '') === setId);
-    if (m) { console.log('[CT] Match codice esatto:', ctExpName(m)); return m; }
+    if (m) { ctLog('[CT] Match codice esatto:', ctExpName(m)); return m; }
   }
 
   m = expansions.find(e => {
@@ -4691,7 +4937,7 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
     const shortSet = norm(setName.replace(/^[^:]+:\s*/, ''));
     return (en.length >= 4 && (setNorm.includes(en) || en.includes(shortSet) || shortSet.includes(en)));
   });
-  if (m) { console.log('[CT] Match contains:', ctExpName(m)); return m; }
+  if (m) { ctLog('[CT] Match contains:', ctExpName(m)); return m; }
 
   let best = null, bestScore = 0;
   const withoutPrefix = setName.replace(/^[^:]+:\s*/, '');
@@ -4705,10 +4951,10 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
       if (score > bestScore) { bestScore = score; best = e; }
     }
   }
-  console.log(`[CT] Miglior match token: score=${bestScore.toFixed(2)}`, ctExpName(best));
+  ctLog(`[CT] Miglior match token: score=${bestScore.toFixed(2)}`, ctExpName(best));
   if (bestScore >= 0.45) return best;
 
-  console.info('[CT] Nessun match espansione per', setName);
+  ctLog('[CT] Nessun match espansione per', setName);
   return null;
 }
 
@@ -4730,7 +4976,7 @@ async function ctFindBlueprint(card, expansionId, token) {
     .sort((a, b) => b.score - a.score);
 
   if (ranked.length) {
-    console.log('[CT] Blueprint scelto:', ranked[0].b?.name, ctBpNumber(ranked[0].b), 'score', ranked[0].score);
+    ctLog('[CT] Blueprint scelto:', ranked[0].b?.name, ctBpNumber(ranked[0].b), 'score', ranked[0].score);
     return ranked[0].b;
   }
 
@@ -4806,15 +5052,24 @@ function ctTrimListingOutliers(listings) {
   return trimmed.length >= 2 ? trimmed : listings;
 }
 
-function ctAverageConditions(listings, langFilter = searchLangFilter) {
+function ctListingPriceEur(listing) {
+  const cents = Number(listing?.price_cents ?? listing?.price?.cents);
+  if (!Number.isFinite(cents) || cents <= 0) return null;
+  const cur = String(listing?.price_currency || listing?.price?.currency || 'EUR').toUpperCase();
+  if (cur && cur !== 'EUR') return null;
+  return cents / 100;
+}
+
+function ctAverageConditions(listings, langFilter = searchLangFilter, editionFilter = searchEditionFilter) {
   const valid = listings
     .map(l => ({
       listing: l,
-      price: Number(l.price_cents) / 100,
-      currency: (l.price_currency || 'EUR').toUpperCase()
+      price: ctListingPriceEur(l),
+      currency: String(l.price_currency || l.price?.currency || 'EUR').toUpperCase(),
     }))
-    .filter(x => Number.isFinite(x.price) && x.price > 0)
-    .filter(x => !langFilter || listingMatchesLanguage(x.listing, langFilter));
+    .filter(x => x.price != null && x.price > 0)
+    .filter(x => !langFilter || listingMatchesLanguage(x.listing, langFilter))
+    .filter(x => !editionFilter || listingMatchesEdition(x.listing, editionFilter));
 
   if (langFilter) {
     ctDebug('language filter stats', {
@@ -4834,6 +5089,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
     const l = x.listing;
     const raw  = l.properties_hash?.condition || 'Near Mint';
     const cond = ctCondKey(raw);
+    const firstEdition = ctListingIsFirstEdition(l);
     if (!byCondition[cond.key]) {
       byCondition[cond.key] = {
         key: cond.key,
@@ -4849,6 +5105,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
         seller: l.user?.username || '?',
         language: ctListingLanguageRaw(l) || '?',
         foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
+        firstEdition,
         listings: [],
       };
     }
@@ -4864,6 +5121,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
       seller: l.user?.username || l.seller?.username || '?',
       language: ctListingLanguageRaw(l) || '?',
       foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
+      firstEdition,
       quantity: l.quantity || 1,
       url: l.url || l.card_url || ''
     });
@@ -4872,6 +5130,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
       row.seller = l.user?.username || '?';
       row.language = ctListingLanguageRaw(l) || '?';
       row.foil = l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false;
+      row.firstEdition = firstEdition;
     }
   }
 
@@ -4888,6 +5147,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter) {
       row.seller = top.seller;
       row.language = top.language;
       row.foil = top.foil;
+      row.firstEdition = !!top.firstEdition;
     }
     delete row.sum;
   });
@@ -4915,6 +5175,34 @@ function ctLangFilterError(listings, langFilter = searchLangFilter) {
   return `Nessun annuncio CardTrader in ${ctLanguageLabel(langFilter)}. Prova "Qualsiasi" o un'altra lingua.`;
 }
 
+function ctEditionFilterError(listings, editionFilter = searchEditionFilter) {
+  if (!editionFilter) return null;
+  if (!listings?.length) return null;
+  const hasAny = listings.some(l => listingMatchesEdition(l, editionFilter));
+  if (hasAny) return null;
+  return `Nessun annuncio CardTrader in ${ctEditionLabel(editionFilter)}. Prova "Qualsiasi" o l'altra edizione.`;
+}
+
+function ctListingFilterError(listings) {
+  const langErr = ctLangFilterError(listings);
+  if (langErr) return langErr;
+  const editionErr = ctEditionFilterError(listings);
+  if (editionErr) return editionErr;
+  if ((searchLangFilter || searchEditionFilter) && listings?.length) {
+    const hasCombo = listings.some(l =>
+      listingMatchesLanguage(l, searchLangFilter) && listingMatchesEdition(l, searchEditionFilter)
+    );
+    if (!hasCombo) {
+      const parts = [
+        searchLangFilter ? ctLanguageLabel(searchLangFilter) : null,
+        searchEditionFilter ? ctEditionLabel(searchEditionFilter) : null,
+      ].filter(Boolean).join(' · ');
+      return `Nessun annuncio CardTrader per ${parts}. Prova a togliere un filtro.`;
+    }
+  }
+  return null;
+}
+
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
@@ -4929,9 +5217,9 @@ async function ctGetPriceByBlueprintId(blueprintId) {
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
 
-    const langErr = ctLangFilterError(listings);
-    if (langErr) return {
-      error: langErr,
+    const filterErr = ctListingFilterError(listings);
+    if (filterErr) return {
+      error: filterErr,
       blueprintId,
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
@@ -4977,7 +5265,7 @@ async function ctGetPrice(card, game = 'pokemon') {
     if (expansion) {
       bp = await ctFindBlueprint(card, expansion.id, null);
       expansionName = ctExpName(expansion);
-      console.log('[CT] Blueprint via espansione:', bp?.name, '|', expansionName);
+      ctLog('[CT] Blueprint via espansione:', bp?.name, '|', expansionName);
     }
 
     // ── Approccio 2 (fallback): cerca per nome nelle espansioni
@@ -4987,7 +5275,7 @@ async function ctGetPrice(card, game = 'pokemon') {
         bp = nameResults[0];
         expansionName = bp.expansion?.name_en || ctExpName(bp.expansion) || '';
         setMatchWarning = expansion ? null : 'Match CardTrader per nome/numero';
-        console.log('[CT] Blueprint via ricerca nome:', bp?.name, '|', expansionName);
+        ctLog('[CT] Blueprint via ricerca nome:', bp?.name, '|', expansionName);
       }
     }
 
@@ -5007,9 +5295,9 @@ async function ctGetPrice(card, game = 'pokemon') {
       url: `https://www.cardtrader.com/en/cards/${bp.id}`
     };
 
-    const langErr = ctLangFilterError(listings);
-    if (langErr) return {
-      error: langErr,
+    const filterErr = ctListingFilterError(listings);
+    if (filterErr) return {
+      error: filterErr,
       blueprintId: bp.id,
       url: `https://www.cardtrader.com/en/cards/${bp.id}`,
     };
@@ -5049,12 +5337,13 @@ async function ctGetPrice(card, game = 'pokemon') {
   }
 }
 
-function renderCtMarketMenu(d, condKey, selectedListing = null) {
+function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
   const cond = (d.conditions || []).find(c => c.key === condKey) || d.conditions?.[0];
   if (!cond) return '';
   const rows = (cond.listings || []).map((l, idx) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
+    const edition = l.firstEdition ? ' · 1ª' : '';
     const qty = l.quantity > 1 ? ` · x${l.quantity}` : '';
     const isSelected = selectedListing?.condKey === condKey && selectedListing?.index === idx;
     return `
@@ -5062,18 +5351,22 @@ function renderCtMarketMenu(d, condKey, selectedListing = null) {
         data-listing-index="${idx}" data-cond-key="${escHtml(condKey)}" aria-pressed="${isSelected}">
         <span class="ct-listing-price">${fmt(l.price)}${isSelected ? ' ←' : ''}</span>
         <span class="ct-listing-seller" title="${escHtml(l.seller)}">${escHtml(l.seller)}</span>
-        <span class="ct-listing-meta">${lang}${foil}${qty}</span>
+        <span class="ct-listing-meta">${lang}${edition}${foil}${qty}</span>
       </button>`;
   }).join('');
 
   return `
-    <div class="ct-market-menu">
+    <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
       <div class="ct-market-title">
         <span>Annunci caricati su CT · ${escHtml(cond.label)}</span>
-        <span>${cond.count || 0} annunci · tocca per scegliere il prezzo</span>
+        <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
+          ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${cond.count || 0}
+        </button>
       </div>
-      <div class="ct-listing-list">
-        ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+      <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
+        <div class="ct-listing-list">
+          ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+        </div>
       </div>
     </div>`;
 }
@@ -5129,12 +5422,13 @@ function renderCtSection() {
   const nmCond = (d.conditions || []).find(c => c.key === 'NM') || d.conditions?.[0];
   const condRows = (d.conditions || []).map(c => {
     const foilMark = c.foil ? ' ✨' : '';
+    const editionMark = c.firstEdition ? ' · 1ª' : '';
     const isSelected = c.key === selectedCtCond;
     return `
       <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
         <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
         <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
-        <span class="ct-cond-meta">Min CT${foilMark}</span>
+        <span class="ct-cond-meta">Min CT${foilMark}${editionMark}</span>
         <span class="ct-cond-count">Min. Cardmarket · ${c.count} ann.</span>
       </button>`;
   }).join('');
@@ -5159,7 +5453,7 @@ function renderCtSection() {
       <div class="ct-cond-grid">
         ${condRows || '<p class="ct-msg warn">Nessuna condizione disponibile</p>'}
       </div>
-      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing)}
+      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen)}
       <div class="ct-footer-row">
         <span class="ct-chip">${d.total} listino${d.total > 1 ? 'i' : ''} totali</span>
         <a class="ct-link" href="${d.url}" target="_blank">↗ Vedi su CardTrader</a>
@@ -5202,6 +5496,11 @@ function getFastSuggestions(name) {
 
   suggLastNames.forEach(addIfMatch);
 
+  const activeSetId = getSelectedSetId();
+  if (activeSetId) {
+    getPokemonSetCards(activeSetId).forEach(card => addIfMatch(card?.name));
+  }
+
   for (const [k, arr] of suggCache.entries()) {
     if (!(k.startsWith(q) || q.startsWith(k))) continue;
     (arr || []).forEach(addIfMatch);
@@ -5213,10 +5512,13 @@ function getFastSuggestions(name) {
 
 async function loadSuggestions(name) {
   const key = name.toLowerCase();
+  const reqSeq = ++suggReqSeq;
   if (suggCache.has(key)) {
     const hit = suggCache.get(key);
     suggLastNames = hit || [];
-    renderSugg(hit || []);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === key) {
+      renderSugg(hit || []);
+    }
     return;
   }
   if (suggCtrl) suggCtrl.abort();
@@ -5226,7 +5528,9 @@ async function loadSuggestions(name) {
     const names = [...new Set(cards.map(c => c.name))].sort().slice(0, 10);
     suggCache.set(key, names);
     suggLastNames = names;
-    renderSugg(names);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === key) {
+      renderSugg(names);
+    }
   } catch (e) {
     if (e.name !== 'AbortError') {
       console.warn('Suggerimenti non disponibili:', networkFetchErrorMessage(e, e.message));
@@ -5251,15 +5555,17 @@ function renderSugg(names) {
     return `<button type="button" class="sugg-item" data-name="${n}">${highlighted}</button>`;
   }).join('');
   box.hidden = false;
-  box.querySelectorAll('button').forEach(btn => {
-    // mousedown + preventDefault() previene il blur dell'input prima della selezione
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-name]');
+      if (!btn) return;
       e.preventDefault();
       $('pokemonName').value = btn.dataset.name;
       hideSuggestions();
       $('pokemonName').focus();
     });
-  });
+  }
 }
 
 // Chiudi suggerimenti cliccando fuori
@@ -5269,6 +5575,10 @@ document.addEventListener('mousedown', e => {
   }
   if (!$('cardSet').contains(e.target) && !$('setSuggestions').contains(e.target)) {
     hideSetSuggestions();
+  }
+  if (pokemonCtMarketMenuOpen && !e.target.closest('.ct-market-menu')) {
+    pokemonCtMarketMenuOpen = false;
+    if (selectedCard) renderResult();
   }
 });
 
@@ -5408,12 +5718,15 @@ function renderSetSuggestions(sets) {
       <span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:2px;">ID: ${escHtml(s.id)}</span>
     </button>`).join('');
   box.hidden = false;
-  box.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-set-id]');
+      if (!btn) return;
       e.preventDefault();
       selectSetOption(btn.dataset.setId, btn.dataset.setText);
     });
-  });
+  }
 }
 
 async function preloadPokemonSetCards(setId, opts = {}) {
@@ -5852,6 +6165,54 @@ document.getElementById('condSelect')?.addEventListener('change', e => {
   if (selectedCard) renderResult();
 });
 
+document.getElementById('cardLanguage')?.addEventListener('change', () => {
+  searchLangFilter = $('cardLanguage')?.value?.trim() || '';
+  selectedCtListing = null;
+  if (!selectedCard) return;
+  choicePriceCache.delete(choiceCacheKey(selectedCard));
+  ctPriceData = null;
+  renderResult();
+  const priceGen = ++priceFetchGen;
+  ctGetPrice(selectedCard).then(result => {
+    if (priceGen !== priceFetchGen) return;
+    ctPriceData = result;
+    if (result?.price && !result.error) {
+      basePrice = result.price;
+      priceSrc = 'CardTrader';
+      choicePriceCache.set(choiceCacheKey(selectedCard), { price: result.price, src: 'CardTrader', ct: result });
+    }
+    renderResult();
+  }).catch(err => {
+    if (priceGen !== priceFetchGen) return;
+    console.warn('ctGetPrice (lang):', err);
+    renderResult();
+  });
+});
+
+document.getElementById('cardEdition')?.addEventListener('change', () => {
+  searchEditionFilter = $('cardEdition')?.value?.trim() || '';
+  selectedCtListing = null;
+  if (!selectedCard) return;
+  choicePriceCache.delete(choiceCacheKey(selectedCard));
+  ctPriceData = null;
+  renderResult();
+  const priceGen = ++priceFetchGen;
+  ctGetPrice(selectedCard).then(result => {
+    if (priceGen !== priceFetchGen) return;
+    ctPriceData = result;
+    if (result?.price && !result.error) {
+      basePrice = result.price;
+      priceSrc = 'CardTrader';
+      choicePriceCache.set(choiceCacheKey(selectedCard), { price: result.price, src: 'CardTrader', ct: result });
+    }
+    renderResult();
+  }).catch(err => {
+    if (priceGen !== priceFetchGen) return;
+    console.warn('ctGetPrice (edition):', err);
+    renderResult();
+  });
+});
+
 document.getElementById('cardQty')?.addEventListener('input', () => {
   if (selectedCard) renderResult();
 });
@@ -5877,6 +6238,7 @@ async function doSearch() {
 
   const myGen = ++searchGen;
   searchLangFilter = lang;
+  searchEditionFilter = $('cardEdition')?.value?.trim() || '';
   priceFetchGen++;
 
   // Cancel any in-flight search / stale CT price loads
@@ -5888,6 +6250,8 @@ async function doSearch() {
   selectedCtListing = null;
   manualPokemonPrice = null;
   manualPokemonPriceRaw = '';
+  pokemonGraded = false;
+  pokemonGradeScore = 10;
   choicePriceCache.clear();
   ctPriceData = null;
   $('resultCard').hidden = true;
@@ -5916,10 +6280,11 @@ async function doSearch() {
       return;
     }
     const langNote = lang ? ` · lingua ${lang}` : '';
+    const editionNote = searchEditionFilter ? ` · ${ctEditionLabel(searchEditionFilter)}` : '';
     showMsg(
       cards.length === 1
-        ? `Carta trovata${langNote}!`
-        : `Trovate ${cards.length} carte${langNote} — seleziona quella corretta.`,
+        ? `Carta trovata${langNote}${editionNote}!`
+        : `Trovate ${cards.length} carte${langNote}${editionNote} — seleziona quella corretta.`,
       'success'
     );
     if (cards.length === 1) {
@@ -6205,6 +6570,8 @@ function selectCard(card) {
   selectedCtListing = null;
   manualPokemonPrice = null;
   manualPokemonPriceRaw = '';
+  pokemonGraded = false;
+  pokemonGradeScore = 10;
 
   const cached = choicePriceCache.get(choiceCacheKey(card));
   if (cached?.ct && cached.price != null && !cached.ct.error) {
@@ -6294,6 +6661,12 @@ function renderResult() {
             <input id="manualPokemonPriceInput" type="text" inputmode="decimal" placeholder="Es. 12,50" value="${escHtml(manualPokemonPriceRaw)}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
             <button id="applyPokemonManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;">Applica</button>
             <button id="clearPokemonManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;" ${manualPokemonPrice == null && !manualPokemonPriceRaw.trim() ? 'disabled' : ''}>Reset</button>
+            ${gradedControlsHtml({
+              checkId: 'pokemonGradedCheck',
+              selectId: 'pokemonGradeScoreSelect',
+              graded: pokemonGraded,
+              score: pokemonGradeScore,
+            })}
           </div>
           ${basePrice && selectedQuality !== 'NM' ? `
           <div class="price-row">
@@ -6308,8 +6681,8 @@ function renderResult() {
 
     <button class="btn btn-success" id="addBtn">
       ${isEditMode
-        ? `💾 &nbsp;Salva modifiche (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}`
-        : `＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}`}
+        ? `💾 &nbsp;Salva modifiche (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${gradedLabel(pokemonGraded, pokemonGradeScore)}`
+        : `＋ &nbsp;Aggiungi (${selectedQuality} · ${fmt(calc)})${effectivePrice.manual ? ' · manuale' : ''}${gradedLabel(pokemonGraded, pokemonGradeScore)}${qty > 1 ? ` &nbsp;<span style="opacity:.75; font-weight:500;">×${qty}</span>` : ''}`}
     </button>
   `;
 
@@ -6325,8 +6698,18 @@ function renderResult() {
   });
   $('applyPokemonManualPriceBtn')?.addEventListener('click', applyPokemonManualPrice);
   $('clearPokemonManualPriceBtn')?.addEventListener('click', clearPokemonManualPrice);
+  $('pokemonGradedCheck')?.addEventListener('change', (e) => {
+    pokemonGraded = !!e.target.checked;
+    if (pokemonGraded && !normalizeGradeScore(pokemonGradeScore)) pokemonGradeScore = 10;
+    renderResult();
+  });
+  $('pokemonGradeScoreSelect')?.addEventListener('change', (e) => {
+    pokemonGradeScore = normalizeGradeScore(e.target.value) || 10;
+    if (pokemonGraded) renderResult();
+  });
   bindPokemonCtConditionRows();
   bindPokemonCtListingRows();
+  bindPokemonCtMarketToggle();
   bindPreviewImage($('resultContent')?.querySelector('img.previewable-img'));
 }
 
@@ -6349,9 +6732,11 @@ async function addToCollection() {
         condKey: selectedCtListing.condKey,
         seller: selectedCtListing.seller,
         price: unit,
+        firstEdition: !!selectedCtListing.listing?.firstEdition,
       }
     : null;
   const priceFields = buildCollectionPriceFields(unit, selPrice, effectivePrice, listingPick);
+  const firstEdition = resolveCollectionEdition(listingPick, selectedCtListing?.listing);
 
   if (isEditMode) {
     const current = collection[editIdx];
@@ -6403,8 +6788,12 @@ async function addToCollection() {
       setId: selectedCard.set?.id || '',
       number: selectedCard.number || '-',
       lang,
+      firstEdition,
+      edition: firstEdition === true ? '1st' : firstEdition === false ? 'unlimited' : '',
       quality: selectedQuality,
       condition: selectedQuality,
+      graded: !!pokemonGraded,
+      gradeScore: pokemonGraded ? (normalizeGradeScore(pokemonGradeScore) || 10) : null,
       basePrice,
       img: getImg(selectedCard),
       imgUrl: getImg(selectedCard),
@@ -6431,10 +6820,11 @@ async function addToCollection() {
   const srcNote = effectivePrice.manual
     ? ' (manuale)'
     : (selPrice.fromCt || selPrice.condition ? '' : ' (stima)');
+  const gradedNote = gradedLabel(pokemonGraded, pokemonGradeScore);
   showMsg(
     qty > 1
-      ? `${qty}× ${selectedCard.name} · ${selectedQuality} · ${fmt(unit)}${srcNote} aggiunte alla collezione.`
-      : `${selectedCard.name} · ${selectedQuality} · ${fmt(unit)}${srcNote} aggiunta alla collezione.`,
+      ? `${qty}× ${selectedCard.name} · ${selectedQuality} · ${fmt(unit)}${srcNote}${gradedNote} aggiunte alla collezione.`
+      : `${selectedCard.name} · ${selectedQuality} · ${fmt(unit)}${srcNote}${gradedNote} aggiunta alla collezione.`,
     'success'
   );
   const collCard = document.querySelector('.panel:last-child .card');
@@ -6483,6 +6873,7 @@ function bpFromCollectionItem(item) {
     },
     imgUrl: img,
     image_url: img || undefined,
+    _sealedType: item.sealedType || null,
   };
 }
 
@@ -6491,9 +6882,17 @@ function fillPokemonSearchFromItem(item) {
   if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
   const lang = item.lang || item.language || '';
   if ($('cardLanguage')) $('cardLanguage').value = lang === 'Any' ? '' : lang;
+  if ($('cardEdition')) {
+    if (item.edition === '1st' || item.firstEdition === true) $('cardEdition').value = '1st';
+    else if (item.edition === 'unlimited' || item.firstEdition === false) $('cardEdition').value = 'unlimited';
+    else $('cardEdition').value = '';
+  }
+  searchEditionFilter = $('cardEdition')?.value || '';
   const qKey = item.quality || item.condition || 'NM';
   if ($('condSelect')) $('condSelect').value = qKey;
   selectedQuality = qKey;
+  pokemonGraded = !!item.graded;
+  pokemonGradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
 
   const setId = item.setId || item.card?.set?.id || '';
   const setRow = setId && typeof POKEMON_SETS !== 'undefined'
@@ -6510,9 +6909,16 @@ function fillTcgSearchFromItem(gameKey, item) {
   if ($(`${cfg.prefix}CardNumber`)) {
     $(`${cfg.prefix}CardNumber`).value = item.number && item.number !== '?' ? item.number : '';
   }
+  if (cfg.typeField && $(cfg.typeField)) {
+    $(cfg.typeField).value = item.sealedType || '';
+  }
   const lang = item.lang || item.language || '';
   if ($(cfg.langField)) $(cfg.langField).value = lang === 'Any' || lang === 'any' ? '' : lang;
   if ($(cfg.condField)) $(cfg.condField).value = item.quality || item.condition || 'NM';
+  if (ctTcgState[gameKey]) {
+    ctTcgState[gameKey].graded = !!item.graded;
+    ctTcgState[gameKey].gradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
+  }
   const setField = $(`${cfg.prefix}CardSet`);
   const setIdField = $(`${cfg.prefix}CardSetId`);
   if (setIdField) setIdField.value = item.setId || '';
@@ -6542,6 +6948,8 @@ async function openCollectionItem(idx) {
     hideAllSuggestions();
     hideSetSuggestions();
     selectCard(cardFromCollectionItem(item));
+    pokemonGraded = !!item.graded;
+    pokemonGradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
     if (item.manualPrice || item.priceMode === 'manual') {
       manualPokemonPrice = Number(item.price) || null;
       manualPokemonPriceRaw = manualPokemonPrice != null ? String(manualPokemonPrice).replace('.', ',') : '';
@@ -6562,8 +6970,11 @@ async function openCollectionItem(idx) {
     return;
   }
 
-  const gameKey = game === 'onepiece' ? 'onepiece' : 'riftbound';
-  const cfg = CT_TCG_CONFIG[gameKey];
+  const gameKey = game === 'onepiece' ? 'onepiece'
+    : game === 'riftbound' ? 'riftbound'
+    : game === 'sealed' ? 'sealed'
+    : null;
+  if (!gameKey) return;
   const bp = bpFromCollectionItem(item);
   if (!bp.id) {
     tcgShowMsg(gameKey, 'Impossibile aprire la carta: ID CardTrader mancante.', 'warn');
@@ -6590,6 +7001,8 @@ async function openCollectionItem(idx) {
         listing: null,
       }
     : null;
+  ctTcgState[gameKey].graded = !!item.graded;
+  ctTcgState[gameKey].gradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
   tcgRenderResult(gameKey, bp, ctTcgState[gameKey].prices);
   scrollToSearchPanel();
 }
@@ -6797,9 +7210,265 @@ function onCollectionChanged(opts = {}) {
 // ════════════════════════════════════════════════════════════════════
 // CT TCG — One Piece & Riftbound (ricerca CardTrader)
 // ════════════════════════════════════════════════════════════════════
+const SEALED_TYPE_LABELS = {
+  box: 'Box',
+  etb: 'ETB / Bundle',
+  blister: 'Blister',
+  boxset: 'Box set',
+  pack: 'Bustine singole',
+};
+
+/** Typo / nomi non ancora in POKEMON_SETS */
+const SEALED_SET_ALIAS_EXTRA = {
+  'phantasmal flames': ['fiamme spettrali', 'phantom flames', 'megaevoluzione fiamme spettrali'],
+  'pitch black': ['buio pesto', 'megaevoluzione buio pesto'],
+  'chaos rising': ['caos nascente', 'caos ascendente'],
+  'ascended heroes': ['ascesa eroica', 'megaevoluzione ascesa eroica'],
+};
+
+let _sealedLangIndex = null;
+
+function stripPokemonSetLabel(text) {
+  return String(text || '')
+    .replace(/\s*·.*$/, '')
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim();
+}
+
+function findSealedCanonicalName(pokeSet) {
+  if (typeof POKEMON_SEALED_SETS === 'undefined' || !pokeSet) return '';
+  const id = norm(pokeSet.id || '');
+  const compact = id.replace(/\./g, '');
+  const mapped = CT_SET_CODE_MAP[compact] || CT_SET_CODE_MAP[id] || '';
+
+  // Preferisci codice CT internazionale (ssp/twm/…) — l'id TCG (sv8/sv6) spesso è il set JP
+  const codes = [];
+  if (mapped) codes.push(normalizeTcgSetCode(mapped));
+  else {
+    codes.push(normalizeTcgSetCode(id), normalizeTcgSetCode(compact));
+  }
+
+  for (const code of codes) {
+    if (!code) continue;
+    const row = POKEMON_SEALED_SETS.find(s => normalizeTcgSetCode(s.code || s.id) === code);
+    if (row) return stripPokemonSetLabel(row.text || row.id);
+  }
+  return '';
+}
+
+/** Indice IT↔EN dai set Pokémon (POKEMON_SETS) + sealed CT */
+function getSealedLangIndex() {
+  if (_sealedLangIndex) return _sealedLangIndex;
+  const byEn = new Map();
+  const aliasToEn = new Map();
+
+  const add = (canonicalEn, ...aliases) => {
+    const enN = normCardName(canonicalEn);
+    if (!enN || enN.length < 2) return;
+    if (!byEn.has(enN)) byEn.set(enN, new Set());
+    byEn.get(enN).add(enN);
+    for (const a of aliases) {
+      const aN = normCardName(a);
+      if (!aN || aN.length < 3) continue;
+      byEn.get(enN).add(aN);
+      if (aN !== enN) aliasToEn.set(aN, enN);
+    }
+  };
+
+  for (const [en, aliases] of Object.entries(SEALED_SET_ALIAS_EXTRA)) {
+    add(en, ...aliases);
+  }
+
+  if (typeof POKEMON_SETS !== 'undefined') {
+    const sealedEnNames = new Set(
+      (typeof POKEMON_SEALED_SETS !== 'undefined' ? POKEMON_SEALED_SETS : [])
+        .map(s => normCardName(stripPokemonSetLabel(s.text || s.id)))
+        .filter(Boolean)
+    );
+    for (const s of POKEMON_SETS) {
+      const label = stripPokemonSetLabel(s.text);
+      const parts = label.split(/\s+[–—-]\s+/).map(p => p.trim()).filter(Boolean);
+      const canonical = findSealedCanonicalName(s) || '';
+      if (canonical) {
+        add(canonical, ...parts, s.id);
+      } else if (parts.length >= 2) {
+        const enPart = parts.find(p => sealedEnNames.has(normCardName(p))) || parts[1] || parts[0];
+        add(enPart, ...parts, s.id);
+      } else if (parts[0]) {
+        add(parts[0], s.id);
+      }
+    }
+  }
+
+  // Anche i set sealed puri (solo EN) restano indicizzati
+  if (typeof POKEMON_SEALED_SETS !== 'undefined') {
+    for (const s of POKEMON_SEALED_SETS) {
+      const en = stripPokemonSetLabel(s.text || s.id);
+      if (en) add(en, s.id, s.code || '');
+    }
+  }
+
+  _sealedLangIndex = { byEn, aliasToEn };
+  return _sealedLangIndex;
+}
+
+function sealedAliasesForSetName(setName) {
+  const key = normCardName(stripPokemonSetLabel(setName));
+  if (!key) return [];
+  const { byEn, aliasToEn } = getSealedLangIndex();
+  if (byEn.has(key)) return [...byEn.get(key)];
+  const en = aliasToEn.get(key);
+  if (en && byEn.has(en)) return [...byEn.get(en)];
+  // match parziale sul nome set sealed (es. "Pitch Black: …")
+  for (const [enN, aliases] of byEn) {
+    if (key.includes(enN) || enN.includes(key) && key.length >= 8) return [...aliases];
+  }
+  return [];
+}
+
+function rewriteSealedItalianQuery(normalized) {
+  let out = ` ${normalized} `;
+  const { aliasToEn } = getSealedLangIndex();
+  const aliases = [...aliasToEn.keys()].sort((a, b) => b.length - a.length);
+  for (const aN of aliases) {
+    if (aN.length < 4) continue;
+    if (!out.includes(aN)) continue;
+    const enN = aliasToEn.get(aN);
+    if (!enN || enN === aN) continue;
+    out = out.split(aN).join(` ${enN} `);
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/** Pattern nella query che implicano un tipo sealed (IT/EN) */
+const SEALED_TYPE_QUERY_RE = [
+  { type: 'etb', re: /\b(etb|e\.?t\.?b\.?|elite\s*trainer(?:\s*boxes?)?|trainer\s*boxes?|set\s*allenatore(?:\s*fuoriclasse)?|\bsaf\b|booster\s*bundles?|bundles?)\b/gi },
+  { type: 'box', re: /\b(booster\s*boxes?|display\s*boxes?|box\s*espansione|box\s*booster|scatola\s*espansione)\b/gi },
+  { type: 'blister', re: /\b(blisters?|checklane)\b/gi },
+  { type: 'pack', re: /\b(bustine?|buste|booster\s*packs?|singol[ae]|sleeved\s*boosters?)\b/gi },
+  { type: 'boxset', re: /\b(box\s*sets?|collections?|collezion[ei]|tins?|upc|premium\s*collections?|latta)\b/gi },
+];
+
+function sealedSetAliasBlob(setName) {
+  return sealedAliasesForSetName(setName).join(' ');
+}
+
+function enrichSealedSets(sets) {
+  return (sets || []).map(s => {
+    const aliases = sealedAliasesForSetName(s.text || s.id || '');
+    const en = normCardName(stripPokemonSetLabel(s.text || ''));
+    const it = aliases.find(a => {
+      const aN = normCardName(a);
+      if (!aN || aN === en) return false;
+      // Preferisci etichette italiane tipiche
+      return /[àèéìòù]|buio|fiamme|caos|ascesa|rivali|avventure|scintille|corona|segreto|crepuscolo|crono|destino|paradosso|ossidiana|evoluzioni|scarlatto|zenit|tempesta|origine|splendore|astri|colpo|celebrazioni|cieli|dominio|stili|cammino|scontro|spada|forze|fiabesco|mascherato|infuocata|nascente|pesto|spettrali|prismatiche|folgoranti|astrale|predestinati|insieme/i.test(a);
+    });
+    if (it && !norm(s.text || '').includes(norm(it))) {
+      return { ...s, text: `${s.text} · ${it}` };
+    }
+    return s;
+  });
+}
+
+function sealedTokenMatches(hay, token) {
+  if (!token) return true;
+  if (hay.includes(token)) return true;
+  // prefisso: "phantom" ↔ "phantasmal"
+  if (token.length >= 4) {
+    const words = hay.split(' ').filter(Boolean);
+    if (words.some(w => w.startsWith(token) || (token.startsWith(w) && w.length >= 4 && token.length - w.length <= 2))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Estrae tipo sealed + query pulita (supporta IT e scorciatoie tipo "etb") */
+function parseSealedSearchQuery(rawName, typeFilter = '') {
+  let q = String(rawName || '').trim();
+  let detectedType = String(typeFilter || '').trim();
+
+  for (const { type, re } of SEALED_TYPE_QUERY_RE) {
+    re.lastIndex = 0;
+    if (re.test(q)) {
+      if (!detectedType) detectedType = type;
+      q = q.replace(re, ' ');
+    }
+  }
+
+  let normalized = normCardName(q);
+
+  // Typo / forme prodotto (il resto IT→EN arriva dall'indice set)
+  const phraseFixes = [
+    [/phantom\s+flames/g, 'phantasmal flames'],
+    [/set\s*allenatore(?:\s*fuoriclasse)?/g, 'elite trainer box'],
+  ];
+  for (const [re, en] of phraseFixes) {
+    normalized = normalized.replace(re, en);
+  }
+
+  normalized = rewriteSealedItalianQuery(normalized);
+
+  const tokens = [...new Set(normalized.split(' ').filter(t => t.length > 1))];
+  return { type: detectedType, tokens, expanded: normalized, raw: normalized };
+}
+
+function sealedCatalogHaystack(card) {
+  const base = `${card.name || ''} ${card.setName || ''} ${card.setCode || ''} ${card.setId || ''}`;
+  return normCardName(`${base} ${sealedSetAliasBlob(card.setName || '')}`);
+}
+
+function scoreSealedCatalogCard(card, parsed) {
+  const hay = sealedCatalogHaystack(card);
+  const tokens = parsed.tokens;
+  if (!tokens.length) {
+    // solo filtro tipo
+    return parsed.type && card.type === parsed.type ? 50 : 0;
+  }
+
+  const matched = tokens.filter(t => sealedTokenMatches(hay, t));
+  if (!matched.length) return -1;
+
+  // Richiedi tutti i token se pochi; altrimenti maggioranza
+  const need = tokens.length <= 3 ? tokens.length : Math.ceil(tokens.length * 0.7);
+  if (matched.length < need) return -1;
+
+  let score = matched.length * 45;
+  if (matched.length === tokens.length) score += 90;
+
+  // Match sulla frase set / nome prodotto
+  if (parsed.raw && hay.includes(parsed.raw)) score += 80;
+  const setHay = normCardName(`${card.setName || ''} ${sealedSetAliasBlob(card.setName || '')}`);
+  const setHits = tokens.filter(t => sealedTokenMatches(setHay, t)).length;
+  score += setHits * 40;
+  if (parsed.raw && setHay.includes(parsed.raw)) score += 120;
+  // Tutti i token del set → priorità alta (es. phantasmal+flames)
+  if (tokens.length >= 2 && setHits === tokens.length) score += 100;
+
+  if (parsed.type && card.type === parsed.type) score += 120;
+  else if (parsed.type && card.type !== parsed.type) return -1;
+
+  // Preferisci il prodotto "titolare" (ETB / Booster Box) rispetto a case/PC
+  const n = normCardName(card.name);
+  if (/\bcase\b/.test(n)) score -= 45;
+  if (parsed.type === 'etb' || tokens.some(t => t === 'elite' || t === 'trainer')) {
+    if (/elite trainer box$/.test(n)) score += 70;
+    else if (/elite trainer box/.test(n)) score += 40;
+    if (/pokemon center/.test(n)) score -= 30;
+    if (/booster bundle/.test(n)) score += 10;
+  }
+  if (parsed.type === 'box' || tokens.includes('box')) {
+    if (/booster box$/.test(n)) score += 60;
+  }
+
+  if (card.priceNm != null || card.priceMin != null) score += 15;
+  return score;
+}
+
 const CT_TCG_CONFIG = {
   onepiece: {
     game: 'onepiece',
+    ctGame: 'onepiece',
     prefix: 'op',
     icon: '☠️',
     searchLabel: '🔍 Cerca Carta OP',
@@ -6811,6 +7480,7 @@ const CT_TCG_CONFIG = {
   },
   riftbound: {
     game: 'riftbound',
+    ctGame: 'riftbound',
     prefix: 'rb',
     icon: '⚔️',
     searchLabel: '🔍 Cerca Carta Riftbound',
@@ -6820,11 +7490,25 @@ const CT_TCG_CONFIG = {
     qtyField: 'rbQty',
     condField: 'rbCondSearch',
   },
+  sealed: {
+    game: 'sealed',
+    ctGame: 'pokemon',
+    prefix: 'sl',
+    icon: '📦',
+    searchLabel: '🔍 Cerca Sealed',
+    choiceTitle: '📦 Scegli il prodotto Sealed',
+    getSets: () => enrichSealedSets(typeof POKEMON_SEALED_SETS !== 'undefined' ? POKEMON_SEALED_SETS : []),
+    langField: 'slLang',
+    qtyField: 'slQty',
+    condField: 'slCondSearch',
+    typeField: 'slSealedType',
+  },
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, manualPrice: null, manualPriceRaw: '' },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
+  sealed: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
 };
 
 function tcgManualPriceUnit(gameKey) {
@@ -6954,15 +7638,30 @@ async function tcgLoadNameSuggestions(gameKey, name, genToken = null) {
   const prefixFromSet = detectTcgCardNumberPrefix(setText);
   const set = getTcgSelectedSet(gameKey);
   const usePrefix = !!(name && prefixFromSet);
+  const typeFilter = cfg.typeField ? ($(cfg.typeField)?.value || '') : '';
+  const ctGame = cfg.ctGame || cfg.game;
   try {
-    const bps = sortTcgSearchResults(await ctSearchBlueprintsForTcg(name, null, cfg.game, {
-      setId: usePrefix ? '' : set.id,
-      setCtId: usePrefix ? '' : set.ctId,
-      cardNum: usePrefix ? prefixFromSet : '',
-      limit: usePrefix ? 60 : (set.ctId || set.id ? 30 : 15),
-    }), name, usePrefix ? prefixFromSet : '');
-    if (genToken != null && genToken !== ctTcgState[gameKey].suggGen) return;
-    tcgRenderNameSuggestions(gameKey, bps);
+    let bps = [];
+    if (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed') {
+      bps = searchTcgLocalCatalog(
+        gameKey,
+        name,
+        usePrefix ? prefixFromSet : '',
+        usePrefix ? '' : (set.id || ''),
+        usePrefix ? '' : (set.ctId || ''),
+        usePrefix ? 40 : 16,
+        typeFilter
+      );
+    }
+    if (!bps.length && gameKey !== 'sealed') {
+      bps = await ctSearchBlueprintsForTcg(name, null, ctGame, {
+        setId: usePrefix ? '' : set.id,
+        setCtId: usePrefix ? '' : set.ctId,
+        cardNum: usePrefix ? prefixFromSet : '',
+        limit: usePrefix ? 60 : (set.ctId || set.id ? 30 : 15),
+      });
+    }
+    tcgRenderNameSuggestions(gameKey, sortTcgSearchResults(bps, name, usePrefix ? prefixFromSet : ''));
   } catch {}
 }
 
@@ -6985,47 +7684,142 @@ async function tcgRunSearch(gameKey, name, num) {
   const set = getTcgSelectedSet(gameKey);
   const resolvedSet = resolveTcgSetFromInput(setText, cfg.getSets());
   const usePrefixWithName = !!(name && prefixFromSet);
+  const typeFilter = cfg.typeField ? ($(cfg.typeField)?.value || '') : '';
+  const ctGame = cfg.ctGame || cfg.game;
 
   let bps = [];
+  let catalogBps = [];
 
-  if (usePrefixWithName) {
-    bps = await ctSearchBlueprintsForTcg(name, null, cfg.game, {
-      setId: '',
-      setCtId: '',
-      cardNum: prefixFromSet,
-      limit: 45,
-    });
+  // Catalogo locale + live CT (Sealed: solo catalogo prodotti)
+  if (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed') {
+    catalogBps = searchTcgLocalCatalog(
+      gameKey,
+      name,
+      usePrefixWithName ? prefixFromSet : num,
+      usePrefixWithName ? '' : (set.id || ''),
+      usePrefixWithName ? '' : (set.ctId || ''),
+      usePrefixWithName ? 60 : 24,
+      typeFilter
+    );
+    if (catalogBps.length) {
+      bps = catalogBps;
+    } else if (gameKey !== 'sealed') {
+      bps = await ctSearchBlueprintsForTcg(name, num, ctGame, {
+        setId: usePrefixWithName ? '' : set.id,
+        setCtId: usePrefixWithName ? '' : set.ctId,
+        cardNum: usePrefixWithName ? prefixFromSet : num,
+        limit: usePrefixWithName ? 80 : 30,
+        typeFilter,
+      });
+    }
   }
 
   if (!bps.length) {
-    const setLocked = !!(set.ctId || resolvedSet);
-    bps = await ctSearchBlueprintsForTcg(name || num, null, cfg.game, {
-      setId: set.id,
-      setCtId: set.ctId,
-      cardNum: num || cardPrefix || '',
-      limit: setLocked ? 45 : 28,
+    bps = await ctSearchBlueprintsForTcg(name, num, ctGame, {
+      setId: usePrefixWithName ? '' : set.id,
+      setCtId: usePrefixWithName ? '' : set.ctId,
+      cardNum: usePrefixWithName ? prefixFromSet : num,
+      limit: usePrefixWithName ? 80 : 30,
+      typeFilter,
     });
   }
 
-  if (!bps.length && cardPrefix) {
-    bps = await ctSearchBlueprintsForTcg(name || num || cardPrefix, null, cfg.game, {
-      setId: '',
-      setCtId: '',
-      cardNum: cardPrefix,
-      limit: 45,
+  if (cardPrefix) {
+    bps = bps.filter(bp => {
+      const cn = String(bp.collector_number || '').toUpperCase();
+      const prefix = detectTcgCardNumberPrefix(cn);
+      return !prefix || prefix === cardPrefix || prefix.includes(cardPrefix) || cardPrefix.includes(prefix);
     });
   }
 
-  if (num) {
+  tcgRenderNameSuggestions(gameKey, sortTcgSearchResults(bps, name, usePrefixWithName ? prefixFromSet : ''));
+  return bps;
+}
+
+async function tcgRunSearch(gameKey, name, num) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  const setText = $(`${cfg.prefix}CardSet`)?.value?.trim() || '';
+  const prefixFromSet = detectTcgCardNumberPrefix(setText);
+  const prefixFromNum = detectTcgCardNumberPrefix(num);
+  const cardPrefix = prefixFromNum || prefixFromSet;
+  const set = getTcgSelectedSet(gameKey);
+  const resolvedSet = resolveTcgSetFromInput(setText, cfg.getSets());
+  const usePrefixWithName = !!(name && prefixFromSet);
+  const typeFilter = cfg.typeField ? ($(cfg.typeField)?.value || '') : '';
+  const ctGame = cfg.ctGame || cfg.game;
+
+  let bps = [];
+  let catalogBps = [];
+
+  // Catalogo locale + live CT (Sealed: solo catalogo prodotti)
+  if (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed') {
+    const localLimit = (set.ctId || resolvedSet || cardPrefix || typeFilter) ? 80 : 48;
+    catalogBps = searchTcgLocalCatalog(
+      gameKey,
+      name,
+      gameKey === 'sealed' ? '' : (num || cardPrefix || ''),
+      set.id || resolvedSet?.id || '',
+      set.ctId || resolvedSet?.ctId || '',
+      localLimit,
+      typeFilter
+    );
+    if (!catalogBps.length && (name || num || typeFilter)) {
+      catalogBps = searchTcgLocalCatalog(
+        gameKey,
+        name,
+        gameKey === 'sealed' ? '' : (num || cardPrefix || ''),
+        '',
+        '',
+        localLimit,
+        typeFilter
+      );
+    }
+  }
+
+  if (gameKey !== 'sealed') {
+    if (usePrefixWithName) {
+      bps = await ctSearchBlueprintsForTcg(name, null, ctGame, {
+        setId: '',
+        setCtId: '',
+        cardNum: prefixFromSet,
+        limit: 45,
+      });
+    }
+
+    if (!bps.length) {
+      const setLocked = !!(set.ctId || resolvedSet);
+      bps = await ctSearchBlueprintsForTcg(name || num, null, ctGame, {
+        setId: set.id,
+        setCtId: set.ctId,
+        cardNum: num || cardPrefix || '',
+        limit: setLocked ? 45 : 28,
+      });
+    }
+
+    if (!bps.length && cardPrefix) {
+      bps = await ctSearchBlueprintsForTcg(name || num || cardPrefix, null, ctGame, {
+        setId: '',
+        setCtId: '',
+        cardNum: cardPrefix,
+        limit: 45,
+      });
+    }
+  }
+
+  // Catalogo prima: mantiene prezzi snapshot in dedupe
+  bps = dedupeBlueprints([...catalogBps, ...bps]);
+
+  if (gameKey !== 'sealed' && num) {
     const normNum = num.toUpperCase().replace(/\s/g, '');
     const byNum = bps.filter(b => {
       const bpNum = ctBpCollectorNumber(b).toUpperCase().replace(/\s/g, '');
-      return bpNum === normNum || bpNum.includes(normNum) || normNum.includes(bpNum);
+      if (!bpNum) return false;
+      return bpNum === normNum || bpNum.includes(normNum) || (normNum.length >= 4 && normNum.includes(bpNum));
     });
     if (byNum.length) bps = dedupeBlueprints(byNum);
   }
 
-  if (cardPrefix) {
+  if (gameKey !== 'sealed' && cardPrefix) {
     const byPrefix = bps.filter(b => tcgBpMatchesCardPrefix(b, cardPrefix));
     if (byPrefix.length) bps = dedupeBlueprints(byPrefix);
   }
@@ -7047,8 +7841,11 @@ function tcgRenderNameSuggestions(gameKey, bps) {
   `).join('');
   ctTcgState[gameKey]._sugg = bps;
   box.hidden = false;
-  box.querySelectorAll('.sugg-item').forEach(btn => {
-    btn.addEventListener('mousedown', e => {
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-idx]');
+      if (!btn) return;
       e.preventDefault();
       const bp = ctTcgState[gameKey]._sugg[Number(btn.dataset.idx)];
       if (!bp) return;
@@ -7066,7 +7863,7 @@ function tcgRenderNameSuggestions(gameKey, bps) {
       box.hidden = true;
       tcgDoSearch(gameKey);
     });
-  });
+  }
 }
 
 async function tcgDoSearch(gameKey) {
@@ -7074,7 +7871,14 @@ async function tcgDoSearch(gameKey) {
   clearCollectionEdit();
   const name = $(`${cfg.prefix}CardName`)?.value?.trim() || '';
   const num  = $(`${cfg.prefix}CardNumber`)?.value?.trim() || '';
-  if (!name && !num) { tcgShowMsg(gameKey, 'Inserisci il nome o il numero della carta', 'warn'); return; }
+  const typeFilter = cfg.typeField ? ($(cfg.typeField)?.value || '') : '';
+  const sealedQ = gameKey === 'sealed' ? parseSealedSearchQuery(name, typeFilter) : null;
+  if (!name && !num && !(gameKey === 'sealed' && (typeFilter || sealedQ?.type))) {
+    tcgShowMsg(gameKey, gameKey === 'sealed'
+      ? 'Inserisci il nome del prodotto (anche in italiano) o scegli un tipo sealed'
+      : 'Inserisci il nome o il numero della carta', 'warn');
+    return;
+  }
 
   const searchGen = ++ctTcgState[gameKey].searchGen;
   clearTimeout(ctTcgState[gameKey].suggTimer);
@@ -7084,8 +7888,11 @@ async function tcgDoSearch(gameKey) {
   $(`${cfg.prefix}ResultCard`).hidden = true;
   ctTcgState[gameKey].selected = null;
   ctTcgState[gameKey].prices = null;
+  ctTcgState[gameKey].marketMenuOpen = false;
   ctTcgState[gameKey].manualPrice = null;
   ctTcgState[gameKey].manualPriceRaw = '';
+  ctTcgState[gameKey].graded = false;
+  ctTcgState[gameKey].gradeScore = 10;
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
 
   try {
@@ -7093,21 +7900,27 @@ async function tcgDoSearch(gameKey) {
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
 
     if (!bps.length) {
-      tcgShowMsg(gameKey, `Nessuna carta ${cfg.game === 'onepiece' ? 'One Piece' : 'Riftbound'} trovata per "${name || num}"`, 'warn');
+      const label = cfg.game === 'onepiece' ? 'One Piece'
+        : cfg.game === 'riftbound' ? 'Riftbound'
+        : cfg.game === 'sealed' ? 'Sealed'
+        : cfg.game;
+      tcgShowMsg(gameKey, `Nessun risultato ${label} per "${name || num || typeFilter || 'ricerca'}"`, 'warn');
       return;
     }
 
     if (activeGame === gameKey) {
       if (gameKey === 'onepiece') $('onepieceResults').hidden = false;
       if (gameKey === 'riftbound') $('riftboundResults').hidden = false;
+      if (gameKey === 'sealed') $('sealedResults').hidden = false;
     }
 
     if (bps.length === 1) {
       await tcgSelectCard(gameKey, bps[0], searchGen);
+      tcgShowMsg(gameKey, '✓ Prodotto trovato', 'success');
     } else {
       tcgShowChoices(gameKey, bps);
+      tcgShowMsg(gameKey, `✓ ${bps.length} risultati`, 'success');
     }
-    tcgShowMsg(gameKey, `✓ ${bps.length > 1 ? bps.length + ' carte trovate' : 'Carta trovata'}`, 'success');
   } catch (e) {
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     const msg = e.status === 404
@@ -7126,9 +7939,18 @@ function tcgShowChoices(gameKey, bps) {
   ctTcgState[gameKey].choices = bps;
   if (gameKey === 'onepiece') $('onepieceResults').hidden = false;
   if (gameKey === 'riftbound') $('riftboundResults').hidden = false;
+  if (gameKey === 'sealed') $('sealedResults').hidden = false;
   $(`${cfg.prefix}ChoicesCount`).textContent = `${bps.length} risultati`;
   $(`${cfg.prefix}ChoicesList`).innerHTML = bps.map((bp, i) => {
-    const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
+    const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
+    const lang = $(cfg.langField)?.value?.trim() || '';
+    const catPrice = (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed')
+      ? tcgCatalogPriceForLang(bp, lang)
+      : (bp._catalogPriceNm ?? bp._catalogPriceMin);
+    const typeLabel = bp._sealedType ? SEALED_TYPE_LABELS[bp._sealedType] : '';
+    const priceHtml = catPrice != null
+      ? `<span class="choice-price ct-live" title="Min CT snapshot">${fmt(catPrice)}</span>`
+      : '';
     return `
     <div class="choice-card choice-card-tcg" onclick="tcgPickChoice('${gameKey}', ${i})">
       ${img
@@ -7136,8 +7958,9 @@ function tcgShowChoices(gameKey, bps) {
         : `<div class="choice-no-img tcg-choice-img">${cfg.icon}</div>`}
       <div class="choice-info">
         <div class="choice-name">${escHtml(bp.name)}</div>
-        <div class="choice-set">${escHtml(bp.expansion?.name_en || '?')}</div>
+        <div class="choice-set">${escHtml(bp.expansion?.name_en || '?')}${typeLabel ? ` · ${escHtml(typeLabel)}` : ''}</div>
         ${bp.collector_number ? `<span class="choice-num">#${escHtml(bp.collector_number)}</span>` : ''}
+        ${priceHtml}
       </div>
     </div>`;
   }).join('');
@@ -7160,51 +7983,139 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   $(`${cfg.prefix}ChoicesCard`).hidden = true;
   if (gameKey === 'onepiece') $('onepieceResults').hidden = false;
   if (gameKey === 'riftbound') $('riftboundResults').hidden = false;
+  if (gameKey === 'sealed') $('sealedResults').hidden = false;
   ctTcgState[gameKey].selected = bp;
   ctTcgState[gameKey].prices = null;
   ctTcgState[gameKey].selectedListing = null;
+  ctTcgState[gameKey].marketMenuOpen = false;
   ctTcgState[gameKey].manualPrice = null;
   ctTcgState[gameKey].manualPriceRaw = '';
-  tcgRenderResult(gameKey, bp, null);
+  ctTcgState[gameKey].graded = false;
+  ctTcgState[gameKey].gradeScore = 10;
+
+  const lang = $(cfg.langField)?.value?.trim() || '';
+  const catalogUnit = (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed')
+    ? tcgCatalogPriceForLang(bp, lang)
+    : (bp._catalogPriceNm ?? bp._catalogPriceMin);
+  if (catalogUnit != null) {
+    const interim = {
+      conditions: [{
+        key: 'NM',
+        label: 'Near Mint',
+        minPrice: catalogUnit,
+        price: catalogUnit,
+        avgPrice: catalogUnit,
+        count: 0,
+        listings: [],
+        foil: false,
+      }],
+      total: 0,
+      url: `https://www.cardtrader.com/en/cards/${bp.id}`,
+      expansionName: bp.expansion?.name_en,
+      _fromCatalog: true,
+    };
+    ctTcgState[gameKey].prices = interim;
+    tcgRenderResult(gameKey, bp, interim);
+  } else {
+    tcgRenderResult(gameKey, bp, null);
+  }
 
   try {
     const lang = $(cfg.langField)?.value?.trim() || '';
-    const marketplacePath = ctMarketplaceProductsPath(bp.id, lang);
-    ctDebug('tcgSelectCard start', {
-      gameKey,
-      bpId: bp.id,
-      bpName: bp.name,
-      uiLang: lang,
-      langCode: ctLanguageApiCode(lang),
-      marketplacePath,
-    });
-    const data = await ctFetch(marketplacePath);
+    let data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
-    const listings = Object.values(data).flat();
-    const { conditions } = ctAverageConditions(listings, lang);
-    ctDebug('tcgSelectCard prices', {
-      gameKey,
-      bpId: bp.id,
-      listings: listings.length,
-      conditions: conditions.length,
-      firstCondition: conditions[0]?.key || null,
-      firstPrice: conditions[0]?.minPrice || conditions[0]?.price || null,
-    });
-    ctTcgState[gameKey].prices = {
-      conditions,
-      total: listings.length,
-      url: `https://www.cardtrader.com/en/cards/${bp.id}`,
-      expansionName: bp.expansion?.name_en,
-    };
+    let listings = Object.values(data || {}).flat().filter(l => l && typeof l === 'object' && (l.price_cents != null || l.price));
+    let usedLang = lang;
+    let langFallback = false;
+
+    // Se la lingua scelta non ha annunci, ripeti senza filtro (OP promo JP spesso senza EN/IT)
+    if (!listings.length && lang) {
+      data = await ctFetch(ctMarketplaceProductsPath(bp.id, ''));
+      if (searchGen !== ctTcgState[gameKey].searchGen) return;
+      listings = Object.values(data || {}).flat().filter(l => l && typeof l === 'object' && (l.price_cents != null || l.price));
+      usedLang = '';
+      langFallback = listings.length > 0;
+    }
+
+    let { conditions } = ctAverageConditions(listings, usedLang, '');
+    if (!conditions.length && listings.length && lang && !langFallback) {
+      // Annunci presenti ma scartati dal match lingua client (es. jp vs ja)
+      ({ conditions } = ctAverageConditions(listings, '', ''));
+      langFallback = conditions.length > 0;
+      usedLang = '';
+    }
+
+    const url = `https://www.cardtrader.com/en/cards/${bp.id}`;
+    const expansionName = bp.expansion?.name_en;
+    const warnLang = langFallback
+      ? `Nessun annuncio in ${ctLanguageLabel(lang)} — mostro tutte le lingue.`
+      : null;
+
+    if (conditions.length) {
+      ctTcgState[gameKey].prices = {
+        conditions,
+        total: listings.length,
+        url,
+        expansionName,
+        warning: warnLang || undefined,
+      };
+    } else {
+      const langErr = listings.length
+        ? ctLangFilterError(listings, lang)
+        : (lang
+          ? `Nessun annuncio CardTrader in ${ctLanguageLabel(lang)}. Prova "Qualsiasi" o un'altra lingua.`
+          : null);
+      if (catalogUnit != null) {
+        ctTcgState[gameKey].prices = {
+          conditions: [{
+            key: 'NM',
+            label: 'Near Mint',
+            minPrice: catalogUnit,
+            price: catalogUnit,
+            avgPrice: catalogUnit,
+            count: 0,
+            listings: [],
+            foil: false,
+          }],
+          total: listings.length,
+          url,
+          expansionName,
+          _fromCatalog: true,
+          warning: langErr || warnLang || 'Prezzo da catalogo (nessun annuncio live filtrato).',
+        };
+      } else {
+        ctTcgState[gameKey].prices = {
+          conditions: [],
+          total: listings.length,
+          url,
+          expansionName,
+          error: langErr || 'Nessun annuncio con prezzo su CardTrader.',
+        };
+      }
+    }
   } catch (e) {
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
-    ctDebug('tcgSelectCard error', {
-      gameKey,
-      bpId: bp?.id,
-      err: e?.message || String(e),
-      status: e?.status || null,
-    });
-    ctTcgState[gameKey].prices = { error: e.message || 'Errore prezzi CT' };
+    if (catalogUnit != null) {
+      ctTcgState[gameKey].prices = {
+        conditions: [{
+          key: 'NM',
+          label: 'Near Mint',
+          minPrice: catalogUnit,
+          price: catalogUnit,
+          avgPrice: catalogUnit,
+          count: 0,
+          listings: [],
+          foil: false,
+        }],
+        total: 0,
+        url: `https://www.cardtrader.com/en/cards/${bp.id}`,
+        expansionName: bp.expansion?.name_en,
+        _fromCatalog: true,
+        warning: e.message || 'Errore prezzi CT — uso catalogo',
+      };
+    } else {
+      ctTcgState[gameKey].prices = { error: e.message || 'Errore prezzi CT' };
+    }
   }
   tcgRenderResult(gameKey, bp, ctTcgState[gameKey].prices);
   $(`${cfg.prefix}ResultCard`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -7253,8 +8164,9 @@ function tcgRenderResult(gameKey, bp, prices) {
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const qty = parseInt($(cfg.qtyField)?.value) || 1;
   const priceHtml = !prices ? '<div class="ct-loading"><div class="spinner"></div><span>Caricamento prezzi…</span></div>'
-    : prices.error ? `<p class="ct-msg warn">⚠️ ${escHtml(prices.error)}</p>`
+    : prices.error && !(prices.conditions || []).length ? `<p class="ct-msg warn">⚠️ ${escHtml(prices.error)}</p>`
     : `
+      ${prices.warning ? `<p class="ct-msg warn" style="margin-bottom:8px">⚠️ ${escHtml(prices.warning)}</p>` : ''}
       ${selPrice ? `
       <div class="ct-price-hero" style="margin-bottom:10px">
         <div class="ct-price-hero-item">
@@ -7262,7 +8174,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           <span class="ct-price-hero-val">${fmt(selPrice.unit)}</span>
         </div>
         <div class="ct-price-hero-item">
-          <span class="ct-price-hero-lbl">${selPrice.manual ? 'Prezzo inserito manualmente' : (selPrice.fromCt ? 'Da annunci CT reali' : 'Stima (nessun annuncio in questa condizione)')}</span>
+          <span class="ct-price-hero-lbl">${selPrice.manual ? 'Prezzo inserito manualmente' : (selPrice.fromCt ? 'Da annunci CT reali' : (prices._fromCatalog ? (gameKey === 'sealed' ? 'Snapshot catalogo Sealed' : 'Snapshot catalogo') : 'Stima (nessun annuncio in questa condizione)'))}</span>
           <span class="ct-price-hero-val muted">${selPrice.manual ? 'override attivo' : (selPrice.fromCt ? `${selPrice.ctCond?.count || 0} annunci` : '—')}</span>
         </div>
       </div>` : ''}
@@ -7278,14 +8190,14 @@ function tcgRenderResult(gameKey, bp, prices) {
           </button>`;
         }).join('')}
       </div>
-      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing)}
+      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen)}
       <div class="ct-footer-row">
         <span class="ct-chip">${prices.total} annunci totali</span>
         <a class="ct-link" href="${prices.url}" target="_blank" rel="noopener noreferrer">↗ Vedi su CardTrader</a>
       </div>`;
 
   card.innerHTML = `
-    <div class="result-header" style="margin-bottom:12px;font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Carta selezionata</div>
+    <div class="result-header" style="margin-bottom:12px;font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">${gameKey === 'sealed' ? 'Prodotto selezionato' : 'Carta selezionata'}</div>
     <div class="tcg-result-layout">
       <div class="tcg-result-img">
         ${img
@@ -7297,8 +8209,9 @@ function tcgRenderResult(gameKey, bp, prices) {
         <div class="tcg-result-name">${escHtml(bp.name)}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
           <span class="badge-set">${escHtml(bp.expansion?.name_en || '?')}</span>
-          ${bp.collector_number ? `<span class="badge-num">#${escHtml(bp.collector_number)}</span>` : ''}
-          ${bp.category_name ? `<span class="badge-rarity">${escHtml(bp.category_name)}</span>` : ''}
+          ${bp._sealedType ? `<span class="badge-rarity">${escHtml(SEALED_TYPE_LABELS[bp._sealedType] || bp._sealedType)}</span>` : ''}
+          ${bp.collector_number && gameKey !== 'sealed' ? `<span class="badge-num">#${escHtml(bp.collector_number)}</span>` : ''}
+          ${bp.category_name && !bp._sealedType ? `<span class="badge-rarity">${escHtml(bp.category_name)}</span>` : ''}
         </div>
         <div class="ct-section" style="margin-top:0">
           <div class="ct-header">CardTrader — Prezzi Mercato <span class="ct-badge live">● LIVE</span></div>
@@ -7310,6 +8223,12 @@ function tcgRenderResult(gameKey, bp, prices) {
             <input id="${cfg.prefix}ManualPriceInput" type="text" inputmode="decimal" placeholder="Es. 7,90" value="${escHtml(ctTcgState[gameKey].manualPriceRaw || '')}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
             <button id="${cfg.prefix}ApplyManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;">Applica</button>
             <button id="${cfg.prefix}ClearManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;" ${ctTcgState[gameKey].manualPrice == null && !(ctTcgState[gameKey].manualPriceRaw || '').trim() ? 'disabled' : ''}>Reset</button>
+            ${gradedControlsHtml({
+              checkId: `${cfg.prefix}GradedCheck`,
+              selectId: `${cfg.prefix}GradeScoreSelect`,
+              graded: ctTcgState[gameKey].graded,
+              score: ctTcgState[gameKey].gradeScore,
+            })}
           </div>
         </div>
       </div>
@@ -7317,8 +8236,8 @@ function tcgRenderResult(gameKey, bp, prices) {
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span class="pill pill-set">Condizione: ${escHtml(qLabel)} (${qKey})</span>
       <button class="btn btn-primary" onclick="tcgAddToCollection('${gameKey}')">${isEditMode
-        ? `💾 Salva modifiche (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''}`
-        : `+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''} ×${qty}`}</button>
+        ? `💾 Salva modifiche (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''}${gradedLabel(ctTcgState[gameKey].graded, ctTcgState[gameKey].gradeScore)}`
+        : `+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''}${gradedLabel(ctTcgState[gameKey].graded, ctTcgState[gameKey].gradeScore)} ×${qty}`}</button>
     </div>`;
   card.hidden = false;
   $(`${cfg.prefix}ManualPriceInput`)?.addEventListener('input', (e) => {
@@ -7333,6 +8252,17 @@ function tcgRenderResult(gameKey, bp, prices) {
   $(`${cfg.prefix}ApplyManualPriceBtn`)?.addEventListener('click', () => applyTcgManualPrice(gameKey));
   $(`${cfg.prefix}ClearManualPriceBtn`)?.addEventListener('click', () => clearTcgManualPrice(gameKey));
   bindPreviewImage(card.querySelector('img.previewable-img'));
+  $(`${cfg.prefix}GradedCheck`)?.addEventListener('change', (e) => {
+    ctTcgState[gameKey].graded = !!e.target.checked;
+    if (ctTcgState[gameKey].graded && !normalizeGradeScore(ctTcgState[gameKey].gradeScore)) {
+      ctTcgState[gameKey].gradeScore = 10;
+    }
+    tcgRenderResult(gameKey, bp, prices);
+  });
+  $(`${cfg.prefix}GradeScoreSelect`)?.addEventListener('change', (e) => {
+    ctTcgState[gameKey].gradeScore = normalizeGradeScore(e.target.value) || 10;
+    if (ctTcgState[gameKey].graded) tcgRenderResult(gameKey, bp, prices);
+  });
   card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
     row.addEventListener('click', () => {
       const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
@@ -7341,6 +8271,10 @@ function tcgRenderResult(gameKey, bp, prices) {
       ctTcgState[gameKey].selectedListing = null;
       tcgRenderResult(gameKey, bp, prices);
     });
+  });
+  card.querySelector('button.ct-market-toggle')?.addEventListener('click', () => {
+    ctTcgState[gameKey].marketMenuOpen = !ctTcgState[gameKey].marketMenuOpen;
+    tcgRenderResult(gameKey, bp, prices);
   });
   card.querySelectorAll('button.ct-listing-row[data-listing-index]').forEach(row => {
     row.addEventListener('click', () => {
@@ -7356,6 +8290,7 @@ function tcgRenderResult(gameKey, bp, prices) {
         seller: listing.seller || '',
         listing,
       };
+      ctTcgState[gameKey].marketMenuOpen = false;
       tcgRenderResult(gameKey, bp, prices);
     });
   });
@@ -7441,6 +8376,11 @@ window.tcgAddToCollection = async function(gameKey) {
       lang,
       quality: qKey,
       condition: qKey,
+      graded: !!ctTcgState[gameKey].graded,
+      gradeScore: ctTcgState[gameKey].graded
+        ? (normalizeGradeScore(ctTcgState[gameKey].gradeScore) || 10)
+        : null,
+      sealedType: bp._sealedType || null,
       basePrice: nmMin,
       img,
       imgUrl: img,
@@ -7459,7 +8399,8 @@ window.tcgAddToCollection = async function(gameKey) {
     localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
   }
   const srcNote = resolved?.manual ? ' (manuale)' : (resolved?.fromCt ? '' : ' (stima)');
-  tcgShowMsg(gameKey, `${qty > 1 ? qty + '× ' : ''}${bp.name} · ${qKey} · ${fmt(unit)}${srcNote} aggiunta a La mia collezione!`, 'success');
+  const gradedNote = gradedLabel(ctTcgState[gameKey].graded, ctTcgState[gameKey].gradeScore);
+  tcgShowMsg(gameKey, `${qty > 1 ? qty + '× ' : ''}${bp.name} · ${qKey} · ${fmt(unit)}${srcNote}${gradedNote} aggiunta a La mia collezione!`, 'success');
 };
 
 function initCtTcgGame(gameKey) {
@@ -7500,13 +8441,31 @@ function initCtTcgGame(gameKey) {
   $(`${cfg.prefix}CardName`)?.addEventListener('blur', () => {
     setTimeout(() => { $(`${cfg.prefix}NameSuggestions`).hidden = true; }, 200);
   });
+  if (cfg.typeField) {
+    $(cfg.typeField)?.addEventListener('change', () => {
+      const name = $(`${cfg.prefix}CardName`)?.value?.trim() || '';
+      if (name.length >= 2 || $(cfg.typeField).value) tcgDoSearch(gameKey);
+    });
+  }
 }
 
 Object.keys(CT_TCG_CONFIG).forEach(initCtTcgGame);
 
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.ct-market-menu')) return;
+  Object.keys(CT_TCG_CONFIG).forEach((gameKey) => {
+    if (!ctTcgState[gameKey]?.marketMenuOpen) return;
+    ctTcgState[gameKey].marketMenuOpen = false;
+    if (ctTcgState[gameKey].selected && activeGame === gameKey) {
+      tcgRenderResult(gameKey, ctTcgState[gameKey].selected, ctTcgState[gameKey].prices);
+    }
+  });
+});
+
 function getCollectionStatsByGame() {
   const games = [
     { key: 'pokemon', label: 'Pokémon', icon: '🎴' },
+    { key: 'sealed', label: 'Sealed', icon: '📦' },
     { key: 'onepiece', label: 'One Piece', icon: '☠️' },
     { key: 'riftbound', label: 'Riftbound', icon: '⚔️' },
   ];
@@ -7567,6 +8526,8 @@ function renderCollection() {
   if (!visible.length) {
     const emptyMsg = activeGame === 'pokemon'
       ? 'Nessuna carta Pokémon aggiunta ancora.'
+      : activeGame === 'sealed'
+        ? 'Nessun prodotto Sealed aggiunto ancora.'
       : activeGame === 'onepiece'
         ? 'Nessuna carta One Piece aggiunta ancora.'
         : 'Nessuna carta Riftbound aggiunta ancora.';
@@ -7596,13 +8557,17 @@ function renderCollection() {
         <div style="display:flex;align-items:center;gap:8px;">
           ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
           <div>
-            <div style="font-weight:600;">${item.name}</div>
-            <div style="font-size:0.73rem;color:var(--text-muted);">#${item.number || '—'}</div>
+            <div style="font-weight:600;">${item.name}${item.firstEdition === true ? ' <span style="color:var(--accent);font-size:0.72rem;">1ª</span>' : ''}</div>
+            <div style="font-size:0.73rem;color:var(--text-muted);">${
+              item.game === 'sealed'
+                ? (SEALED_TYPE_LABELS[item.sealedType] || 'Sealed')
+                : `#${item.number || '—'}`
+            }</div>
           </div>
         </div>
       </td>
       <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
-      <td><span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span></td>
+      <td><span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>${gradedBadgeHtml(item)}</td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
       <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
         ${ctPriceVal}
@@ -7625,10 +8590,19 @@ function renderCollection() {
 document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
   const items = collection.filter(i => (i.game || 'pokemon') === activeGame);
   if (!items.length) return;
-  const rows = [['Nome','Set','SetID','Numero','Lingua','Condizione','Prezzo (€)']];
-  items.forEach(i => rows.push([i.name, i.set, i.setId, i.number, i.language || i.lang || 'Any', i.condition, i.price.toFixed(2)]));
+  const rows = [['Nome','Set','SetID','Numero','Tipo Sealed','Lingua','Edizione','Condizione','Gradata','Voto','Prezzo (€)']];
+  items.forEach(i => rows.push([
+    i.name, i.set, i.setId, i.number,
+    i.sealedType ? (SEALED_TYPE_LABELS[i.sealedType] || i.sealedType) : '',
+    i.language || i.lang || 'Any',
+    i.firstEdition === true ? '1ª' : (i.firstEdition === false ? 'Unlimited' : ''),
+    i.condition,
+    i.graded ? 'Sì' : 'No',
+    i.graded && normalizeGradeScore(i.gradeScore) != null ? String(normalizeGradeScore(i.gradeScore)) : '',
+    i.price.toFixed(2)
+  ]));
   const total = items.reduce((s, i) => s + i.price, 0);
-  rows.push(['','','','','TOTALE','',total.toFixed(2)]);
+  rows.push(['','','','','','','','TOTALE','','','',total.toFixed(2)]);
   const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   dlBlob(csv, 'text/csv;charset=utf-8;', `dls-${activeGame}-lista.csv`);
 });
@@ -7646,17 +8620,23 @@ function dlBlob(content, type, name) {
 // ── Game switcher ─────────────────────────────────────────────────────
 const GAME_UI = {
   pokemon:   { label: 'Pokémon TCG',   tagBg: '',                          tagColor: '' },
+  sealed:    { label: 'Sealed Pokémon', tagBg: 'rgba(100,116,139,0.18)',  tagColor: '#94a3b8' },
   onepiece:  { label: 'One Piece TCG', tagBg: 'rgba(192,57,43,0.12)',    tagColor: '#c0392b' },
   riftbound: { label: 'Riftbound',     tagBg: 'rgba(201,146,10,0.15)',    tagColor: '#c9920a' },
 };
 
 function resetModalLocks() {
   document.body.classList.remove('auth-open', 'ios-install-open');
+  document.body.style.overflow = '';
   ['authOverlay', 'profileOverlay', 'manualPriceOverlay'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.classList.add('is-closed');
+    if (!el) return;
+    el.classList.add('is-closed');
+    el.style.display = 'none';
+    el.style.pointerEvents = 'none';
   });
   document.getElementById('installIosSheet')?.remove();
+  document.querySelectorAll('.install-ios-overlay, .install-banner').forEach(el => el.remove());
 }
 
 function bindAccountButton() {
@@ -7677,9 +8657,9 @@ function bindGameTabs() {
   });
 }
 
-function switchActiveGame(game) {
+function switchActiveGame(game, opts = {}) {
   if (!game || !GAME_UI[game]) return;
-  if (game === activeGame) return;
+  if (game === activeGame && !opts.force) return;
   activeGame = game;
   try {
     priceFetchGen++;
@@ -7693,9 +8673,11 @@ function switchActiveGame(game) {
     document.querySelectorAll('.game-tab').forEach(t => t.classList.toggle('active', t.dataset.game === game));
     const panels = [
       ['pokemonSearch', game === 'pokemon'],
+      ['sealedSearch', game === 'sealed'],
       ['onepieceSearch', game === 'onepiece'],
       ['riftboundSearch', game === 'riftbound'],
       ['pokemonResults', game === 'pokemon'],
+      ['sealedResults', game === 'sealed'],
       ['onepieceResults', game === 'onepiece'],
       ['riftboundResults', game === 'riftbound'],
     ];
@@ -7718,6 +8700,14 @@ function switchActiveGame(game) {
   }
 }
 
+function applyGameFromUrl() {
+  try {
+    const g = new URLSearchParams(location.search).get('game');
+    if (g && GAME_UI[g]) return g;
+  } catch {}
+  return 'pokemon';
+}
+
 // ── Avvio app ───────────────────────────────────────────────────────
 function initApp() {
   localStorage.removeItem('dls_ct_token');
@@ -7733,7 +8723,7 @@ function initApp() {
   if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
   restoreSessionLocal();
-  switchActiveGame('pokemon');
+  switchActiveGame(applyGameFromUrl(), { force: true });
   tryAutoLogin();
 }
 
@@ -7743,6 +8733,14 @@ bindCollectionActions();
 (function initBackground() {
   const canvas = $('bgCanvas');
   if (!canvas) return;
+
+  // Su telefono / PWA il canvas è nascosto: non consumare batteria
+  const skipAnim = () => document.documentElement.classList.contains('is-mobile')
+    || document.documentElement.classList.contains('is-standalone')
+    || window.matchMedia('(max-width: 680px)').matches
+    || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (skipAnim()) return;
+
   const ctx = canvas.getContext('2d');
   let W, H;
 
@@ -8263,7 +9261,11 @@ function openProfilePanel() {
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
   const overlay = $('profileOverlay');
-  if (overlay) overlay.classList.remove('is-closed');
+  if (overlay) {
+    overlay.classList.remove('is-closed');
+    overlay.style.display = '';
+    overlay.style.pointerEvents = '';
+  }
   document.body.classList.add('auth-open');
   loadUserProfile().then(() => {
     if (!dlsUser) return;
@@ -8275,7 +9277,12 @@ function openProfilePanel() {
 }
 
 function closeProfilePanel() {
-  $('profileOverlay')?.classList.add('is-closed');
+  const overlay = $('profileOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
+  }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -8338,11 +9345,18 @@ function openAuthModal() {
   const overlay = $('authOverlay');
   if (!overlay) return;
   overlay.classList.remove('is-closed');
+  overlay.style.display = '';
+  overlay.style.pointerEvents = '';
   document.body.classList.add('auth-open');
   setTimeout(() => $('authEmail')?.focus(), 100);
 }
 function closeAuthModal() {
-  $('authOverlay')?.classList.add('is-closed');
+  const overlay = $('authOverlay');
+  if (overlay) {
+    overlay.classList.add('is-closed');
+    overlay.style.display = 'none';
+    overlay.style.pointerEvents = 'none';
+  }
   document.body.classList.remove('auth-open');
   document.activeElement?.blur();
 }
@@ -8477,16 +9491,20 @@ manualPriceOverlayEl?.addEventListener('click', e => {
 
 function scheduleCtPreload(game = activeGame) {
   clearTimeout(ctPreloadTimer);
+  // Sealed cerca solo sul catalogo locale: nessun preload CT dedicato
+  if (game === 'sealed') return;
   ctPreloadTimer = setTimeout(() => ctPreloadExpansions(game), 400);
 }
 
 async function ctPreloadExpansions(game = activeGame) {
-  if (ctPreloadDone[game]) return;
+  const key = ctResolveGameKey(game);
+  if (ctPreloadDone[key] || ctPreloadDone[game]) return;
   try {
     await ctGetGameId(null, game);
     await ctGetExpansions(null, game);
+    ctPreloadDone[key] = true;
     ctPreloadDone[game] = true;
-    console.log(`[CT] Pre-caricamento espansioni ${game} completato`);
+    ctLog(`[CT] Pre-caricamento espansioni ${key} completato`);
   } catch (e) {
     console.warn('[CT] Pre-load espansioni fallito:', e.message || e);
   }
@@ -8503,7 +9521,7 @@ async function ctPreloadBlueprintsForSet(setId) {
     });
     if (exp && !ctCache.blueprints.has(exp.id)) {
       await ctGetBlueprints(exp.id, null);
-      console.log('[CT] Blueprint pre-caricati per', exp.name_en, ':', ctCache.blueprints.get(exp.id)?.length);
+      ctLog('[CT] Blueprint pre-caricati per', exp.name_en, ':', ctCache.blueprints.get(exp.id)?.length);
     }
   } catch (e) {
     console.warn('[CT] Pre-load blueprint fallito:', e.message || e);
@@ -8601,8 +9619,18 @@ if ('serviceWorker' in navigator) {
     }
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=43').then(reg => {
         console.log('[SW] Registrato, scope:', reg.scope);
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+              sw.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
       }).catch(err => {
         console.warn('[SW] Registrazione fallita:', err);
       });
@@ -8807,9 +9835,28 @@ window.addEventListener('load', () => {
 
 bindGameTabs();
 bindAccountButton();
-initApp();
+try {
+  resetModalLocks();
+  initApp();
+} catch (err) {
+  console.error('[DLS] initApp fallita:', err);
+  try { alert('🚨 Init fallita:\n' + (err?.message || err)); } catch (_) {}
+  try { resetModalLocks(); bindGameTabs(); bindAccountButton(); } catch (_) {}
+}
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
+
+// PWA: sblocca overlay bloccati dopo resume / back-forward cache
+window.addEventListener('pageshow', () => {
+  resetModalLocks();
+  if (isStandaloneApp()) syncInstalledState();
+  updateInstallUi();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  resetModalLocks();
+  if (isStandaloneApp()) syncInstalledState();
+});
 </script>
 </body>
 </html>
