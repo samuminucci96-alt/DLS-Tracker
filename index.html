@@ -2716,7 +2716,7 @@
 
     <div id="authRecoveryPanel" hidden>
       <div class="auth-recovery-info">
-        Genera un codice di recupero, poi usalo qui sotto per impostare una nuova password.
+        Richiedi un codice a 4 cifre sulla tua email registrata e accedi con la password di recupero.
       </div>
       <div class="auth-field">
         <label>Email</label>
@@ -2729,12 +2729,16 @@
       <div class="auth-recovery-info" id="recoveryTokenBox" hidden style="margin-top:12px"></div>
       <div id="recoveryConfirmFields" hidden>
         <div class="auth-field">
-          <label>Codice recupero</label>
+          <label>Password di recupero (codice 4 cifre)</label>
           <div class="auth-recovery-code">
-            <input id="recoveryToken" type="text" placeholder="Incolla il codice" autocomplete="one-time-code">
-            <button type="button" class="btn btn-outline" id="recoveryPasteBtn" style="white-space:nowrap">Incolla</button>
+            <input id="recoveryToken" type="text" inputmode="numeric" maxlength="4" placeholder="Es. 0427" autocomplete="one-time-code">
           </div>
         </div>
+        <div class="auth-actions" style="margin-top:12px">
+          <button type="button" class="btn" id="recoveryLoginBtn" style="width:100%">Accedi con codice</button>
+        </div>
+      </div>
+      <div id="recoverySetPasswordFields" hidden>
         <div class="auth-field">
           <label>Nuova password</label>
           <input id="recoveryPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="new-password">
@@ -2744,7 +2748,7 @@
           <input id="recoveryPasswordConfirm" type="password" placeholder="Ripeti la nuova password" autocomplete="new-password">
         </div>
         <div class="auth-actions" style="margin-top:12px">
-          <button type="button" class="btn" id="recoveryConfirmBtn" style="width:100%">Conferma recupero</button>
+          <button type="button" class="btn" id="recoverySetPasswordBtn" style="width:100%">Imposta nuova password</button>
         </div>
       </div>
       <div class="auth-err" id="recoveryErr" style="margin-top:12px"></div>
@@ -10092,22 +10096,26 @@ function closeAuthModal() {
 let emailIsRegister = false;
 let authRecoveryActive = false;
 let authRecoveryStep = 'request';
+let recoverySessionToken = '';
 
 function setAuthRecoveryStep(step = 'request') {
   authRecoveryStep = step;
   authRecoveryActive = true;
+  if (step === 'request') recoverySessionToken = '';
   const loginPanel = $('authLoginPanel');
   const recoveryPanel = $('authRecoveryPanel');
   if (loginPanel) loginPanel.hidden = true;
   if (recoveryPanel) recoveryPanel.hidden = false;
   $('authTitle').textContent = 'Recupero password';
-  $('authSub').textContent = step === 'confirm'
-    ? 'Inserisci il codice ricevuto e imposta una nuova password'
-    : 'Genera un codice di recupero e poi imposta una nuova password';
+  $('authSub').textContent = step === 'set-password'
+    ? 'Accesso con codice effettuato: ora imposta la nuova password'
+    : 'Ricevi il codice via email e accedi con password di recupero';
   const confirmFields = $('recoveryConfirmFields');
   if (confirmFields) confirmFields.hidden = step !== 'confirm';
+  const setPasswordFields = $('recoverySetPasswordFields');
+  if (setPasswordFields) setPasswordFields.hidden = step !== 'set-password';
   const tokenBox = $('recoveryTokenBox');
-  if (tokenBox && step !== 'confirm') {
+  if (tokenBox && step === 'request') {
     tokenBox.hidden = true;
     tokenBox.textContent = '';
   }
@@ -10115,12 +10123,14 @@ function setAuthRecoveryStep(step = 'request') {
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   if ($('recoveryEmail') && $('authEmail')) $('recoveryEmail').value = $('authEmail').value.trim();
   if (step === 'request') setTimeout(() => $('recoveryEmail')?.focus(), 50);
-  else setTimeout(() => $('recoveryToken')?.focus(), 50);
+  else if (step === 'confirm') setTimeout(() => $('recoveryToken')?.focus(), 50);
+  else setTimeout(() => $('recoveryPassword')?.focus(), 50);
 }
 
 function showLoginPanel() {
   authRecoveryActive = false;
   authRecoveryStep = 'request';
+  recoverySessionToken = '';
   const loginPanel = $('authLoginPanel');
   const recoveryPanel = $('authRecoveryPanel');
   if (loginPanel) loginPanel.hidden = false;
@@ -10129,6 +10139,8 @@ function showLoginPanel() {
   if (tokenBox) { tokenBox.hidden = true; tokenBox.textContent = ''; }
   const confirmFields = $('recoveryConfirmFields');
   if (confirmFields) confirmFields.hidden = true;
+  const setPasswordFields = $('recoverySetPasswordFields');
+  if (setPasswordFields) setPasswordFields.hidden = true;
   const err = $('recoveryErr');
   if (err) { err.textContent = ''; err.style.display = 'none'; }
 }
@@ -10165,13 +10177,11 @@ async function requestPasswordReset() {
     }
     setAuthRecoveryStep('confirm');
     $('recoveryEmail').value = data.email || email;
-    $('recoveryToken').value = data.resetToken || '';
+    $('recoveryToken').value = '';
     const tokenBox = $('recoveryTokenBox');
     if (tokenBox) {
       tokenBox.hidden = false;
-      tokenBox.textContent = data.resetToken
-        ? `Codice generato. Copialo subito: ${data.resetToken} (valido ${data.expiresInMinutes || 15} minuti).`
-        : 'Codice generato. Copialo per completare il recupero.';
+      tokenBox.textContent = `Codice inviato via email. Usa la password di recupero (4 cifre), valida ${data.expiresInMinutes || 15} minuti.`;
     }
     showAuthErr('recoveryErr', '');
     setTimeout(() => $('recoveryToken')?.focus(), 50);
@@ -10185,32 +10195,76 @@ async function requestPasswordReset() {
   }
 }
 
-async function confirmPasswordReset() {
+async function recoveryLogin() {
   const email = $('recoveryEmail')?.value.trim();
-  const resetToken = $('recoveryToken')?.value.trim();
+  const recoveryCode = ($('recoveryToken')?.value || '').trim();
+  if (!email || !recoveryCode) {
+    showAuthErr('recoveryErr', 'Compila email e password di recupero.');
+    return;
+  }
+  const btn = $('recoveryLoginBtn');
+  const origText = btn?.textContent || 'Accedi con codice';
+  if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
+  try {
+    const res = await authFetch(API_AUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'recovery-login', email, password: recoveryCode })
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      showAuthErr('recoveryErr', data.error || 'Accesso con password di recupero fallito');
+      return;
+    }
+    recoverySessionToken = data.recoveryToken || '';
+    if (!recoverySessionToken) {
+      showAuthErr('recoveryErr', 'Sessione di recupero non valida. Riprova.');
+      return;
+    }
+    setAuthRecoveryStep('set-password');
+    showAuthErr('recoveryErr', '');
+    showMsg('Accesso con password di recupero effettuato. Imposta ora la nuova password.', 'info');
+  } catch (e) {
+    console.error('recoveryLogin:', e);
+    showAuthErr('recoveryErr', API_BASE_URL
+      ? 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.'
+      : 'Errore di rete. Riprova.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
+}
+
+async function setNewPasswordAfterRecovery() {
   const pass = $('recoveryPassword')?.value;
   const passConfirm = $('recoveryPasswordConfirm')?.value;
-  if (!email || !resetToken || !pass || !passConfirm) {
-    showAuthErr('recoveryErr', 'Compila email, codice, nuova password e conferma');
+  if (!pass || !passConfirm) {
+    showAuthErr('recoveryErr', 'Inserisci nuova password e conferma.');
     return;
   }
   if (pass !== passConfirm) {
     showAuthErr('recoveryErr', 'Le nuove password non coincidono.');
     return;
   }
-  const btn = $('recoveryConfirmBtn');
-  const origText = btn?.textContent || 'Conferma recupero';
+  if (!recoverySessionToken) {
+    showAuthErr('recoveryErr', 'Sessione recupero scaduta. Richiedi un nuovo codice.');
+    setAuthRecoveryStep('request');
+    return;
+  }
+
+  const btn = $('recoverySetPasswordBtn');
+  const origText = btn?.textContent || 'Imposta nuova password';
   if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
   try {
     const res = await authFetch(API_AUTH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'confirm-reset', email, resetToken, password: pass })
+      headers: { 'Content-Type': 'application/json', 'X-DLS-Recovery': recoverySessionToken },
+      body: JSON.stringify({ action: 'set-new-password', newPassword: pass })
     });
     let data = {};
     try { data = await res.json(); } catch {}
     if (!res.ok) {
-      showAuthErr('recoveryErr', data.error || 'Recupero password fallito');
+      showAuthErr('recoveryErr', data.error || 'Impostazione nuova password fallita');
       return;
     }
     try {
@@ -10225,7 +10279,7 @@ async function confirmPasswordReset() {
     await loadUserProfile();
     await loadCloudCollection({ askMergeChoice: true });
   } catch (e) {
-    console.error('confirmPasswordReset:', e);
+    console.error('setNewPasswordAfterRecovery:', e);
     showAuthErr('recoveryErr', API_BASE_URL
       ? 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.'
       : 'Errore di rete. Riprova.');
@@ -10306,17 +10360,17 @@ document.getElementById('emailToggleLink')?.addEventListener('click', () => setE
 document.getElementById('forgotPasswordLink')?.addEventListener('click', () => setAuthRecoveryStep('request'));
 document.getElementById('recoveryBackBtn')?.addEventListener('click', () => setEmailMode(false));
 document.getElementById('recoveryRequestBtn')?.addEventListener('click', requestPasswordReset);
-document.getElementById('recoveryConfirmBtn')?.addEventListener('click', confirmPasswordReset);
-document.getElementById('recoveryPasteBtn')?.addEventListener('click', async () => {
-  try {
-    const text = await navigator.clipboard?.readText?.();
-    if (text) $('recoveryToken').value = text.trim();
-  } catch {}
+document.getElementById('recoveryLoginBtn')?.addEventListener('click', recoveryLogin);
+document.getElementById('recoverySetPasswordBtn')?.addEventListener('click', setNewPasswordAfterRecovery);
+document.getElementById('recoveryEmail')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (authRecoveryStep === 'request') requestPasswordReset();
+    else if (authRecoveryStep === 'confirm') recoveryLogin();
+  }
 });
-document.getElementById('recoveryEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') requestPasswordReset(); });
-document.getElementById('recoveryToken')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
-document.getElementById('recoveryPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
-document.getElementById('recoveryPasswordConfirm')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
+document.getElementById('recoveryToken')?.addEventListener('keydown', e => { if (e.key === 'Enter') recoveryLogin(); });
+document.getElementById('recoveryPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') setNewPasswordAfterRecovery(); });
+document.getElementById('recoveryPasswordConfirm')?.addEventListener('keydown', e => { if (e.key === 'Enter') setNewPasswordAfterRecovery(); });
 
 document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
 const profileOverlayEl = document.getElementById('profileOverlay');
