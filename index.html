@@ -119,7 +119,8 @@
       color: var(--text);
       display: block;
       overflow-x: clip;
-      overflow-y: visible;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       padding:
         max(var(--shell-pad), var(--safe-top))
         max(var(--shell-pad), var(--safe-right))
@@ -2523,6 +2524,11 @@
     @media (max-width: 680px) {
       :root { --shell-pad: 10px; }
 
+      /* iOS Safari: evita ricalcoli continui del viewport con tastiera aperta. */
+      body {
+        min-height: 100svh;
+      }
+
       html, body {
         overflow-x: clip;
         max-width: 100%;
@@ -3039,7 +3045,7 @@
           <div id="pokemonQuickField" hidden>
             <div class="field">
               <label for="pokemonQuickCode">Codice carta</label>
-              <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off">
+              <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off" autocapitalize="characters" spellcheck="false">
               <p class="quick-search-hint">Inserisci solo codice set + numero carta. Esempi: TM 074 (Trionfante), TWM 074 (Twilight Masquerade), PBL 048.</p>
             </div>
           </div>
@@ -5714,8 +5720,11 @@ function gradeScoreRegex(score) {
   const n = normalizeGradeScore(score);
   if (n == null) return null;
   const [intPart, fracPart = ''] = String(n).split('.');
-  if (!fracPart) return `${intPart}(?:[.,]0)?`;
-  return `${intPart}[.,]${fracPart}`;
+  if (!fracPart) {
+    // Evita che "9" matchi anche "9.5" o "9,5".
+    return `${intPart}(?:\\s*[.,]\\s*0)?(?!\\s*[.,]\\s*\\d)`;
+  }
+  return `${intPart}\\s*[.,]\\s*${fracPart}`;
 }
 
 function ctListingMentionedGrades(listing) {
@@ -7084,11 +7093,11 @@ document.getElementById('searchBtn')?.addEventListener('click', () => {
 document.getElementById('resetSearchBtn')?.addEventListener('click', resetPokemonSearchFields);
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-document.getElementById('pokemonQuickCode')?.addEventListener('input', () => {
+document.getElementById('pokemonQuickCode')?.addEventListener('blur', () => {
   const el = $('pokemonQuickCode');
   if (!el) return;
-  const up = el.value.toUpperCase().replace(/\s{2,}/g, ' ');
-  if (el.value !== up) el.value = up;
+  const normalized = el.value.toUpperCase().replace(/\s{2,}/g, ' ').trim();
+  if (el.value !== normalized) el.value = normalized;
 });
 document.getElementById('pokemonQuickCode')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') doSearch();
