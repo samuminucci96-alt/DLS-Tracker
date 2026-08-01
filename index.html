@@ -3620,8 +3620,16 @@ function cardNumberMatches(searchNumber, cardNumber) {
   const cn = norm(cardNumber || '');
   if (!cn) return false;
 
-  const rawSearch = searchNumber.split('/')[0].replace(/^0+/, '') || '0';
-  const rawCard = String(cardNumber || '').split('/')[0].replace(/^0+/, '') || '0';
+  const rawSearchFull = String(searchNumber || '').split('/')[0].trim();
+  const rawCardFull = String(cardNumber || '').split('/')[0].trim();
+  const rawSearch = rawSearchFull.replace(/^0+/, '') || '0';
+  const rawCard = rawCardFull.replace(/^0+/, '') || '0';
+
+  const searchDigits = (rawSearchFull.match(/\d+/) || [''])[0].replace(/^0+/, '') || '0';
+  const cardDigits = (rawCardFull.match(/\d+/) || [''])[0].replace(/^0+/, '') || '0';
+
+  // Match numerico esatto anche quando il numero carta contiene prefisso set (es. SFA078).
+  if (searchDigits && cardDigits && searchDigits === cardDigits) return true;
   if (rawSearch === rawCard) return true;
   if (promoNumberMatches(rawSearch, rawCard) || promoNumberMatches(rawCard, rawSearch)) return true;
 
@@ -3711,8 +3719,11 @@ function scoreBlueprintForCard(card, bp) {
       if (!isPokemonPromoSet(card)) return 0;
       score += 4;
     } else if (bpNum !== rawNum) {
-      if (promoNumberMatches(rawNum, bpNum)) score += 22;
-      else return 0;
+      if (promoNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(bpNum, rawNum)) {
+        score += 22;
+      } else return 0;
     } else {
       score += 30;
     }
@@ -5219,7 +5230,11 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
       }
       if (!card && rawNum) {
         const bpNum = ctBpNumber(bp);
-        if (bpNum && bpNum !== rawNum && !promoNumberMatches(rawNum, bpNum)) continue;
+        if (bpNum
+          && bpNum !== rawNum
+          && !promoNumberMatches(rawNum, bpNum)
+          && !cardNumberMatches(rawNum, bpNum)
+          && !cardNumberMatches(bpNum, rawNum)) continue;
       }
       hits.push({ bp, score: score || 1, expansion: exp });
       if (hits.length >= 12) break;
@@ -7564,7 +7579,7 @@ function renderResult() {
           ${(card.types||[]).length ? `<span class="pill pill-type">${card.types.join(' · ')}</span>` : ''}
           <span class="pill pill-set">Condizione: ${QUALITY[selectedQuality]?.label || selectedQuality}</span>
         </div>
-        <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px; margin: 10px 0 8px;">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px auto; margin: 10px 0 8px;">
           <div class="field">
             <label for="cardLanguage">Lingua</label>
             <select id="cardLanguage">
@@ -7600,6 +7615,12 @@ function renderResult() {
           <div class="field">
             <label for="cardQty">Qtà</label>
             <input id="cardQty" type="number" min="1" max="99" value="${qty}" placeholder="1">
+          </div>
+          <div class="field">
+            <label for="addBtnQuick">&nbsp;</label>
+            <button type="button" class="btn btn-success" id="addBtnQuick" style="min-height:44px;padding:10px 14px;white-space:nowrap;">
+              ${isEditMode ? '💾 Salva' : '＋ Aggiungi'}
+            </button>
           </div>
         </div>
         <div class="price-box">
@@ -7649,6 +7670,7 @@ function renderResult() {
   `;
 
   $('addBtn').addEventListener('click', addToCollection);
+  $('addBtnQuick')?.addEventListener('click', addToCollection);
   $('condSelect')?.addEventListener('change', e => {
     selectedQuality = e.target.value;
     selectedCtListing = null;
