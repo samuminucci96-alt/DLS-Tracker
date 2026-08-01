@@ -133,6 +133,33 @@
       max-width: 100%;
     }
 
+    /* iOS Safari: durante la digitazione riduce repaint pesanti che fanno "ballare" il cursore. */
+    html.ios-input-stable {
+      scroll-behavior: auto;
+    }
+    html.ios-input-stable .card,
+    html.ios-input-stable header,
+    html.ios-input-stable .auth-modal,
+    html.ios-input-stable .profile-modal,
+    html.ios-input-stable .install-banner,
+    html.ios-input-stable .suggestions,
+    html.ios-input-stable .ct-market-overlay {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    html.ios-input-stable .btn,
+    html.ios-input-stable .btn-primary,
+    html.ios-input-stable .choice-card,
+    html.ios-input-stable .sugg-item,
+    html.ios-input-stable tbody tr,
+    html.ios-input-stable .app-shell,
+    html.ios-input-stable header,
+    html.ios-input-stable .main-grid > .panel:first-child,
+    html.ios-input-stable .main-grid > .panel:last-child {
+      animation: none !important;
+      transition: none !important;
+    }
+
     .app-shell {
       width: 100%;
       max-width: 1440px;
@@ -679,6 +706,22 @@
       border-color: var(--accent);
       color: var(--accent);
       font-weight: 700;
+    }
+
+    .collection-sort-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .collection-sort-select {
+      min-width: 210px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      border-radius: 10px;
     }
 
     .search-mode-toggle {
@@ -1274,6 +1317,31 @@
     }
     .grand-game-row small { font-size: 0.68rem; }
 
+    html[data-theme="dark"] .collection-grand {
+      background: linear-gradient(140deg, rgba(29, 49, 79, 0.78), rgba(78, 60, 28, 0.38));
+      border-color: rgba(139, 178, 243, 0.38);
+      box-shadow: inset 0 1px 0 rgba(223, 235, 255, 0.08);
+    }
+    html[data-theme="dark"] .collection-grand-label,
+    html[data-theme="dark"] .collection-grand-meta {
+      color: #cfddf5;
+    }
+    html[data-theme="dark"] .collection-grand-val {
+      color: #b8d1ff;
+      text-shadow: 0 1px 0 rgba(10, 20, 35, 0.7);
+    }
+    html[data-theme="dark"] .grand-game-row {
+      background: rgba(9, 18, 32, 0.74);
+      border: 1px solid rgba(145, 181, 242, 0.26);
+      color: #cfddf5;
+    }
+    html[data-theme="dark"] .grand-game-row strong {
+      color: #f3f7ff;
+    }
+    html[data-theme="dark"] .grand-game-row small {
+      color: #d7e3f8;
+    }
+
     .stat-box {
       padding: 11px 13px;
       background: var(--surface-2);
@@ -1283,6 +1351,16 @@
     }
     .stat-val { font-size: 1.25rem; font-weight: 700; }
     .stat-lbl { font-size: 0.72rem; color: var(--text-muted); margin-top: 1px; }
+    html[data-theme="dark"] .stat-box {
+      background: rgba(13, 25, 43, 0.9);
+      border-color: rgba(145, 181, 242, 0.3);
+    }
+    html[data-theme="dark"] .stat-val {
+      color: #edf3ff;
+    }
+    html[data-theme="dark"] .stat-lbl {
+      color: #d2e0f7;
+    }
 
     .table-wrap {
       overflow-x: auto;
@@ -1327,6 +1405,27 @@
     tr.coll-row-open { cursor: pointer; }
     tr.coll-row-open:hover td { background: var(--surface-2); }
     tr.coll-row-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .coll-group-row td {
+      padding: 8px 10px;
+      background: color-mix(in srgb, var(--accent-dim) 70%, var(--surface-2));
+      border-top: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: 0.02em;
+    }
+    .coll-group-row td > div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .coll-group-row small {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
     tr.coll-row-editing td {
       background: rgba(245, 158, 11, 0.14) !important;
       box-shadow: inset 0 1px 0 rgba(180, 83, 9, 0.22), inset 0 -1px 0 rgba(180, 83, 9, 0.22);
@@ -2769,6 +2868,14 @@
 
       .price-refresh-row { flex-direction: column; align-items: stretch; }
       .price-refresh-row .btn { width: 100%; }
+      .collection-sort-wrap {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .collection-sort-select {
+        min-width: 0;
+        width: 100%;
+      }
     }
 
     @media (max-width: 380px) {
@@ -3276,6 +3383,15 @@
         <div class="price-refresh-row" id="priceRefreshRow" style="display:none">
           <div class="price-status" id="priceStatus">—</div>
           <div class="price-refresh-actions">
+            <label class="collection-sort-wrap" for="collectionSortSelect">
+              Ordina
+              <select id="collectionSortSelect" class="collection-sort-select" aria-label="Ordinamento collezione">
+                <option value="value_desc">Valore: più alto</option>
+                <option value="value_asc">Valore: più basso</option>
+                <option value="name_az">Nome carta: A-Z</option>
+                <option value="set_group">SET</option>
+              </select>
+            </label>
             <button class="btn btn-outline collection-filter-btn" id="collectionGradedFilterBtn" aria-pressed="false">Solo gradate</button>
             <button class="btn btn-outline" id="refreshPricesBtn" style="padding:6px 12px;font-size:0.78rem;">
               🔄 Aggiorna prezzi
@@ -3785,7 +3901,35 @@ let pokemonGradeScore = 10;
 const POKEMON_SEARCH_MODE_STORAGE_KEY = 'dls_pokemon_search_mode';
 let pokemonQuickSearchMode = false;
 const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only';
+const COLLECTION_SORT_STORAGE_KEY = 'dls_collection_sort_mode';
 let collectionOnlyGraded = false;
+let collectionSortMode = 'value_desc';
+
+function normalizeCollectionSortMode(v) {
+  const mode = String(v || '').trim();
+  if (mode === 'value_desc' || mode === 'value_asc' || mode === 'name_az' || mode === 'set_group') return mode;
+  return 'value_desc';
+}
+
+function updateCollectionSortControl() {
+  const sel = $('collectionSortSelect');
+  if (!sel) return;
+  const mode = normalizeCollectionSortMode(collectionSortMode);
+  if (sel.value !== mode) sel.value = mode;
+}
+
+function bindCollectionSortControl() {
+  const sel = $('collectionSortSelect');
+  if (!sel || sel.dataset.bound === '1') return;
+  sel.dataset.bound = '1';
+  sel.addEventListener('change', () => {
+    collectionSortMode = normalizeCollectionSortMode(sel.value);
+    try {
+      localStorage.setItem(COLLECTION_SORT_STORAGE_KEY, collectionSortMode);
+    } catch {}
+    renderCollection();
+  });
+}
 
 function updateCollectionGradeFilterButton() {
   const btn = $('collectionGradedFilterBtn');
@@ -3807,6 +3951,142 @@ function bindCollectionGradeFilterToggle() {
     updateCollectionGradeFilterButton();
     renderCollection();
   });
+}
+
+function collectionSetLabel(item) {
+  return String(item?.set || item?.setName || item?.setId || 'Senza set').trim() || 'Senza set';
+}
+
+function collectionNameLabel(item) {
+  return String(item?.name || '').trim();
+}
+
+function collectionPriceValue(item) {
+  const n = Number(item?.price);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function compareCollectionNameThenSet(a, b) {
+  const nameCmp = collectionNameLabel(a.item).localeCompare(collectionNameLabel(b.item), 'it', { sensitivity: 'base', numeric: true });
+  if (nameCmp) return nameCmp;
+  const setCmp = collectionSetLabel(a.item).localeCompare(collectionSetLabel(b.item), 'it', { sensitivity: 'base', numeric: true });
+  if (setCmp) return setCmp;
+  return a.idx - b.idx;
+}
+
+function sortCollectionEntries(entries) {
+  const out = [...entries];
+  const mode = normalizeCollectionSortMode(collectionSortMode);
+
+  if (mode === 'name_az') {
+    out.sort(compareCollectionNameThenSet);
+    return out;
+  }
+
+  if (mode === 'set_group') {
+    out.sort((a, b) => {
+      const setCmp = collectionSetLabel(a.item).localeCompare(collectionSetLabel(b.item), 'it', { sensitivity: 'base', numeric: true });
+      if (setCmp) return setCmp;
+      return compareCollectionNameThenSet(a, b);
+    });
+    return out;
+  }
+
+  if (mode === 'value_asc' || mode === 'value_desc') {
+    out.sort((a, b) => {
+      const diff = collectionPriceValue(a.item) - collectionPriceValue(b.item);
+      if (diff) return mode === 'value_asc' ? diff : -diff;
+      return compareCollectionNameThenSet(a, b);
+    });
+    return out;
+  }
+
+  return out;
+}
+
+function renderCollectionRowHtml({ item, idx }) {
+  ensureItemPriceTracking(item);
+  const ctPriceVal = item.ctPrice != null ? fmt(item.ctPrice) : (item.price ? fmt(item.price) : '—');
+  const modeMeta = priceModeMeta(item);
+  const ctClass = item.manualPrice || item.priceMode === 'manual'
+    ? 'ct-price-cell manual'
+    : item.ctPrice != null
+      ? 'ct-price-cell updated'
+      : 'ct-price-cell';
+  const lastUpd = item.lastPriceUpdate
+    ? new Date(item.lastPriceUpdate?.toDate?.() || item.lastPriceUpdate).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const imgRaw = item.img || item.imgUrl;
+  const img = imgRaw ? ctResolveStoredImage(imgRaw) : '';
+  const isEditingRow = item._id && item._id === collectionEditEntryId;
+
+  return `
+    <tr class="coll-row-open${isEditingRow ? ' coll-row-editing' : ''}" data-open-idx="${idx}" tabindex="0" title="${isEditingRow ? 'Carta in modifica' : 'Apri nella ricerca'}">
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
+          <div>
+            <div style="font-weight:600;">${item.name}${item.firstEdition === true ? ' <span style="color:var(--accent);font-size:0.72rem;">1ª</span>' : ''}</div>
+            <div style="font-size:0.73rem;color:var(--text-muted);">${
+              item.game === 'sealed'
+                ? (SEALED_TYPE_LABELS[item.sealedType] || 'Sealed')
+                : `#${item.number || '—'}`
+            }</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
+      <td>
+        <div class="collection-cond-wrap">
+          <span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>
+          ${item.graded
+            ? `<span class="collection-graded-label">GRADATA${formatGradeScore(item.gradeScore) ? ` · VOTO ${formatGradeScore(item.gradeScore)}` : ''}</span>`
+            : ''}
+        </div>
+      </td>
+      <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
+      <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
+        ${ctPriceVal}
+        <div class="price-origin-tag ${modeMeta.key}">${modeMeta.label}</div>
+        ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
+      </td>
+      <td class="td-actions">
+        <button type="button" class="btn btn-outline" data-manual-edit-idx="${idx}" title="Modifica prezzo manuale" style="padding:6px 8px;font-size:0.74rem;">€</button>
+        <button type="button" class="btn btn-outline" data-manual-reset-idx="${idx}" title="Reset prezzo manuale e ripristina mercato" style="padding:6px 8px;font-size:0.74rem;">↺</button>
+        <button type="button" class="btn btn-ghost-danger" data-remove-idx="${idx}" title="Rimuovi">✕</button>
+      </td>
+    </tr>`;
+}
+
+function renderCollectionGroupedBySetHtml(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const setLabel = collectionSetLabel(entry.item);
+    if (!groups.has(setLabel)) groups.set(setLabel, []);
+    groups.get(setLabel).push(entry);
+  }
+
+  const groupNames = [...groups.keys()].sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base', numeric: true }));
+  const html = [];
+
+  for (const groupName of groupNames) {
+    const rows = groups.get(groupName) || [];
+    rows.sort(compareCollectionNameThenSet);
+    const total = rows.reduce((sum, { item }) => sum + collectionPriceValue(item), 0);
+    const count = rows.length;
+    html.push(`
+      <tr class="coll-group-row">
+        <td colspan="6">
+          <div>
+            <span>${escHtml(groupName)}</span>
+            <small>${count} cart${count === 1 ? 'a' : 'e'} · ${fmt(total)}</small>
+          </div>
+        </td>
+      </tr>`);
+    html.push(rows.map(renderCollectionRowHtml).join(''));
+  }
+
+  return html.join('');
 }
 
 function normalizeGradeScore(v) {
@@ -9792,9 +10072,10 @@ function renderCollection() {
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => (item.game || 'pokemon') === activeGame);
 
-  const visible = collectionOnlyGraded
+  const visibleBase = collectionOnlyGraded
     ? gameItems.filter(({ item }) => !!item.graded)
     : gameItems;
+  const visible = sortCollectionEntries(visibleBase);
 
   const total = visible.reduce((s, { item }) => s + (Number(item.price) || 0), 0);
   const avg   = visible.length ? total / visible.length : 0;
@@ -9813,6 +10094,7 @@ function renderCollection() {
   if (exportCsvBtn) exportCsvBtn.disabled = !hasItems;
   if (clearBtn) clearBtn.disabled = !hasGameItems;
   updateCollectionGradeFilterButton();
+  updateCollectionSortControl();
 
   const collBody = $('collBody');
   const priceRefreshRow = $('priceRefreshRow');
@@ -9834,58 +10116,9 @@ function renderCollection() {
     return;
   }
 
-  collBody.innerHTML = visible.map(({ item, idx }) => {
-    ensureItemPriceTracking(item);
-    const ctPriceVal = item.ctPrice != null ? fmt(item.ctPrice) : (item.price ? fmt(item.price) : '—');
-    const modeMeta = priceModeMeta(item);
-    const ctClass    = item.manualPrice || item.priceMode === 'manual'
-      ? 'ct-price-cell manual'
-      : item.ctPrice != null
-        ? 'ct-price-cell updated'
-        : 'ct-price-cell';
-    const lastUpd    = item.lastPriceUpdate
-      ? new Date(item.lastPriceUpdate?.toDate?.() || item.lastPriceUpdate).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
-      : null;
-    const imgRaw = item.img || item.imgUrl;
-    const img = imgRaw ? ctResolveStoredImage(imgRaw) : '';
-    const isEditingRow = item._id && item._id === collectionEditEntryId;
-    return `
-    <tr class="coll-row-open${isEditingRow ? ' coll-row-editing' : ''}" data-open-idx="${idx}" tabindex="0" title="${isEditingRow ? 'Carta in modifica' : 'Apri nella ricerca'}">
-      <td>
-        <div style="display:flex;align-items:center;gap:8px;">
-          ${img ? `<img src="${img}" style="width:26px;height:36px;object-fit:cover;border-radius:4px;background:var(--surface-3);flex-shrink:0;" loading="lazy">` : ''}
-          <div>
-            <div style="font-weight:600;">${item.name}${item.firstEdition === true ? ' <span style="color:var(--accent);font-size:0.72rem;">1ª</span>' : ''}</div>
-            <div style="font-size:0.73rem;color:var(--text-muted);">${
-              item.game === 'sealed'
-                ? (SEALED_TYPE_LABELS[item.sealedType] || 'Sealed')
-                : `#${item.number || '—'}`
-            }</div>
-          </div>
-        </div>
-      </td>
-      <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
-      <td>
-        <div class="collection-cond-wrap">
-          <span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>
-          ${item.graded
-            ? `<span class="collection-graded-label">GRADATA${formatGradeScore(item.gradeScore) ? ` · VOTO ${formatGradeScore(item.gradeScore)}` : ''}</span>`
-            : ''}
-        </div>
-      </td>
-      <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
-      <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
-        ${ctPriceVal}
-        <div class="price-origin-tag ${modeMeta.key}">${modeMeta.label}</div>
-        ${lastUpd ? `<div style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">${lastUpd}</div>` : ''}
-      </td>
-      <td class="td-actions">
-        <button type="button" class="btn btn-outline" data-manual-edit-idx="${idx}" title="Modifica prezzo manuale" style="padding:6px 8px;font-size:0.74rem;">€</button>
-        <button type="button" class="btn btn-outline" data-manual-reset-idx="${idx}" title="Reset prezzo manuale e ripristina mercato" style="padding:6px 8px;font-size:0.74rem;">↺</button>
-        <button type="button" class="btn btn-ghost-danger" data-remove-idx="${idx}" title="Rimuovi">✕</button>
-      </td>
-    </tr>`;
-  }).join('');
+  collBody.innerHTML = normalizeCollectionSortMode(collectionSortMode) === 'set_group'
+    ? renderCollectionGroupedBySetHtml(visible)
+    : visible.map(renderCollectionRowHtml).join('');
 
   // Mostra/nascondi riga aggiorna prezzi
   if (priceRefreshRow) priceRefreshRow.style.display = 'flex';
@@ -10024,7 +10257,11 @@ function initApp() {
   try {
     collectionOnlyGraded = localStorage.getItem(COLLECTION_GRADED_FILTER_STORAGE_KEY) === '1';
   } catch {}
+  try {
+    collectionSortMode = normalizeCollectionSortMode(localStorage.getItem(COLLECTION_SORT_STORAGE_KEY) || 'value_desc');
+  } catch {}
   updateCollectionGradeFilterButton();
+  updateCollectionSortControl();
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
@@ -10044,6 +10281,7 @@ function initApp() {
 
 bindCollectionActions();
 bindCollectionGradeFilterToggle();
+bindCollectionSortControl();
 
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
@@ -11450,11 +11688,17 @@ window.addEventListener('load', () => {
   }
   document.addEventListener('focusin', e => {
     if (!e.target.matches('input, select, textarea')) return;
+    if (isIosDevice()) {
+      document.documentElement.classList.add('ios-input-stable');
+    }
     document.getElementById('installBanner')?.classList.add('keyboard-open');
   });
   document.addEventListener('focusout', () => {
     setTimeout(() => {
       if (document.activeElement?.matches('input, select, textarea')) return;
+      if (isIosDevice()) {
+        document.documentElement.classList.remove('ios-input-stable');
+      }
       document.getElementById('installBanner')?.classList.remove('keyboard-open');
     }, 120);
   });
@@ -11478,19 +11722,21 @@ try {
 } catch (err) {
   console.error('[DLS] initApp fallita:', err);
   try { alert('🚨 Init fallita:\n' + (err?.message || err)); } catch (_) {}
-  try { resetModalLocks(); bindGameTabs(); bindThemeToggle(); bindPokemonSearchModeToggle(); bindAccountButton(); bindCollectionGradeFilterToggle(); } catch (_) {}
+  try { resetModalLocks(); bindGameTabs(); bindThemeToggle(); bindPokemonSearchModeToggle(); bindAccountButton(); bindCollectionGradeFilterToggle(); bindCollectionSortControl(); } catch (_) {}
 }
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
 
 // PWA: sblocca overlay bloccati dopo resume / back-forward cache
 window.addEventListener('pageshow', () => {
+  document.documentElement.classList.remove('ios-input-stable');
   resetModalLocks();
   if (isStandaloneApp()) syncInstalledState();
   updateInstallUi();
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  document.documentElement.classList.remove('ios-input-stable');
   resetModalLocks();
   if (isStandaloneApp()) syncInstalledState();
 });

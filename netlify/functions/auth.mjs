@@ -143,6 +143,7 @@ export default async (req) => {
       if (!found) {
         return new Response(JSON.stringify({ error: "Nessun account trovato con questa email." }), { status: 404, headers: cors });
       }
+
       const recoveryCode = String(randomInt(0, 10000)).padStart(4, "0");
       const recoverySalt = randomBytes(16).toString("hex");
       const recoveryHash = await hashPass(recoveryCode, recoverySalt);
@@ -158,7 +159,35 @@ export default async (req) => {
       } else {
         await store.setJSON(found.normalized, next);
       }
-      await sendRecoveryCodeEmail(found.normalized, recoveryCode);
+
+      try {
+        await sendRecoveryCodeEmail(found.normalized, recoveryCode);
+      } catch (mailErr) {
+        // Evita di lasciare un codice salvato se la mail non e' stata inviata.
+        const rollback = clearRecoveryFields({
+          ...next,
+          updatedAt: new Date().toISOString(),
+        });
+        try {
+          if (found.key !== found.normalized) {
+            await saveUserRecord(store, found.normalized, rollback, found.key);
+          } else {
+            await store.setJSON(found.normalized, rollback);
+          }
+        } catch (rollbackErr) {
+          console.error("Recovery rollback error:", rollbackErr);
+        }
+
+        const details = String(mailErr?.message || "");
+        const isConfigError = /RESEND_API_KEY|non configurato/i.test(details);
+        console.error("Recovery email send error:", mailErr);
+        return new Response(JSON.stringify({
+          error: isConfigError
+            ? "Recupero password non disponibile: servizio email non configurato. Contatta supporto."
+            : "Impossibile inviare il codice di recupero in questo momento. Riprova tra poco.",
+        }), { status: isConfigError ? 503 : 502, headers: cors });
+      }
+
       return new Response(JSON.stringify({
         email: found.normalized,
         expiresInMinutes: 15,
