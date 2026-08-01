@@ -1101,6 +1101,19 @@
       font-size: 0.78rem;
       cursor: pointer;
     }
+    .collection-cond-wrap {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+    }
+    .collection-graded-label {
+      font-size: 0.69rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.01em;
+      line-height: 1;
+    }
 
     /* ─── Collection table ───────────────────────────────────────── */
     .stats-row {
@@ -2809,8 +2822,8 @@
           <button type="button" class="btn btn-primary" id="searchBtn">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
-          <button type="button" class="btn btn-outline" id="stopSearchBtn" style="width:100%;margin-top:8px;">
-            ⏹️ &nbsp;Stop ricerca
+          <button type="button" class="btn btn-outline" id="resetSearchBtn" style="width:100%;margin-top:8px;">
+            ↺ &nbsp;Reset campi
           </button>
           <div id="searchProgressBar"></div>
         </div>
@@ -2845,29 +2858,6 @@
             <input type="hidden" id="slCardSetCtId" value="">
             <div id="slSetSuggestions" class="suggestions" hidden></div>
           </div>
-          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px;">
-            <div class="field">
-              <label for="slLang">Lingua</label>
-              <select id="slLang">
-                <option value="" selected>Qualsiasi</option>
-                <option value="en">🇬🇧 Inglese</option>
-                <option value="it">🇮🇹 Italiano</option>
-                <option value="ja">🇯🇵 Giapponese</option>
-                <option value="fr">🇫🇷 Francese</option>
-                <option value="de">🇩🇪 Tedesco</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="slCondSearch">Condizione</label>
-              <select id="slCondSearch">
-                <option value="NM">NM — Sealed / Near Mint</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="slQty">Qtà</label>
-              <input id="slQty" type="number" min="1" max="99" value="1">
-            </div>
-          </div>
           <button type="button" class="btn btn-primary" id="slSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('sealed')">
             <span id="slSearchBtnInner">🔍 &nbsp;Cerca Sealed</span>
           </button>
@@ -2897,32 +2887,6 @@
             <input type="hidden" id="opCardSetCtId" value="">
             <div id="opSetSuggestions" class="suggestions" hidden></div>
           </div>
-          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px;">
-            <div class="field">
-              <label for="opLang">Lingua</label>
-              <select id="opLang">
-                <option value="" selected>Qualsiasi</option>
-                <option value="en">🇬🇧 Inglese</option>
-                <option value="ja">🇯🇵 Giapponese</option>
-                <option value="zh">🇨🇳 Cinese (Semplificato)</option>
-                <option value="ko">🇰🇷 Coreano</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="opCondSearch">Condizione</label>
-              <select id="opCondSearch">
-                <option value="NM">NM — Mint</option>
-                <option value="EX">EX — Slightly Played</option>
-                <option value="GOOD">GOOD — Moderately Played</option>
-                <option value="PLAYED">PLAYED — Played</option>
-                <option value="POOR">POOR — Poor</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="opQty">Quantità</label>
-              <input id="opQty" type="number" min="1" max="99" value="1">
-            </div>
-          </div>
           <button type="button" class="btn btn-primary" id="opSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('onepiece')">
             <span id="opSearchBtnInner">🔍 &nbsp;Cerca Carta OP</span>
           </button>
@@ -2951,31 +2915,6 @@
             <input type="hidden" id="rbCardSetId" value="">
             <input type="hidden" id="rbCardSetCtId" value="">
             <div id="rbSetSuggestions" class="suggestions" hidden></div>
-          </div>
-          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px;">
-            <div class="field">
-              <label for="rbLang">Lingua</label>
-              <select id="rbLang">
-                <option value="" selected>Qualsiasi</option>
-                <option value="en">🇬🇧 Inglese</option>
-                <option value="fr">🇫🇷 Francese</option>
-                <option value="zh">🇨🇳 Cinese</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="rbCondSearch">Condizione</label>
-              <select id="rbCondSearch">
-                <option value="NM">NM — Mint</option>
-                <option value="EX">EX — Slightly Played</option>
-                <option value="GOOD">GOOD — Moderately Played</option>
-                <option value="PLAYED">PLAYED — Played</option>
-                <option value="POOR">POOR — Poor</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="rbQty">Quantità</label>
-              <input id="rbQty" type="number" min="1" max="99" value="1">
-            </div>
           </div>
           <button type="button" class="btn btn-primary" id="rbSearchBtn" style="width:100%;margin-top:4px" onclick="tcgDoSearch('riftbound')">
             <span id="rbSearchBtnInner">🔍 &nbsp;Cerca Carta Riftbound</span>
@@ -3495,6 +3434,7 @@ let collection      = [];
 let activeGame      = 'pokemon';
 let dlsUser         = null;
 let searchCtrl      = null;   // AbortController for main search
+let pokemonSearchInFlight = false;
 let searchGen       = 0;
 let searchLangFilter = '';
 let searchEditionFilter = '';
@@ -3516,15 +3456,27 @@ let pokemonGraded = false;
 let pokemonGradeScore = 10;
 
 function normalizeGradeScore(v) {
-  const n = parseInt(v, 10);
+  const raw = String(v ?? '').trim().replace(',', '.');
+  const n = Number(raw);
   if (!Number.isFinite(n) || n < 1 || n > 10) return null;
-  return n;
+  const rounded = Math.round(n * 2) / 2;
+  if (Math.abs(n - rounded) > 1e-9) return null;
+  return rounded;
+}
+
+function formatGradeScore(v) {
+  const n = normalizeGradeScore(v);
+  if (n == null) return '';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function gradeScoreOptionsHtml(selected) {
   const sel = normalizeGradeScore(selected) || 10;
-  return Array.from({ length: 10 }, (_, i) => i + 1)
-    .map(n => `<option value="${n}"${n === sel ? ' selected' : ''}>${n}</option>`)
+  return Array.from({ length: 19 }, (_, i) => 1 + (i * 0.5))
+    .map(n => {
+      const value = Number.isInteger(n) ? String(n) : n.toFixed(1);
+      return `<option value="${value}"${n === sel ? ' selected' : ''}>${value}</option>`;
+    })
     .join('');
 }
 
@@ -3551,8 +3503,8 @@ function gradedLabel(graded, score) {
 
 function gradedBadgeHtml(item) {
   if (!item?.graded) return '';
-  const n = normalizeGradeScore(item.gradeScore);
-  return `<span class="graded-badge">GRAD${n != null ? ` ${n}` : ''}</span>`;
+  const score = formatGradeScore(item.gradeScore);
+  return `<span class="graded-badge">GRAD${score ? ` ${score}` : ''}</span>`;
 }
 const suggCache     = new Map();
 const pokemonQueryCache = new Map();
@@ -4362,9 +4314,10 @@ function setSearchLoading(on) {
   const inner = $('searchBtnInner');
   const bar = $('searchProgressBar');
   if (!btn || !inner) return;
-  btn.disabled = on;
+  pokemonSearchInFlight = !!on;
+  btn.disabled = false;
   if (on) {
-    inner.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .65s linear infinite;flex-shrink:0;"></span>Ricerca in corso…</span>`;
+    inner.innerHTML = '⏹️ &nbsp;Stop ricerca';
     bar?.classList.add('active');
   } else {
     inner.innerHTML = '🔍 &nbsp;Cerca Carta';
@@ -4372,13 +4325,39 @@ function setSearchLoading(on) {
   }
 }
 
-function stopPokemonSearch() {
+function stopPokemonSearch(silent = false) {
   if (!searchCtrl) return;
   searchCtrl.abort();
   searchCtrl = null;
   searchGen++;
   setSearchLoading(false);
-  showMsg('Ricerca interrotta.', 'info');
+  if (!silent) showMsg('Ricerca interrotta.', 'info');
+}
+
+function resetPokemonSearchFields() {
+  if (searchCtrl) stopPokemonSearch(true);
+  clearTimeout(setSuggTimer);
+  if ($('pokemonName')) $('pokemonName').value = '';
+  if ($('cardNumber')) $('cardNumber').value = '';
+  if ($('cardSet')) $('cardSet').value = '';
+  if ($('cardSetId')) $('cardSetId').value = '';
+  selectedCard = null;
+  selectedCtListing = null;
+  ctPriceData = null;
+  manualPokemonPrice = null;
+  manualPokemonPriceRaw = '';
+  pokemonSelectedQty = 1;
+  pokemonGraded = false;
+  pokemonGradeScore = 10;
+  searchLangFilter = '';
+  searchEditionFilter = '';
+  maybeSeedCards = [];
+  choicePriceCache.clear();
+  if ($('resultCard')) $('resultCard').hidden = true;
+  if ($('choicesCard')) $('choicesCard').hidden = true;
+  hideAllSuggestions();
+  showMsg('', 'info');
+  $('pokemonName')?.focus();
 }
 
 function resolveApiBaseUrl() {
@@ -6415,8 +6394,14 @@ function searchLocal(name, number, set, lang) {
 }
 
 // ── Main search ───────────────────────────────────────────────────────
-document.getElementById('searchBtn')?.addEventListener('click', doSearch);
-document.getElementById('stopSearchBtn')?.addEventListener('click', stopPokemonSearch);
+document.getElementById('searchBtn')?.addEventListener('click', () => {
+  if (pokemonSearchInFlight) {
+    stopPokemonSearch();
+    return;
+  }
+  doSearch();
+});
+document.getElementById('resetSearchBtn')?.addEventListener('click', resetPokemonSearchFields);
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
@@ -7192,8 +7177,16 @@ function fillTcgSearchFromItem(gameKey, item) {
     $(cfg.typeField).value = item.sealedType || '';
   }
   const lang = item.lang || item.language || '';
-  if ($(cfg.langField)) $(cfg.langField).value = lang === 'Any' || lang === 'any' ? '' : lang;
-  if ($(cfg.condField)) $(cfg.condField).value = item.quality || item.condition || 'NM';
+  const normalizedLang = lang === 'Any' || lang === 'any' ? '' : lang;
+  const normalizedQuality = item.quality || item.condition || 'NM';
+  if (tcgUsesInlineFilters(gameKey)) {
+    ctTcgState[gameKey].selectedLang = normalizedLang;
+    ctTcgState[gameKey].selectedQuality = normalizedQuality;
+    ctTcgState[gameKey].selectedQty = 1;
+  } else {
+    if ($(cfg.langField)) $(cfg.langField).value = normalizedLang;
+    if ($(cfg.condField)) $(cfg.condField).value = normalizedQuality;
+  }
   if (ctTcgState[gameKey]) {
     ctTcgState[gameKey].graded = !!item.graded;
     ctTcgState[gameKey].gradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
@@ -7254,12 +7247,17 @@ async function openCollectionItem(idx) {
     : game === 'sealed' ? 'sealed'
     : null;
   if (!gameKey) return;
+  const cfg = CT_TCG_CONFIG[gameKey];
   const bp = bpFromCollectionItem(item);
   if (!bp.id) {
     tcgShowMsg(gameKey, 'Impossibile aprire la carta: ID CardTrader mancante.', 'warn');
     return;
   }
-  if ($(cfg.qtyField)) $(cfg.qtyField).value = '1';
+  if (tcgUsesInlineFilters(gameKey)) {
+    ctTcgState[gameKey].selectedQty = 1;
+  } else if ($(cfg.qtyField)) {
+    $(cfg.qtyField).value = '1';
+  }
   fillTcgSearchFromItem(gameKey, item);
   await tcgSelectCard(gameKey, bp);
   if (item.manualPrice || item.priceMode === 'manual') {
@@ -7785,10 +7783,41 @@ const CT_TCG_CONFIG = {
 };
 
 const ctTcgState = {
-  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
-  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
-  sealed: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10 },
+  onepiece: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10, selectedLang: '', selectedQuality: 'NM', selectedQty: 1 },
+  riftbound: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10, selectedLang: '', selectedQuality: 'NM', selectedQty: 1 },
+  sealed: { selected: null, prices: null, choices: [], suggTimer: null, suggGen: 0, searchGen: 0, selectedListing: null, marketMenuOpen: false, manualPrice: null, manualPriceRaw: '', graded: false, gradeScore: 10, selectedLang: '', selectedQuality: 'NM', selectedQty: 1 },
 };
+
+function tcgUsesInlineFilters(gameKey) {
+  return gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed';
+}
+
+function tcgGetLang(gameKey) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return '';
+  if (tcgUsesInlineFilters(gameKey)) {
+    return ctTcgState[gameKey]?.selectedLang || '';
+  }
+  return $(cfg.langField)?.value?.trim() || '';
+}
+
+function tcgGetQuality(gameKey) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return 'NM';
+  if (tcgUsesInlineFilters(gameKey)) {
+    return ctTcgState[gameKey]?.selectedQuality || 'NM';
+  }
+  return $(cfg.condField)?.value || 'NM';
+}
+
+function tcgGetQty(gameKey) {
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return 1;
+  if (tcgUsesInlineFilters(gameKey)) {
+    return Math.max(1, Math.min(99, parseInt(ctTcgState[gameKey]?.selectedQty, 10) || 1));
+  }
+  return Math.max(1, Math.min(99, parseInt($(cfg.qtyField)?.value, 10) || 1));
+}
 
 function tcgManualPriceUnit(gameKey) {
   const state = ctTcgState[gameKey];
@@ -8293,6 +8322,7 @@ async function tcgDoSearch(gameKey) {
   ctTcgState[gameKey].manualPriceRaw = '';
   ctTcgState[gameKey].graded = false;
   ctTcgState[gameKey].gradeScore = 10;
+  if (tcgUsesInlineFilters(gameKey)) ctTcgState[gameKey].selectedQty = 1;
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
 
   try {
@@ -8343,7 +8373,7 @@ function tcgShowChoices(gameKey, bps) {
   $(`${cfg.prefix}ChoicesCount`).textContent = `${bps.length} risultati`;
   $(`${cfg.prefix}ChoicesList`).innerHTML = bps.map((bp, i) => {
     const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
-    const lang = $(cfg.langField)?.value?.trim() || '';
+    const lang = tcgGetLang(gameKey);
     const catPrice = (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed')
       ? tcgCatalogPriceForLang(bp, lang)
       : (bp._catalogPriceNm ?? bp._catalogPriceMin);
@@ -8374,9 +8404,10 @@ window.tcgPickChoice = function(gameKey, index) {
   tcgSelectCard(gameKey, bp);
 };
 
-async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].searchGen) {
+async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].searchGen, opts = {}) {
   const cfg = CT_TCG_CONFIG[gameKey];
   bp.imgUrl = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
+  const preservePrefs = !!opts.preservePrefs;
   clearTimeout(ctTcgState[gameKey].suggTimer);
   ctTcgState[gameKey].suggGen++;
   $(`${cfg.prefix}NameSuggestions`).hidden = true;
@@ -8388,12 +8419,15 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   ctTcgState[gameKey].prices = null;
   ctTcgState[gameKey].selectedListing = null;
   ctTcgState[gameKey].marketMenuOpen = false;
-  ctTcgState[gameKey].manualPrice = null;
-  ctTcgState[gameKey].manualPriceRaw = '';
-  ctTcgState[gameKey].graded = false;
-  ctTcgState[gameKey].gradeScore = 10;
+  if (!preservePrefs) {
+    ctTcgState[gameKey].manualPrice = null;
+    ctTcgState[gameKey].manualPriceRaw = '';
+    ctTcgState[gameKey].graded = false;
+    ctTcgState[gameKey].gradeScore = 10;
+    if (tcgUsesInlineFilters(gameKey)) ctTcgState[gameKey].selectedQty = 1;
+  }
 
-  const lang = $(cfg.langField)?.value?.trim() || '';
+  const lang = tcgGetLang(gameKey);
   const catalogUnit = (gameKey === 'onepiece' || gameKey === 'riftbound' || gameKey === 'sealed')
     ? tcgCatalogPriceForLang(bp, lang)
     : (bp._catalogPriceNm ?? bp._catalogPriceMin);
@@ -8421,7 +8455,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
   }
 
   try {
-    const lang = $(cfg.langField)?.value?.trim() || '';
+    const lang = tcgGetLang(gameKey);
     let data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     let listings = Object.values(data || {}).flat().filter(l => l && typeof l === 'object' && (l.price_cents != null || l.price));
@@ -8523,7 +8557,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
 
 function getTcgUnitPrice(gameKey) {
   const cfg = CT_TCG_CONFIG[gameKey];
-  const qKey = $(cfg.condField)?.value || 'NM';
+  const qKey = tcgGetQuality(gameKey);
   const prices = ctTcgState[gameKey].prices;
   const manualUnit = tcgManualPriceUnit(gameKey);
   if (manualUnit != null) {
@@ -8557,12 +8591,67 @@ function tcgRenderResult(gameKey, bp, prices) {
   const cfg = CT_TCG_CONFIG[gameKey];
   const card = $(`${cfg.prefix}ResultCard`);
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
-  const qKey = $(cfg.condField)?.value || 'NM';
+  const qKey = tcgGetQuality(gameKey);
   const qLabel = QUALITY[qKey]?.label || qKey;
   const selPrice = getTcgUnitPrice(gameKey);
   const isEditMode = isCollectionEditActive(cfg.game);
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
-  const qty = parseInt($(cfg.qtyField)?.value) || 1;
+  const qty = tcgGetQty(gameKey);
+  const showInlineFilters = tcgUsesInlineFilters(gameKey);
+  const selectedLang = tcgGetLang(gameKey);
+  const inlineLangOptions = gameKey === 'onepiece'
+    ? [
+        { value: '', label: 'Qualsiasi' },
+        { value: 'en', label: '🇬🇧 Inglese' },
+        { value: 'ja', label: '🇯🇵 Giapponese' },
+        { value: 'zh', label: '🇨🇳 Cinese (Semplificato)' },
+        { value: 'ko', label: '🇰🇷 Coreano' },
+      ]
+    : gameKey === 'riftbound'
+      ? [
+          { value: '', label: 'Qualsiasi' },
+          { value: 'en', label: '🇬🇧 Inglese' },
+          { value: 'fr', label: '🇫🇷 Francese' },
+          { value: 'zh', label: '🇨🇳 Cinese' },
+        ]
+      : [
+          { value: '', label: 'Qualsiasi' },
+          { value: 'en', label: '🇬🇧 Inglese' },
+          { value: 'it', label: '🇮🇹 Italiano' },
+          { value: 'ja', label: '🇯🇵 Giapponese' },
+          { value: 'fr', label: '🇫🇷 Francese' },
+          { value: 'de', label: '🇩🇪 Tedesco' },
+        ];
+  const inlineCondOptions = gameKey === 'sealed'
+    ? [{ value: 'NM', label: 'NM — Sealed / Near Mint' }]
+    : [
+        { value: 'NM', label: 'NM — Mint' },
+        { value: 'EX', label: 'EX — Slightly Played' },
+        { value: 'GOOD', label: 'GOOD — Moderately Played' },
+        { value: 'PLAYED', label: 'PLAYED — Played' },
+        { value: 'POOR', label: 'POOR — Poor' },
+      ];
+  const inlineControlsHtml = showInlineFilters
+    ? `
+        <div class="form-row" style="grid-template-columns: 1fr 1.2fr 80px; margin: 8px 0 10px;">
+          <div class="field">
+            <label for="${cfg.langField}">Lingua</label>
+            <select id="${cfg.langField}">
+              ${inlineLangOptions.map(opt => `<option value="${escHtml(opt.value)}" ${selectedLang === opt.value ? 'selected' : ''}>${escHtml(opt.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="${cfg.condField}">Condizione</label>
+            <select id="${cfg.condField}">
+              ${inlineCondOptions.map(opt => `<option value="${escHtml(opt.value)}" ${qKey === opt.value ? 'selected' : ''}>${escHtml(opt.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="${cfg.qtyField}">Quantità</label>
+            <input id="${cfg.qtyField}" type="number" min="1" max="99" value="${qty}">
+          </div>
+        </div>`
+    : '';
   const priceHtml = !prices ? '<div class="ct-loading"><div class="spinner"></div><span>Caricamento prezzi…</span></div>'
     : prices.error && !(prices.conditions || []).length ? `<p class="ct-msg warn">⚠️ ${escHtml(prices.error)}</p>`
     : `
@@ -8613,6 +8702,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           ${bp.collector_number && gameKey !== 'sealed' ? `<span class="badge-num">#${escHtml(bp.collector_number)}</span>` : ''}
           ${bp.category_name && !bp._sealedType ? `<span class="badge-rarity">${escHtml(bp.category_name)}</span>` : ''}
         </div>
+        ${inlineControlsHtml}
         <div class="ct-section" style="margin-top:0">
           <div class="ct-header">CardTrader — Prezzi Mercato <span class="ct-badge live">● LIVE</span></div>
           ${priceHtml}
@@ -8652,6 +8742,27 @@ function tcgRenderResult(gameKey, bp, prices) {
   $(`${cfg.prefix}ApplyManualPriceBtn`)?.addEventListener('click', () => applyTcgManualPrice(gameKey));
   $(`${cfg.prefix}ClearManualPriceBtn`)?.addEventListener('click', () => clearTcgManualPrice(gameKey));
   bindPreviewImage(card.querySelector('img.previewable-img'));
+  if (showInlineFilters) {
+    $(`${cfg.langField}`)?.addEventListener('change', (e) => {
+      ctTcgState[gameKey].selectedLang = e.target.value || '';
+      ctTcgState[gameKey].selectedListing = null;
+      ctTcgState[gameKey].marketMenuOpen = false;
+      const refreshGen = ++ctTcgState[gameKey].searchGen;
+      tcgSelectCard(gameKey, bp, refreshGen, { preservePrefs: true });
+    });
+    $(`${cfg.condField}`)?.addEventListener('change', (e) => {
+      ctTcgState[gameKey].selectedQuality = e.target.value || 'NM';
+      ctTcgState[gameKey].selectedListing = null;
+      tcgRenderResult(gameKey, bp, prices);
+    });
+    $(`${cfg.qtyField}`)?.addEventListener('input', (e) => {
+      ctTcgState[gameKey].selectedQty = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1));
+      if (String(ctTcgState[gameKey].selectedQty) !== String(e.target.value)) {
+        e.target.value = String(ctTcgState[gameKey].selectedQty);
+      }
+      tcgRenderResult(gameKey, bp, prices);
+    });
+  }
   $(`${cfg.prefix}GradedCheck`)?.addEventListener('change', (e) => {
     ctTcgState[gameKey].graded = !!e.target.checked;
     if (ctTcgState[gameKey].graded && !normalizeGradeScore(ctTcgState[gameKey].gradeScore)) {
@@ -8665,9 +8776,13 @@ function tcgRenderResult(gameKey, bp, prices) {
   });
   card.querySelectorAll('button.ct-cond-row[data-quality-key]').forEach(row => {
     row.addEventListener('click', () => {
-      const qKey = qualityKeyFromCtCond(row.dataset.qualityKey);
-      const sel = $(cfg.condField);
-      if (sel) sel.value = qKey;
+      const quality = qualityKeyFromCtCond(row.dataset.qualityKey);
+      if (tcgUsesInlineFilters(gameKey)) {
+        ctTcgState[gameKey].selectedQuality = quality;
+      } else {
+        const sel = $(cfg.condField);
+        if (sel) sel.value = quality;
+      }
       ctTcgState[gameKey].selectedListing = null;
       tcgRenderResult(gameKey, bp, prices);
     });
@@ -8703,8 +8818,8 @@ window.tcgAddToCollection = async function(gameKey) {
   const editIdx = resolveCollectionEditIndex();
   const isEditMode = editIdx >= 0 && (collection[editIdx]?.game || 'pokemon') === cfg.game;
   if (!bp) return;
-  const qKey = $(cfg.condField)?.value || 'NM';
-  const qty = Math.max(1, Math.min(99, parseInt($(cfg.qtyField)?.value) || 1));
+  const qKey = tcgGetQuality(gameKey);
+  const qty = tcgGetQty(gameKey);
   const manualUnit = tcgManualPriceUnit(gameKey);
   const resolved = getTcgUnitPrice(gameKey)
     || (prices && !prices.error ? resolveCtConditionPrice(prices, qKey) : null)
@@ -8716,7 +8831,7 @@ window.tcgAddToCollection = async function(gameKey) {
   }
   const nmCond = prices?.conditions?.find(c => c.key === 'NM');
   const nmMin = nmCond?.minPrice || nmCond?.price || unit;
-  const lang = $(cfg.langField)?.value || 'any';
+  const lang = tcgGetLang(gameKey) || 'any';
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb') || bp.imgUrl || '';
   const picked = ctTcgState[gameKey].selectedListing;
   const listingPick = !resolved?.manual && picked?.seller
@@ -8967,7 +9082,14 @@ function renderCollection() {
         </div>
       </td>
       <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
-      <td><span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>${gradedBadgeHtml(item)}</td>
+      <td>
+        <div class="collection-cond-wrap">
+          <span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>
+          ${item.graded
+            ? `<span class="collection-graded-label">Graded${formatGradeScore(item.gradeScore) ? ` ${formatGradeScore(item.gradeScore)}` : ''}</span>`
+            : ''}
+        </div>
+      </td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
       <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
         ${ctPriceVal}
