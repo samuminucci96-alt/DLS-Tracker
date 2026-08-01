@@ -2806,45 +2806,6 @@
             </div>
           </div>
 
-          <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px;">
-            <div class="field">
-              <label for="cardLanguage">Lingua</label>
-              <select id="cardLanguage">
-                <option value="">Qualsiasi</option>
-                <option value="English">🇬🇧 English</option>
-                <option value="Italian">🇮🇹 Italiano</option>
-                <option value="Spanish">🇪🇸 Español</option>
-                <option value="German">🇩🇪 Deutsch</option>
-                <option value="French">🇫🇷 Français</option>
-                <option value="Japanese">🇯🇵 日本語</option>
-                <option value="Portuguese">🇵🇹 Português</option>
-                <option value="Korean">🇰🇷 한국어</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="cardEdition">Edizione</label>
-              <select id="cardEdition">
-                <option value="">Qualsiasi</option>
-                <option value="1st">1ª edizione</option>
-                <option value="unlimited">Unlimited</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="condSelect">Condizione</label>
-              <select id="condSelect">
-                <option value="NM">NM — Near Mint (100%)</option>
-                <option value="EX">EX — Excellent (85%)</option>
-                <option value="GOOD">GOOD — Good (70%)</option>
-                <option value="PLAYED">PLAYED — Played (50%)</option>
-                <option value="POOR">POOR — Poor (30%)</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="cardQty">Qtà</label>
-              <input id="cardQty" type="number" min="1" max="99" value="1" placeholder="1">
-            </div>
-          </div>
-
           <button type="button" class="btn btn-primary" id="searchBtn">
             <span id="searchBtnInner">🔍 &nbsp;Cerca Carta</span>
           </button>
@@ -2950,9 +2911,9 @@
             <div class="field">
               <label for="opCondSearch">Condizione</label>
               <select id="opCondSearch">
-                <option value="NM">NM — Near Mint</option>
-                <option value="EX">EX — Excellent</option>
-                <option value="GOOD">GOOD — Good</option>
+                <option value="NM">NM — Mint</option>
+                <option value="EX">EX — Slightly Played</option>
+                <option value="GOOD">GOOD — Moderately Played</option>
                 <option value="PLAYED">PLAYED — Played</option>
                 <option value="POOR">POOR — Poor</option>
               </select>
@@ -3004,9 +2965,9 @@
             <div class="field">
               <label for="rbCondSearch">Condizione</label>
               <select id="rbCondSearch">
-                <option value="NM">NM — Near Mint</option>
-                <option value="EX">EX — Excellent</option>
-                <option value="GOOD">GOOD — Good</option>
+                <option value="NM">NM — Mint</option>
+                <option value="EX">EX — Slightly Played</option>
+                <option value="GOOD">GOOD — Moderately Played</option>
                 <option value="PLAYED">PLAYED — Played</option>
                 <option value="POOR">POOR — Poor</option>
               </select>
@@ -3221,9 +3182,9 @@ function ctLog(...args) { if (CT_DEBUG) console.log(...args); }
 const API_BASE = 'https://api.pokemontcg.io/v2/cards';
 
 const QUALITY = {
-  NM:     { label: 'Near Mint',  short: 'NM',     coeff: 1.00 },
-  EX:     { label: 'Excellent',  short: 'EX',     coeff: 0.85 },
-  GOOD:   { label: 'Good',       short: 'GOOD',   coeff: 0.70 },
+  NM:     { label: 'Mint',              short: 'NM',     coeff: 1.00 },
+  EX:     { label: 'Slightly Played',   short: 'EX',     coeff: 0.85 },
+  GOOD:   { label: 'Moderately Played', short: 'GOOD',   coeff: 0.70 },
   PLAYED: { label: 'Played',     short: 'PLAYED', coeff: 0.50 },
   POOR:   { label: 'Poor',       short: 'POOR',   coeff: 0.30 }
 };
@@ -3547,6 +3508,7 @@ let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, seale
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
+let pokemonSelectedQty = 1;
 let collectionEditEntryId = null;
 let maybeSeedCards = [];
 let pokemonCtMarketMenuOpen = false;
@@ -4756,6 +4718,50 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
   return result;
 }
 
+async function ctSearchBlueprintsByApi(name, token, game = 'pokemon', card = null) {
+  const query = String(name || '').trim();
+  if (!query) return [];
+
+  const data = await ctFetch(`/blueprints?name=${encodeURIComponent(query)}`);
+  const rows = ctParseList(data);
+  if (!rows.length) return [];
+
+  const gameId = await ctGetGameId(token, game);
+  const expansions = await ctGetExpansions(token, game);
+  const expById = new Map(expansions.map(e => [String(e.id), e]));
+  const targetExp = card?.set ? await ctMatchExpansion(card, token, game) : null;
+  const rawNum = (card?.number || '').split('/')[0].replace(/^0+/, '');
+  const setCode = resolveCtCodeForPokemonSet(card?.set?.id, card?.set?.name) || '';
+
+  const hits = rows
+    .filter(bp => !gameId || !bp?.game_id || Number(bp.game_id) === Number(gameId))
+    .filter(bp => {
+      if (!rawNum) return true;
+      const bpNum = ctBpNumber(bp);
+      return bpNum === rawNum || promoNumberMatches(rawNum, bpNum);
+    })
+    .map(bp => {
+      const exp = expById.get(String(bp.expansion_id));
+      const scoreBase = card ? scoreBlueprintForCard(card, bp) : 1;
+      const sameExpansion = targetExp && Number(bp.expansion_id) === Number(targetExp.id) ? 80 : 0;
+      const codeBoost = setCode && exp && norm(exp.code || '') === norm(setCode) ? 40 : 0;
+      const numBoost = rawNum && (ctBpNumber(bp) === rawNum || promoNumberMatches(rawNum, ctBpNumber(bp))) ? 20 : 0;
+      const score = scoreBase + sameExpansion + codeBoost + numBoost;
+      return {
+        ...bp,
+        score,
+        expansion: exp
+          ? { id: exp.id, name_en: ctExpName(exp), code: exp.code }
+          : { id: bp.expansion_id, name_en: '', code: '' },
+      };
+    })
+    .filter(bp => bp.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+
+  return hits;
+}
+
 async function searchCtPromoBlueprints(stubCard, signal) {
   const expansions = await ctGetExpansions(null, 'pokemon');
   const promoExps = expansions.filter(e =>
@@ -5075,17 +5081,17 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
 
 // Mappa condizioni CardTrader → etichetta app
 const CT_COND_MAP = {
-  'near mint':         { key: 'NM',     label: 'Near Mint',      mult: 1.00 },
-  'mint':              { key: 'NM',     label: 'Near Mint',      mult: 1.00 },
-  'excellent':         { key: 'EX',     label: 'Excellent',      mult: 0.85 },
-  'slightly played':   { key: 'EX',     label: 'Exc. (Slight)',  mult: 0.85 },
-  'lightly played':    { key: 'EX',     label: 'Exc. (Light)',   mult: 0.85 },
-  'good':              { key: 'GOOD',   label: 'Good',           mult: 0.70 },
-  'played':            { key: 'GOOD',   label: 'Good (Played)',  mult: 0.70 },
-  'moderately played': { key: 'GOOD',   label: 'Good (Played)',  mult: 0.70 },
-  'heavily played':    { key: 'PLAYED', label: 'Heavily Played', mult: 0.50 },
-  'poor':              { key: 'POOR',   label: 'Poor / Damaged', mult: 0.30 },
-  'damaged':           { key: 'POOR',   label: 'Poor / Damaged', mult: 0.30 },
+  'near mint':         { key: 'NM',     label: 'Mint',              mult: 1.00 },
+  'mint':              { key: 'NM',     label: 'Mint',              mult: 1.00 },
+  'excellent':         { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'slightly played':   { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'lightly played':    { key: 'EX',     label: 'Slightly Played',   mult: 0.85 },
+  'good':              { key: 'GOOD',   label: 'Moderately Played', mult: 0.70 },
+  'moderately played': { key: 'GOOD',   label: 'Moderately Played', mult: 0.70 },
+  'played':            { key: 'PLAYED', label: 'Played',            mult: 0.50 },
+  'heavily played':    { key: 'PLAYED', label: 'Played',            mult: 0.50 },
+  'poor':              { key: 'POOR',   label: 'Poor',              mult: 0.30 },
+  'damaged':           { key: 'POOR',   label: 'Poor',              mult: 0.30 },
 };
 
 function ctCondKey(raw) {
@@ -5367,6 +5373,16 @@ async function ctGetPrice(card, game = 'pokemon') {
       }
     }
 
+    if (!bp) {
+      const apiHits = await ctSearchBlueprintsByApi(card.name, null, game, card);
+      if (apiHits.length) {
+        bp = apiHits[0];
+        expansionName = bp.expansion?.name_en || expansionName;
+        setMatchWarning = setMatchWarning || 'Match CardTrader per nome/numero';
+        ctLog('[CT] Blueprint via API /blueprints:', bp?.name, '|', expansionName);
+      }
+    }
+
     if (!bp) return {
       error: `"${card.name}" non trovato su CardTrader`,
       ctSearchUrl: `https://www.cardtrader.com/en/search?q=${encodeURIComponent(card.name + ' ' + (card.set?.name || ''))}`
@@ -5462,8 +5478,24 @@ async function ctGetPrice(card, game = 'pokemon') {
 }
 
 function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
-  const cond = (d.conditions || []).find(c => c.key === condKey) || d.conditions?.[0];
-  if (!cond) return '';
+  const cond = (d.conditions || []).find(c => c.key === condKey);
+  const condLabel = QUALITY[qualityKeyFromCtCond(condKey)]?.label || condKey;
+  if (!cond) {
+    return `
+      <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
+        <div class="ct-market-title">
+          <span>Annunci caricati su CT · ${escHtml(condLabel)}</span>
+          <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
+            ${isOpen ? 'Chiudi menu' : 'Apri menu'} · 0
+          </button>
+        </div>
+        <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
+          <div class="ct-listing-list">
+            <p class="ct-msg info">Nessun annuncio per questa condizione.</p>
+          </div>
+        </div>
+      </div>`;
+  }
   const rows = (cond.listings || []).map((l, idx) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
@@ -5544,16 +5576,25 @@ function renderCtSection() {
   const selectedCtCond = CT_QUALITY_TO_COND[selectedQuality] || 'NM';
   const priceView = getSelectedUnitPrice();
   const nmCond = (d.conditions || []).find(c => c.key === 'NM') || d.conditions?.[0];
-  const condRows = (d.conditions || []).map(c => {
-    const foilMark = c.foil ? ' ✨' : '';
-    const editionMark = c.firstEdition ? ' · 1ª' : '';
-    const isSelected = c.key === selectedCtCond;
+  const condRows = Object.keys(CT_QUALITY_TO_COND).map(qualityKey => {
+    const ctCondKey = CT_QUALITY_TO_COND[qualityKey];
+    const liveCond = (d.conditions || []).find(c => c.key === ctCondKey);
+    const resolved = liveCond
+      ? { unit: liveCond.minPrice || liveCond.price, fromCt: true }
+      : resolveCtConditionPrice(d, qualityKey, d.price || basePrice || 0);
+    const label = QUALITY[qualityKey]?.label || liveCond?.label || qualityKey;
+    const foilMark = liveCond?.foil ? ' ✨' : '';
+    const editionMark = liveCond?.firstEdition ? ' · 1ª' : '';
+    const isSelected = ctCondKey === selectedCtCond;
+    const count = liveCond?.count || 0;
+    const meta = liveCond ? `Min CT${foilMark}${editionMark}` : 'Stima';
+    const countMeta = liveCond ? `Min. Cardmarket · ${count} ann.` : 'Nessun annuncio';
     return `
-      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(c.key)}" aria-pressed="${isSelected}">
-        <span class="ct-cond-label">${escHtml(c.label)}${isSelected ? ' ← selezionata' : ''}</span>
-        <span class="ct-cond-price">${fmt(c.minPrice || c.price)}</span>
-        <span class="ct-cond-meta">Min CT${foilMark}${editionMark}</span>
-        <span class="ct-cond-count">Min. Cardmarket · ${c.count} ann.</span>
+      <button type="button" class="ct-cond-row${isSelected ? ' ct-cond-nm' : ''}" data-quality-key="${escHtml(ctCondKey)}" aria-pressed="${isSelected}">
+        <span class="ct-cond-label">${escHtml(label)}${isSelected ? ' ← selezionata' : ''}</span>
+        <span class="ct-cond-price">${fmt(resolved.unit || 0)}</span>
+        <span class="ct-cond-meta">${meta}</span>
+        <span class="ct-cond-count">${countMeta}</span>
       </button>`;
   }).join('');
 
@@ -6379,14 +6420,7 @@ document.getElementById('stopSearchBtn')?.addEventListener('click', stopPokemonS
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
-document.getElementById('condSelect')?.addEventListener('change', e => {
-  selectedQuality = e.target.value;
-  selectedCtListing = null;
-  if (selectedCard) renderResult();
-});
-
-document.getElementById('cardLanguage')?.addEventListener('change', () => {
-  searchLangFilter = $('cardLanguage')?.value?.trim() || '';
+function refreshSelectedCardCtPrice(context = 'filter') {
   selectedCtListing = null;
   if (!selectedCard) return;
   choicePriceCache.delete(choiceCacheKey(selectedCard));
@@ -6404,38 +6438,10 @@ document.getElementById('cardLanguage')?.addEventListener('change', () => {
     renderResult();
   }).catch(err => {
     if (priceGen !== priceFetchGen) return;
-    console.warn('ctGetPrice (lang):', err);
+    console.warn(`ctGetPrice (${context}):`, err);
     renderResult();
   });
-});
-
-document.getElementById('cardEdition')?.addEventListener('change', () => {
-  searchEditionFilter = $('cardEdition')?.value?.trim() || '';
-  selectedCtListing = null;
-  if (!selectedCard) return;
-  choicePriceCache.delete(choiceCacheKey(selectedCard));
-  ctPriceData = null;
-  renderResult();
-  const priceGen = ++priceFetchGen;
-  ctGetPrice(selectedCard).then(result => {
-    if (priceGen !== priceFetchGen) return;
-    ctPriceData = result;
-    if (result?.price && !result.error) {
-      basePrice = result.price;
-      priceSrc = 'CardTrader';
-      choicePriceCache.set(choiceCacheKey(selectedCard), { price: result.price, src: 'CardTrader', ct: result });
-    }
-    renderResult();
-  }).catch(err => {
-    if (priceGen !== priceFetchGen) return;
-    console.warn('ctGetPrice (edition):', err);
-    renderResult();
-  });
-});
-
-document.getElementById('cardQty')?.addEventListener('input', () => {
-  if (selectedCard) renderResult();
-});
+}
 
 async function doSearch() {
   if (activeGame !== 'pokemon') {
@@ -6449,7 +6455,7 @@ async function doSearch() {
   const number  = $('cardNumber').value.trim();
   const cardSet = getSelectedSetId();
   if ($('cardSetId')) $('cardSetId').value = cardSet || '';
-  const lang    = $('cardLanguage').value.trim();
+  const lang    = '';
   if (cardSet) preloadPokemonSetCards(cardSet);
   if (!name && !number) {
     showMsg('Inserisci almeno il nome del Pokémon o il numero della carta.', 'error');
@@ -6457,8 +6463,8 @@ async function doSearch() {
   }
 
   const myGen = ++searchGen;
-  searchLangFilter = lang;
-  searchEditionFilter = $('cardEdition')?.value?.trim() || '';
+  searchLangFilter = '';
+  searchEditionFilter = '';
   priceFetchGen++;
 
   // Cancel any in-flight search / stale CT price loads
@@ -6499,12 +6505,10 @@ async function doSearch() {
       showMsg(`Nessuna carta trovata${langHint}. Prova con un termine diverso.`, 'warning');
       return;
     }
-    const langNote = lang ? ` · lingua ${lang}` : '';
-    const editionNote = searchEditionFilter ? ` · ${ctEditionLabel(searchEditionFilter)}` : '';
     showMsg(
       cards.length === 1
-        ? `Carta trovata${langNote}${editionNote}!`
-        : `Trovate ${cards.length} carte${langNote}${editionNote} — seleziona quella corretta.`,
+        ? 'Carta trovata!'
+        : `Trovate ${cards.length} carte — seleziona quella corretta.`,
       'success'
     );
     if (cards.length === 1) {
@@ -6790,6 +6794,7 @@ function renderChoices(cards, opts = {}) {
 function selectCard(card) {
   selectedCard = card;
   selectedQuality = $('condSelect')?.value || 'NM';
+  pokemonSelectedQty = Math.max(1, Math.min(99, parseInt($('cardQty')?.value) || pokemonSelectedQty || 1));
   selectedCtListing = null;
   manualPokemonPrice = null;
   manualPokemonPriceRaw = '';
@@ -6843,7 +6848,7 @@ function renderResult() {
   const selectedPrice = getSelectedUnitPrice();
   const effectivePrice = pokemonEffectivePrice(selectedPrice);
   const calc = effectivePrice.unit;
-  const qty  = parseInt($('cardQty')?.value) || 1;
+  const qty  = Math.max(1, Math.min(99, parseInt(pokemonSelectedQty, 10) || 1));
   const isEditMode = isCollectionEditActive('pokemon');
 
   const srcLabel = effectivePrice.manual
@@ -6869,6 +6874,44 @@ function renderResult() {
           ${card.hp          ? `<span class="pill pill-hp">❤ ${card.hp} HP</span>` : ''}
           ${(card.types||[]).length ? `<span class="pill pill-type">${card.types.join(' · ')}</span>` : ''}
           <span class="pill pill-set">Condizione: ${QUALITY[selectedQuality]?.label || selectedQuality}</span>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px; margin: 10px 0 8px;">
+          <div class="field">
+            <label for="cardLanguage">Lingua</label>
+            <select id="cardLanguage">
+              <option value="" ${!searchLangFilter ? 'selected' : ''}>Qualsiasi</option>
+              <option value="English" ${searchLangFilter === 'English' ? 'selected' : ''}>🇬🇧 English</option>
+              <option value="Italian" ${searchLangFilter === 'Italian' ? 'selected' : ''}>🇮🇹 Italiano</option>
+              <option value="Spanish" ${searchLangFilter === 'Spanish' ? 'selected' : ''}>🇪🇸 Español</option>
+              <option value="German" ${searchLangFilter === 'German' ? 'selected' : ''}>🇩🇪 Deutsch</option>
+              <option value="French" ${searchLangFilter === 'French' ? 'selected' : ''}>🇫🇷 Français</option>
+              <option value="Japanese" ${searchLangFilter === 'Japanese' ? 'selected' : ''}>🇯🇵 日本語</option>
+              <option value="Portuguese" ${searchLangFilter === 'Portuguese' ? 'selected' : ''}>🇵🇹 Português</option>
+              <option value="Korean" ${searchLangFilter === 'Korean' ? 'selected' : ''}>🇰🇷 한국어</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cardEdition">Edizione</label>
+            <select id="cardEdition">
+              <option value="" ${!searchEditionFilter ? 'selected' : ''}>Qualsiasi</option>
+              <option value="1st" ${searchEditionFilter === '1st' ? 'selected' : ''}>1ª edizione</option>
+              <option value="unlimited" ${searchEditionFilter === 'unlimited' ? 'selected' : ''}>Unlimited</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="condSelect">Condizione</label>
+            <select id="condSelect">
+              <option value="NM" ${selectedQuality === 'NM' ? 'selected' : ''}>NM — Mint (100%)</option>
+              <option value="EX" ${selectedQuality === 'EX' ? 'selected' : ''}>EX — Slightly Played (85%)</option>
+              <option value="GOOD" ${selectedQuality === 'GOOD' ? 'selected' : ''}>GOOD — Moderately Played (70%)</option>
+              <option value="PLAYED" ${selectedQuality === 'PLAYED' ? 'selected' : ''}>PLAYED — Played (50%)</option>
+              <option value="POOR" ${selectedQuality === 'POOR' ? 'selected' : ''}>POOR — Poor (30%)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cardQty">Qtà</label>
+            <input id="cardQty" type="number" min="1" max="99" value="${qty}" placeholder="1">
+          </div>
         </div>
         <div class="price-box">
           <div class="price-row">
@@ -6910,6 +6953,23 @@ function renderResult() {
   `;
 
   $('addBtn').addEventListener('click', addToCollection);
+  $('condSelect')?.addEventListener('change', e => {
+    selectedQuality = e.target.value;
+    selectedCtListing = null;
+    renderResult();
+  });
+  $('cardLanguage')?.addEventListener('change', () => {
+    searchLangFilter = $('cardLanguage')?.value?.trim() || '';
+    refreshSelectedCardCtPrice('lang');
+  });
+  $('cardEdition')?.addEventListener('change', () => {
+    searchEditionFilter = $('cardEdition')?.value?.trim() || '';
+    refreshSelectedCardCtPrice('edition');
+  });
+  $('cardQty')?.addEventListener('input', () => {
+    pokemonSelectedQty = Math.max(1, Math.min(99, parseInt($('cardQty')?.value, 10) || 1));
+    if (selectedCard) renderResult();
+  });
   $('manualPokemonPriceInput')?.addEventListener('input', (e) => {
     manualPokemonPriceRaw = e.target.value;
   });
@@ -6941,7 +7001,7 @@ async function addToCollection() {
   if (!selectedCard) return;
   const editIdx = resolveCollectionEditIndex();
   const isEditMode = editIdx >= 0 && (collection[editIdx]?.game || 'pokemon') === 'pokemon';
-  const qty   = Math.max(1, Math.min(99, parseInt($('cardQty')?.value) || 1));
+  const qty   = Math.max(1, Math.min(99, parseInt(pokemonSelectedQty, 10) || 1));
   const selPrice = getSelectedUnitPrice();
   const effectivePrice = pokemonEffectivePrice(selPrice);
   const unit  = parseFloat(Number(effectivePrice.unit || 0).toFixed(2));
@@ -6949,7 +7009,7 @@ async function addToCollection() {
     showMsg(`Nessun prezzo disponibile per ${QUALITY[selectedQuality]?.label || selectedQuality}.`, 'warning');
     return;
   }
-  const lang  = $('cardLanguage').value || 'Any';
+  const lang  = searchLangFilter || 'Any';
   const listingPick = !effectivePrice.manual && selectedCtListing?.seller
     ? {
         condKey: selectedCtListing.condKey,
@@ -7104,15 +7164,11 @@ function fillPokemonSearchFromItem(item) {
   if ($('pokemonName')) $('pokemonName').value = item.name || '';
   if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
   const lang = item.lang || item.language || '';
-  if ($('cardLanguage')) $('cardLanguage').value = lang === 'Any' ? '' : lang;
-  if ($('cardEdition')) {
-    if (item.edition === '1st' || item.firstEdition === true) $('cardEdition').value = '1st';
-    else if (item.edition === 'unlimited' || item.firstEdition === false) $('cardEdition').value = 'unlimited';
-    else $('cardEdition').value = '';
-  }
-  searchEditionFilter = $('cardEdition')?.value || '';
+  searchLangFilter = lang === 'Any' ? '' : lang;
+  if (item.edition === '1st' || item.firstEdition === true) searchEditionFilter = '1st';
+  else if (item.edition === 'unlimited' || item.firstEdition === false) searchEditionFilter = 'unlimited';
+  else searchEditionFilter = '';
   const qKey = item.quality || item.condition || 'NM';
-  if ($('condSelect')) $('condSelect').value = qKey;
   selectedQuality = qKey;
   pokemonGraded = !!item.graded;
   pokemonGradeScore = item.graded ? (normalizeGradeScore(item.gradeScore) || 10) : 10;
@@ -7165,7 +7221,7 @@ async function openCollectionItem(idx) {
   if (game !== activeGame) switchActiveGame(game);
 
   if (game === 'pokemon') {
-    if ($('cardQty')) $('cardQty').value = '1';
+    pokemonSelectedQty = 1;
     fillPokemonSearchFromItem(item);
     $('choicesCard').hidden = true;
     hideAllSuggestions();
