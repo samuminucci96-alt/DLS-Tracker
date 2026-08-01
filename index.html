@@ -2739,6 +2739,10 @@
           <label>Nuova password</label>
           <input id="recoveryPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="new-password">
         </div>
+        <div class="auth-field">
+          <label>Conferma nuova password</label>
+          <input id="recoveryPasswordConfirm" type="password" placeholder="Ripeti la nuova password" autocomplete="new-password">
+        </div>
         <div class="auth-actions" style="margin-top:12px">
           <button type="button" class="btn" id="recoveryConfirmBtn" style="width:100%">Conferma recupero</button>
         </div>
@@ -2798,6 +2802,10 @@
         <div class="auth-field">
           <label for="profileNewPassword">Nuova password</label>
           <input id="profileNewPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="new-password">
+        </div>
+        <div class="auth-field">
+          <label for="profileNewPasswordConfirm">Conferma nuova password</label>
+          <input id="profileNewPasswordConfirm" type="password" placeholder="Ripeti la nuova password" autocomplete="new-password">
         </div>
         <div class="auth-err" id="profilePassErr"></div>
         <div class="profile-pass-actions">
@@ -9898,8 +9906,13 @@ async function changeLoggedUserPassword() {
   }
   const currentPassword = $('profileCurrentPassword')?.value || '';
   const newPassword = $('profileNewPassword')?.value || '';
-  if (!currentPassword || !newPassword) {
-    showAuthErr('profilePassErr', 'Inserisci password attuale e nuova password.');
+  const confirmPassword = $('profileNewPasswordConfirm')?.value || '';
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    showAuthErr('profilePassErr', 'Inserisci password attuale, nuova password e conferma.');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    showAuthErr('profilePassErr', 'Le nuove password non coincidono.');
     return;
   }
   const btn = $('profileChangePasswordBtn');
@@ -9925,6 +9938,7 @@ async function changeLoggedUserPassword() {
     }
     if ($('profileCurrentPassword')) $('profileCurrentPassword').value = '';
     if ($('profileNewPassword')) $('profileNewPassword').value = '';
+    if ($('profileNewPasswordConfirm')) $('profileNewPasswordConfirm').value = '';
     showAuthErr('profilePassErr', '');
     updateAuthUI();
     showMsg('✅ Password aggiornata correttamente.', 'success');
@@ -9971,6 +9985,7 @@ function openProfilePanel() {
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
   if ($('profileCurrentPassword')) $('profileCurrentPassword').value = '';
   if ($('profileNewPassword')) $('profileNewPassword').value = '';
+  if ($('profileNewPasswordConfirm')) $('profileNewPasswordConfirm').value = '';
   showAuthErr('profilePassErr', '');
   const overlay = $('profileOverlay');
   if (overlay) {
@@ -10174,8 +10189,13 @@ async function confirmPasswordReset() {
   const email = $('recoveryEmail')?.value.trim();
   const resetToken = $('recoveryToken')?.value.trim();
   const pass = $('recoveryPassword')?.value;
-  if (!email || !resetToken || !pass) {
-    showAuthErr('recoveryErr', 'Compila email, codice e nuova password');
+  const passConfirm = $('recoveryPasswordConfirm')?.value;
+  if (!email || !resetToken || !pass || !passConfirm) {
+    showAuthErr('recoveryErr', 'Compila email, codice, nuova password e conferma');
+    return;
+  }
+  if (pass !== passConfirm) {
+    showAuthErr('recoveryErr', 'Le nuove password non coincidono.');
     return;
   }
   const btn = $('recoveryConfirmBtn');
@@ -10296,6 +10316,7 @@ document.getElementById('recoveryPasteBtn')?.addEventListener('click', async () 
 document.getElementById('recoveryEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') requestPasswordReset(); });
 document.getElementById('recoveryToken')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
 document.getElementById('recoveryPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
+document.getElementById('recoveryPasswordConfirm')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
 
 document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
 const profileOverlayEl = document.getElementById('profileOverlay');
@@ -10331,6 +10352,9 @@ document.getElementById('profileCurrentPassword')?.addEventListener('keydown', e
   if (e.key === 'Enter') changeLoggedUserPassword();
 });
 document.getElementById('profileNewPassword')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') changeLoggedUserPassword();
+});
+document.getElementById('profileNewPasswordConfirm')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') changeLoggedUserPassword();
 });
 
