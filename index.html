@@ -1101,6 +1101,19 @@
       font-size: 0.78rem;
       cursor: pointer;
     }
+    .collection-cond-wrap {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+    }
+    .collection-graded-label {
+      font-size: 0.69rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.01em;
+      line-height: 1;
+    }
 
     /* ─── Collection table ───────────────────────────────────────── */
     .stats-row {
@@ -3443,15 +3456,27 @@ let pokemonGraded = false;
 let pokemonGradeScore = 10;
 
 function normalizeGradeScore(v) {
-  const n = parseInt(v, 10);
+  const raw = String(v ?? '').trim().replace(',', '.');
+  const n = Number(raw);
   if (!Number.isFinite(n) || n < 1 || n > 10) return null;
-  return n;
+  const rounded = Math.round(n * 2) / 2;
+  if (Math.abs(n - rounded) > 1e-9) return null;
+  return rounded;
+}
+
+function formatGradeScore(v) {
+  const n = normalizeGradeScore(v);
+  if (n == null) return '';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function gradeScoreOptionsHtml(selected) {
   const sel = normalizeGradeScore(selected) || 10;
-  return Array.from({ length: 10 }, (_, i) => i + 1)
-    .map(n => `<option value="${n}"${n === sel ? ' selected' : ''}>${n}</option>`)
+  return Array.from({ length: 19 }, (_, i) => 1 + (i * 0.5))
+    .map(n => {
+      const value = Number.isInteger(n) ? String(n) : n.toFixed(1);
+      return `<option value="${value}"${n === sel ? ' selected' : ''}>${value}</option>`;
+    })
     .join('');
 }
 
@@ -3478,8 +3503,8 @@ function gradedLabel(graded, score) {
 
 function gradedBadgeHtml(item) {
   if (!item?.graded) return '';
-  const n = normalizeGradeScore(item.gradeScore);
-  return `<span class="graded-badge">GRAD${n != null ? ` ${n}` : ''}</span>`;
+  const score = formatGradeScore(item.gradeScore);
+  return `<span class="graded-badge">GRAD${score ? ` ${score}` : ''}</span>`;
 }
 const suggCache     = new Map();
 const pokemonQueryCache = new Map();
@@ -9057,7 +9082,14 @@ function renderCollection() {
         </div>
       </td>
       <td style="font-size:0.8rem;color:var(--text-dim);">${item.set || '—'}</td>
-      <td><span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>${gradedBadgeHtml(item)}</td>
+      <td>
+        <div class="collection-cond-wrap">
+          <span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>
+          ${item.graded
+            ? `<span class="collection-graded-label">Graded${formatGradeScore(item.gradeScore) ? ` ${formatGradeScore(item.gradeScore)}` : ''}</span>`
+            : ''}
+        </div>
+      </td>
       <td style="font-size:0.82rem;color:var(--text-muted);">${item.lang || item.language || 'Any'}</td>
       <td class="${ctClass}" data-ct-price="${idx}" title="${item.manualPrice || item.priceMode === 'manual' ? 'Prezzo manuale bloccato' : (lastUpd ? 'Aggiornato: ' + lastUpd : 'Clicca Aggiorna prezzi')}">
         ${ctPriceVal}
