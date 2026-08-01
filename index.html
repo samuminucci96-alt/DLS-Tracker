@@ -9742,7 +9742,11 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Cloud collection
-async function loadCloudCollection(clearOnAuthFail = true) {
+async function loadCloudCollection(options = true) {
+  const clearOnAuthFail = typeof options === 'boolean'
+    ? options
+    : (options?.clearOnAuthFail ?? true);
+  const askMergeChoice = typeof options === 'object' && !!options?.askMergeChoice;
   const token = getToken();
   if (!token) return;
   try {
@@ -9757,7 +9761,32 @@ async function loadCloudCollection(clearOnAuthFail = true) {
     const cloud = Array.isArray(data) ? data : [];
     let local = [];
     try { local = JSON.parse(localStorage.getItem('dls_collection') || '[]'); } catch {}
-    const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
+    let pending = [];
+    try { pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]'); } catch {}
+
+    let mergeMode = 'merge';
+    if (askMergeChoice && local.length > 0 && cloud.length > 0) {
+      const keepLocal = window.confirm(
+        `Hai ${local.length} carte salvate localmente e ${cloud.length} carte nel tuo account.\n\n` +
+        'Premi OK per unire le due collezioni (merge).\n' +
+        'Premi Annulla per usare solo la collezione account senza importare le carte locali.'
+      );
+      mergeMode = keepLocal ? 'merge' : 'cloud-only';
+    }
+
+    if (mergeMode === 'cloud-only') {
+      const guestCount = local.length + pending.length;
+      collection = Array.isArray(cloud) ? [...cloud] : [];
+      collection.forEach(ensureItemPriceTracking);
+      localStorage.removeItem('dls_collection_pending');
+      persistLocalCollection();
+      renderCollection();
+      if (guestCount > 0) {
+        showMsg(`Collezione account caricata. ${guestCount} carte locali non sono state importate.`, 'info');
+      }
+      return;
+    }
+
     // Locale vince: non ripristinare carte eliminate; aggiungi solo ciò che manca in locale
     collection = mergeCollections(local, pending);
     const localKeys = new Set(collection.map(collectionItemKey));
@@ -10174,7 +10203,7 @@ async function confirmPasswordReset() {
     updateAuthUI();
     showMsg(`✅ Password aggiornata! Benvenuto, ${data.displayName || data.email}`, 'success');
     await loadUserProfile();
-    await loadCloudCollection();
+    await loadCloudCollection({ askMergeChoice: true });
   } catch (e) {
     console.error('confirmPasswordReset:', e);
     showAuthErr('recoveryErr', API_BASE_URL
@@ -10222,7 +10251,7 @@ async function submitAuthForm() {
     updateAuthUI();
     showMsg(`✅ ${action === 'register' ? 'Account creato' : 'Accesso effettuato'}! Benvenuto, ${data.displayName || data.email}`, 'success');
     await loadUserProfile();
-    await loadCloudCollection();
+    await loadCloudCollection({ askMergeChoice: action === 'login' });
   } catch (e) {
     console.error('submitAuthForm:', e);
     if (API_BASE_URL) {
