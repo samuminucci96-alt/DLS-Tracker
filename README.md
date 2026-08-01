@@ -162,6 +162,11 @@ Per abilitare sincronizzazione cloud:
 1. Vai su **Netlify Site Settings → Authentication**
 2. Abilita **Email + Password** o **OAuth** (GitHub, Google)
 
+Recupero password:
+- Dalla finestra di login puoi usare **Password dimenticata?**
+- L'app genera un codice di recupero monouso da copiare e usare per impostare una nuova password
+- Il codice scade dopo pochi minuti
+
 ---
 
 ## 🛠️ Sviluppo Locale
