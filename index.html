@@ -26,6 +26,7 @@
     :root {
       --bg: #e8f4fc;
       --bg-warm: #f4efe6;
+      --bg-grad: linear-gradient(165deg, #e8f4fc 0%, #eef6fc 48%, #f4efe6 100%);
       --surface: rgba(255, 255, 255, 0.88);
       --surface-2: #f0f6fc;
       --surface-3: #e3edf8;
@@ -58,6 +59,45 @@
       color-scheme: light;
     }
 
+    html[data-theme="dark"] {
+      --bg: #0b1424;
+      --bg-warm: #101b2d;
+      --bg-grad: linear-gradient(160deg, #0b1424 0%, #111f34 52%, #17243a 100%);
+      --surface: rgba(14, 25, 42, 0.88);
+      --surface-2: #16263d;
+      --surface-3: #20324e;
+      --border: #2a3f61;
+      --border-hi: #3f5e89;
+      --text: #e7eefc;
+      --text-muted: #a6badb;
+      --text-dim: #c2d2ee;
+      --accent: #79a7ff;
+      --accent-dim: rgba(121, 167, 255, 0.18);
+      --accent-glow: 0 0 0 3px rgba(121, 167, 255, 0.22);
+      --gold: #e0b247;
+      --gold-dim: rgba(224, 178, 71, 0.16);
+      --success: #30c48d;
+      --success-dim: rgba(48, 196, 141, 0.18);
+      --warning: #f4bb5f;
+      --danger: #f87171;
+      --danger-dim: rgba(248, 113, 113, 0.18);
+      --poke: #e0b247;
+      --op: #f07b70;
+      --glass: rgba(15, 26, 43, 0.86);
+      --glass-border: rgba(121, 167, 255, 0.2);
+      color-scheme: dark;
+    }
+
+    html[data-theme="dark"] #bgCanvas {
+      display: none !important;
+    }
+
+    html[data-theme="dark"] .install-banner {
+      background: rgba(14, 25, 42, 0.96);
+      border-color: var(--glass-border);
+      box-shadow: 0 8px 30px rgba(3, 9, 20, 0.45);
+    }
+
     *, *::before, *::after { box-sizing: border-box; }
 
     html {
@@ -75,7 +115,7 @@
       margin: 0;
       min-height: 100dvh;
       height: auto;
-      background: linear-gradient(165deg, #e8f4fc 0%, #eef6fc 48%, #f4efe6 100%);
+      background: var(--bg-grad);
       color: var(--text);
       display: block;
       overflow-x: clip;
@@ -142,6 +182,9 @@
         position: relative;
         z-index: 50;
       }
+      html[data-theme="dark"] header {
+        background: rgba(12, 22, 36, 0.98) !important;
+      }
       #bgCanvas { display: none !important; pointer-events: none !important; }
     }
 
@@ -200,6 +243,28 @@
     .install-app-btn:hover {
       background: rgba(36, 84, 169, 0.14);
       border-color: rgba(36, 84, 169, 0.28);
+    }
+
+    .theme-toggle-btn {
+      width: 38px;
+      min-width: 38px;
+      height: 38px;
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      border: 1px solid var(--border-hi);
+      background: var(--surface-2);
+      color: var(--text-dim);
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--surface-3);
+      color: var(--text);
+      border-color: var(--accent);
     }
 
     .install-banner {
@@ -607,6 +672,27 @@
       font-size: 0.82rem;
     }
     .btn-outline:not(:disabled):hover { background: var(--surface-2); color: var(--text); }
+
+    .search-mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .search-mode-btn {
+      min-height: 40px;
+      font-weight: 700;
+    }
+    .search-mode-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .quick-search-hint {
+      margin: 6px 0 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
 
     .btn-ghost-danger {
       background: transparent;
@@ -2875,6 +2961,7 @@
     </nav>
 
     <div class="header-account">
+      <button type="button" class="btn theme-toggle-btn" id="themeToggleBtn" aria-label="Attiva tema scuro" title="Tema scuro">🌙</button>
       <button type="button" class="btn install-app-btn" id="installAppBtn" hidden aria-label="Installa app">Installa</button>
       <button type="button" class="user-btn" id="userBtn">
         <div class="user-avatar" id="userAvatar">👤</div>
@@ -2900,6 +2987,21 @@
         <div id="pokemonSearch">
         <div class="form-grid">
 
+          <div class="search-mode-toggle" role="group" aria-label="Modalita ricerca Pokemon">
+            <button type="button" class="btn btn-outline search-mode-btn active" id="pokemonModeStandardBtn" aria-pressed="true">Ricerca completa</button>
+            <button type="button" class="btn btn-outline search-mode-btn" id="pokemonModeQuickBtn" aria-pressed="false">Ricerca veloce</button>
+          </div>
+
+          <div id="pokemonQuickField" hidden>
+            <div class="field">
+              <label for="pokemonQuickCode">Codice carta</label>
+              <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off">
+              <p class="quick-search-hint">Inserisci solo codice set + numero carta. Esempio: PBL 048.</p>
+            </div>
+          </div>
+
+          <div id="pokemonStandardFields">
+
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
             <input id="pokemonName" type="text" placeholder="Es. Ninetales, Charizard, Pikachu…" autocomplete="off">
@@ -2917,6 +3019,8 @@
               <input type="hidden" id="cardSetId" value="">
               <div id="setSuggestions" class="suggestions" hidden></div>
             </div>
+          </div>
+
           </div>
 
           <button type="button" class="btn btn-primary" id="searchBtn">
@@ -3185,6 +3289,65 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 
 const $ = (id) => document.getElementById(id);
+const THEME_STORAGE_KEY = 'dls_theme';
+const THEME_LIGHT_COLOR = '#2454a9';
+const THEME_DARK_COLOR = '#0b1424';
+let currentTheme = 'light';
+
+function updateThemeMeta(theme) {
+  const color = theme === 'dark' ? THEME_DARK_COLOR : THEME_LIGHT_COLOR;
+  document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+    if (meta.hasAttribute('media')) {
+      meta.setAttribute('content', THEME_LIGHT_COLOR);
+      return;
+    }
+    meta.setAttribute('content', color);
+  });
+  const navColor = document.querySelector('meta[name="msapplication-navbutton-color"]');
+  if (navColor) navColor.setAttribute('content', theme === 'dark' ? '#111f34' : '#e8f4fc');
+}
+
+function updateThemeToggleButton() {
+  const btn = $('themeToggleBtn');
+  if (!btn) return;
+  const isDark = currentTheme === 'dark';
+  btn.textContent = isDark ? '☀️' : '🌙';
+  btn.setAttribute('aria-label', isDark ? 'Attiva tema chiaro' : 'Attiva tema scuro');
+  btn.title = isDark ? 'Tema chiaro' : 'Tema scuro';
+}
+
+function applyTheme(theme, opts = {}) {
+  const normalized = theme === 'dark' ? 'dark' : 'light';
+  currentTheme = normalized;
+  document.documentElement.setAttribute('data-theme', normalized);
+  updateThemeMeta(normalized);
+  updateThemeToggleButton();
+  if (!opts.skipPersist) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, normalized); } catch {}
+  }
+}
+
+function initTheme() {
+  let stored = '';
+  try { stored = localStorage.getItem(THEME_STORAGE_KEY) || ''; } catch {}
+  if (stored === 'dark' || stored === 'light') {
+    applyTheme(stored, { skipPersist: true });
+    return;
+  }
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark ? 'dark' : 'light', { skipPersist: true });
+}
+
+function bindThemeToggle() {
+  const btn = $('themeToggleBtn');
+  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', () => {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  });
+}
+
+initTheme();
 // Deve stare PRIMA di initViewport: in PWA standalone syncInstalledState la usa subito
 let deferredPrompt = null;
 const CT_DEBUG = /(?:\?|&)ctdebug=1(?:&|$)/.test(location.search);
@@ -3555,6 +3718,8 @@ let maybeSeedCards = [];
 let pokemonCtMarketMenuOpen = false;
 let pokemonGraded = false;
 let pokemonGradeScore = 10;
+const POKEMON_SEARCH_MODE_STORAGE_KEY = 'dls_pokemon_search_mode';
+let pokemonQuickSearchMode = false;
 
 function normalizeGradeScore(v) {
   const raw = String(v ?? '').trim().replace(',', '.');
@@ -4304,6 +4469,57 @@ function resolveTcgSetFromInput(text, sets) {
   }) || null;
 }
 
+function resolvePokemonSetIdFromQuickCode(codeToken) {
+  if (!codeToken || typeof POKEMON_SETS === 'undefined') return '';
+  const token = normalizeTcgSetCode(codeToken);
+  if (!token) return '';
+
+  const byInput = resolveTcgSetFromInput(codeToken, POKEMON_SETS) || resolveTcgSetFromInput(token, POKEMON_SETS);
+  if (byInput?.id) return byInput.id;
+
+  const byMappedCode = POKEMON_SETS.find(setRow => {
+    const setCodes = new Set();
+    setCodes.add(normalizeTcgSetCode(setRow.id || ''));
+    setCodes.add(normalizeTcgSetCode(setRow.code || ''));
+    const ctCode = resolveCtCodeForPokemonSet(setRow.id || '', setRow.text || '');
+    if (ctCode) setCodes.add(normalizeTcgSetCode(ctCode));
+    return setCodes.has(token);
+  });
+  return byMappedCode?.id || '';
+}
+
+function parsePokemonQuickCodeInput(rawValue) {
+  const raw = String(rawValue || '').trim().toUpperCase();
+  if (!raw) {
+    return { error: 'Inserisci il codice carta, ad esempio PBL 048.' };
+  }
+
+  const cleaned = raw.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+  let match = cleaned.match(/^([A-Z0-9.\-]{2,12})\s+([0-9]{1,4}[A-Z]?(?:\/[0-9]{1,4})?)$/);
+  if (!match) {
+    match = cleaned.match(/^([A-Z0-9.\-]{2,12})-([0-9]{1,4}[A-Z]?(?:\/[0-9]{1,4})?)$/);
+  }
+  if (!match) {
+    return { error: 'Formato non valido. Usa ad esempio: PBL 048.' };
+  }
+
+  const setToken = match[1];
+  const number = match[2];
+  const cardSet = resolvePokemonSetIdFromQuickCode(setToken);
+  if (!cardSet) {
+    return { error: `Codice set "${setToken}" non riconosciuto. Esempio valido: PBL 048.` };
+  }
+
+  const setRow = POKEMON_SETS.find(s => norm(s.id) === norm(cardSet));
+  return {
+    name: '',
+    number,
+    cardSet,
+    setToken,
+    setLabel: setRow ? formatPokemonSetLabel(setRow) : setToken,
+  };
+}
+
 function escHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -4436,6 +4652,89 @@ function setSearchLoading(on) {
   }
 }
 
+function setPokemonSearchMode(mode, opts = {}) {
+  const quick = mode === 'quick';
+  pokemonQuickSearchMode = quick;
+
+  const standardBtn = $('pokemonModeStandardBtn');
+  const quickBtn = $('pokemonModeQuickBtn');
+  const standardFields = $('pokemonStandardFields');
+  const quickField = $('pokemonQuickField');
+
+  if (standardBtn) {
+    standardBtn.classList.toggle('active', !quick);
+    standardBtn.setAttribute('aria-pressed', (!quick).toString());
+  }
+  if (quickBtn) {
+    quickBtn.classList.toggle('active', quick);
+    quickBtn.setAttribute('aria-pressed', quick.toString());
+  }
+  if (standardFields) standardFields.hidden = quick;
+  if (quickField) quickField.hidden = !quick;
+
+  hideAllSuggestions();
+  if (!opts.skipPersist) {
+    try {
+      localStorage.setItem(POKEMON_SEARCH_MODE_STORAGE_KEY, quick ? 'quick' : 'full');
+    } catch {}
+  }
+
+  if (opts.focus !== false) {
+    setTimeout(() => {
+      if (quick) $('pokemonQuickCode')?.focus();
+      else $('pokemonName')?.focus();
+    }, 0);
+  }
+}
+
+function initPokemonSearchMode() {
+  let saved = '';
+  try {
+    saved = localStorage.getItem(POKEMON_SEARCH_MODE_STORAGE_KEY) || '';
+  } catch {}
+  setPokemonSearchMode(saved === 'quick' ? 'quick' : 'full', { skipPersist: true, focus: false });
+}
+
+function bindPokemonSearchModeToggle() {
+  const standardBtn = $('pokemonModeStandardBtn');
+  const quickBtn = $('pokemonModeQuickBtn');
+  if (standardBtn && standardBtn.dataset.bound !== '1') {
+    standardBtn.dataset.bound = '1';
+    standardBtn.addEventListener('click', () => setPokemonSearchMode('full'));
+  }
+  if (quickBtn && quickBtn.dataset.bound !== '1') {
+    quickBtn.dataset.bound = '1';
+    quickBtn.addEventListener('click', () => setPokemonSearchMode('quick'));
+  }
+}
+
+function getPokemonSearchParams() {
+  if (!pokemonQuickSearchMode) {
+    const cardSet = getSelectedSetId();
+    if ($('cardSetId')) $('cardSetId').value = cardSet || '';
+    return {
+      name: $('pokemonName').value.trim(),
+      number: $('cardNumber').value.trim(),
+      cardSet,
+      lang: '',
+    };
+  }
+
+  const parsed = parsePokemonQuickCodeInput($('pokemonQuickCode')?.value || '');
+  if (parsed.error) return { error: parsed.error };
+
+  if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
+  if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
+  if ($('cardNumber')) $('cardNumber').value = parsed.number;
+
+  return {
+    name: '',
+    number: parsed.number,
+    cardSet: parsed.cardSet,
+    lang: '',
+  };
+}
+
 function stopPokemonSearch(silent = false) {
   if (!searchCtrl) return;
   searchCtrl.abort();
@@ -4452,6 +4751,7 @@ function resetPokemonSearchFields() {
   if ($('cardNumber')) $('cardNumber').value = '';
   if ($('cardSet')) $('cardSet').value = '';
   if ($('cardSetId')) $('cardSetId').value = '';
+  if ($('pokemonQuickCode')) $('pokemonQuickCode').value = '';
   selectedCard = null;
   selectedCtListing = null;
   ctPriceData = null;
@@ -4468,7 +4768,8 @@ function resetPokemonSearchFields() {
   if ($('choicesCard')) $('choicesCard').hidden = true;
   hideAllSuggestions();
   showMsg('', 'info');
-  $('pokemonName')?.focus();
+  if (pokemonQuickSearchMode) $('pokemonQuickCode')?.focus();
+  else $('pokemonName')?.focus();
 }
 
 function resolveApiBaseUrl() {
@@ -6520,6 +6821,15 @@ document.getElementById('searchBtn')?.addEventListener('click', () => {
 document.getElementById('resetSearchBtn')?.addEventListener('click', resetPokemonSearchFields);
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('pokemonQuickCode')?.addEventListener('input', () => {
+  const el = $('pokemonQuickCode');
+  if (!el) return;
+  const up = el.value.toUpperCase().replace(/\s{2,}/g, ' ');
+  if (el.value !== up) el.value = up;
+});
+document.getElementById('pokemonQuickCode')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
 
 function refreshSelectedCardCtPrice(context = 'filter') {
   selectedCtListing = null;
@@ -6552,11 +6862,16 @@ async function doSearch() {
   clearCollectionEdit();
   maybeSeedCards = [];
 
-  const name    = $('pokemonName').value.trim();
-  const number  = $('cardNumber').value.trim();
-  const cardSet = getSelectedSetId();
-  if ($('cardSetId')) $('cardSetId').value = cardSet || '';
-  const lang    = '';
+  const params = getPokemonSearchParams();
+  if (params.error) {
+    showMsg(params.error, 'error');
+    return;
+  }
+  const name = params.name;
+  const number = params.number;
+  const cardSet = params.cardSet;
+  const lang = params.lang;
+
   if (cardSet) preloadPokemonSetCards(cardSet);
   if (!name && !number) {
     showMsg('Inserisci almeno il nome del Pokémon o il numero della carta.', 'error');
@@ -9354,6 +9669,8 @@ function applyGameFromUrl() {
 
 // ── Avvio app ───────────────────────────────────────────────────────
 function initApp() {
+  updateThemeToggleButton();
+  initPokemonSearchMode();
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
@@ -10347,11 +10664,39 @@ function showAuthErr(id, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
 
+function bindOverlayBackdropClose(overlayEl, onClose) {
+  if (!overlayEl || typeof onClose !== 'function') return;
+  if (overlayEl.dataset.backdropCloseBound === '1') return;
+  overlayEl.dataset.backdropCloseBound = '1';
+
+  let closeArmed = false;
+  const resetArm = () => { closeArmed = false; };
+
+  overlayEl.addEventListener('pointerdown', e => {
+    closeArmed = e.button === 0 && e.target === overlayEl;
+  });
+
+  overlayEl.addEventListener('pointerup', e => {
+    const shouldClose = closeArmed
+      && e.button === 0
+      && e.target === overlayEl
+      && !overlayEl.classList.contains('is-closed');
+    closeArmed = false;
+    if (shouldClose) onClose();
+  });
+
+  overlayEl.addEventListener('pointercancel', resetArm);
+  overlayEl.addEventListener('lostpointercapture', resetArm);
+
+  // Prevent legacy click-based backdrop close from firing on drag-release.
+  overlayEl.addEventListener('click', e => {
+    if (e.target === overlayEl) e.preventDefault();
+  });
+}
+
 document.getElementById('authClose')?.addEventListener('click', closeAuthModal);
 const authOverlayEl = document.getElementById('authOverlay');
-authOverlayEl?.addEventListener('click', e => {
-  if (e.target === authOverlayEl && !authOverlayEl.classList.contains('is-closed')) closeAuthModal();
-});
+bindOverlayBackdropClose(authOverlayEl, closeAuthModal);
 document.getElementById('emailLoginBtn')?.addEventListener('click', submitAuthForm);
 document.getElementById('emailRegisterBtn')?.addEventListener('click', () => setEmailMode(true));
 document.getElementById('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
@@ -10374,9 +10719,7 @@ document.getElementById('recoveryPasswordConfirm')?.addEventListener('keydown', 
 
 document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
 const profileOverlayEl = document.getElementById('profileOverlay');
-profileOverlayEl?.addEventListener('click', e => {
-  if (e.target === profileOverlayEl && !profileOverlayEl.classList.contains('is-closed')) closeProfilePanel();
-});
+bindOverlayBackdropClose(profileOverlayEl, closeProfilePanel);
 document.getElementById('profileLogoutBtn')?.addEventListener('click', () => {
   closeProfilePanel();
   clearSession();
@@ -10422,9 +10765,7 @@ document.getElementById('manualPriceInput')?.addEventListener('keydown', e => {
   }
 });
 const manualPriceOverlayEl = document.getElementById('manualPriceOverlay');
-manualPriceOverlayEl?.addEventListener('click', e => {
-  if (e.target === manualPriceOverlayEl && !manualPriceOverlayEl.classList.contains('is-closed')) closeManualPriceModal();
-});
+bindOverlayBackdropClose(manualPriceOverlayEl, closeManualPriceModal);
 
 // ── Pre-caricamento dati CardTrader (in background) ───────────────────
 
@@ -10773,6 +11114,8 @@ window.addEventListener('load', () => {
 });
 
 bindGameTabs();
+bindThemeToggle();
+bindPokemonSearchModeToggle();
 bindAccountButton();
 try {
   resetModalLocks();
@@ -10780,7 +11123,7 @@ try {
 } catch (err) {
   console.error('[DLS] initApp fallita:', err);
   try { alert('🚨 Init fallita:\n' + (err?.message || err)); } catch (_) {}
-  try { resetModalLocks(); bindGameTabs(); bindAccountButton(); } catch (_) {}
+  try { resetModalLocks(); bindGameTabs(); bindThemeToggle(); bindPokemonSearchModeToggle(); bindAccountButton(); } catch (_) {}
 }
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
