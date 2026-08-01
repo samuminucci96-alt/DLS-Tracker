@@ -3437,6 +3437,7 @@ let searchCtrl      = null;   // AbortController for main search
 let pokemonSearchInFlight = false;
 let searchGen       = 0;
 let searchLangFilter = '';
+let pokemonPreferredLang = '';
 let searchEditionFilter = '';
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
@@ -4349,7 +4350,7 @@ function resetPokemonSearchFields() {
   pokemonSelectedQty = 1;
   pokemonGraded = false;
   pokemonGradeScore = 10;
-  searchLangFilter = '';
+  searchLangFilter = pokemonPreferredLang;
   searchEditionFilter = '';
   maybeSeedCards = [];
   choicePriceCache.clear();
@@ -6448,7 +6449,7 @@ async function doSearch() {
   }
 
   const myGen = ++searchGen;
-  searchLangFilter = '';
+  searchLangFilter = pokemonPreferredLang;
   searchEditionFilter = '';
   priceFetchGen++;
 
@@ -6945,6 +6946,7 @@ function renderResult() {
   });
   $('cardLanguage')?.addEventListener('change', () => {
     searchLangFilter = $('cardLanguage')?.value?.trim() || '';
+    pokemonPreferredLang = searchLangFilter;
     refreshSelectedCardCtPrice('lang');
   });
   $('cardEdition')?.addEventListener('change', () => {
@@ -7150,6 +7152,7 @@ function fillPokemonSearchFromItem(item) {
   if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
   const lang = item.lang || item.language || '';
   searchLangFilter = lang === 'Any' ? '' : lang;
+  pokemonPreferredLang = searchLangFilter;
   if (item.edition === '1st' || item.firstEdition === true) searchEditionFilter = '1st';
   else if (item.edition === 'unlimited' || item.firstEdition === false) searchEditionFilter = 'unlimited';
   else searchEditionFilter = '';
