@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
-import { randomBytes, pbkdf2 as _pbkdf2, timingSafeEqual } from "crypto";
+import { randomBytes, randomInt, pbkdf2 as _pbkdf2, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { signJwt, corsHeaders, requireUser } from "./_lib/jwt.mjs";
+import { signJwt, verifyJwt, corsHeaders, requireUser } from "./_lib/jwt.mjs";
 import { findUserRecord, saveUserRecord, normalizeEmail } from "./_lib/users.mjs";
 
 const pbkdf2 = promisify(_pbkdf2);
@@ -29,6 +29,44 @@ function clearRecoveryFields(user) {
   return next;
 }
 
+function requireRecovery(req) {
+  const token = (req.headers.get("X-DLS-Recovery") || "").trim();
+  if (!token) throw new Error("Sessione recupero mancante");
+  const payload = verifyJwt(token);
+  if (payload.type !== "recovery" || !payload.email) throw new Error("Sessione recupero non valida");
+  return payload;
+}
+
+async function sendRecoveryCodeEmail(email, code) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM || "DLS Tracker <no-reply@dlstracker.netlify.app>";
+  if (!apiKey) {
+    throw new Error("Servizio email non configurato (manca RESEND_API_KEY)");
+  }
+
+  const body = {
+    from,
+    to: [email],
+    subject: "DLS Tracker - Codice recupero account",
+    text: `Il tuo codice di recupero DLS Tracker e': ${code}\n\nUsalo per accedere con password di recupero e impostare una nuova password.\nScadenza codice: 15 minuti.`,
+    html: `<p>Il tuo codice di recupero DLS Tracker e': <strong style=\"font-size:20px;letter-spacing:3px;\">${code}</strong></p><p>Usalo per accedere con password di recupero e impostare una nuova password.</p><p>Scadenza codice: 15 minuti.</p>`,
+  };
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const details = await res.text().catch(() => "");
+    throw new Error(`Invio email fallito (${res.status})${details ? `: ${details}` : ""}`);
+  }
+}
+
 function passMatches(storedHash, candidateHash) {
   if (!storedHash || !candidateHash) return false;
   const a = Buffer.from(storedHash, "hex");
@@ -46,15 +84,15 @@ export default async (req) => {
     try { body = await req.json(); }
     catch { return new Response(JSON.stringify({ error: "Body non valido" }), { status: 400, headers: cors }); }
 
-    const { action, email, password, displayName, resetToken, currentPassword, newPassword } = body || {};
-    const needsPassword = action === "register" || action === "login" || action === "confirm-reset";
-    const needsEmail = action !== "change-password";
+    const { action, email, password, displayName, currentPassword, newPassword } = body || {};
+    const needsPassword = action === "register" || action === "login" || action === "recovery-login";
+    const needsEmail = action !== "change-password" && action !== "set-new-password";
     if ((needsEmail && !email) || (needsPassword && !password)) {
       return new Response(JSON.stringify({ error: needsPassword ? "Email e password richieste" : "Email richiesta" }), { status: 400, headers: cors });
     }
 
     const store = getStore({ name: "dls-users", consistency: "strong" });
-    const userKey = normalizeEmail(email);
+    const userKey = needsEmail ? normalizeEmail(email) : "";
 
     if (action === "register") {
       const existing = await findUserRecord(store, email);
@@ -105,9 +143,9 @@ export default async (req) => {
       if (!found) {
         return new Response(JSON.stringify({ error: "Nessun account trovato con questa email." }), { status: 404, headers: cors });
       }
-      const recoveryToken = randomBytes(18).toString("hex");
+      const recoveryCode = String(randomInt(0, 10000)).padStart(4, "0");
       const recoverySalt = randomBytes(16).toString("hex");
-      const recoveryHash = await hashPass(recoveryToken, recoverySalt);
+      const recoveryHash = await hashPass(recoveryCode, recoverySalt);
       const next = {
         ...found.user,
         recoverySalt,
@@ -120,15 +158,15 @@ export default async (req) => {
       } else {
         await store.setJSON(found.normalized, next);
       }
+      await sendRecoveryCodeEmail(found.normalized, recoveryCode);
       return new Response(JSON.stringify({
         email: found.normalized,
-        resetToken: recoveryToken,
         expiresInMinutes: 15,
-        message: "Codice di recupero generato. Copialo per impostare una nuova password.",
+        message: "Codice di recupero inviato alla tua email.",
       }), { headers: cors });
     }
 
-    if (action === "confirm-reset") {
+    if (action === "recovery-login") {
       const found = await findUserRecord(store, email);
       if (!found) {
         return new Response(JSON.stringify({ error: "Nessun account trovato con questa email." }), { status: 404, headers: cors });
@@ -140,16 +178,34 @@ export default async (req) => {
       if (Date.now() > Number(user.recoveryExpiresAt)) {
         return new Response(JSON.stringify({ error: "Il codice di recupero è scaduto. Richiedine uno nuovo." }), { status: 400, headers: cors });
       }
-      const candidate = await hashPass(resetToken || "", user.recoverySalt);
+      const candidate = await hashPass(password || "", user.recoverySalt);
       if (!passMatches(user.recoveryHash, candidate)) {
         await new Promise(r => setTimeout(r, 500));
-        return new Response(JSON.stringify({ error: "Codice di recupero non valido." }), { status: 401, headers: cors });
+        return new Response(JSON.stringify({ error: "Password di recupero non valida." }), { status: 401, headers: cors });
       }
-      if (String(password || '').length < 6) {
+      const recoveryToken = signJwt({ type: "recovery", email: found.normalized }, 10 * 60);
+      return new Response(JSON.stringify({
+        email: found.normalized,
+        recoveryToken,
+        expiresInMinutes: 10,
+        message: "Accesso con password di recupero effettuato. Ora imposta la nuova password.",
+      }), { headers: cors });
+    }
+
+    if (action === "set-new-password") {
+      const recovery = requireRecovery(req);
+      if (String(newPassword || "").length < 6) {
         return new Response(JSON.stringify({ error: "Password troppo corta (min 6 caratteri)" }), { status: 400, headers: cors });
       }
+
+      const found = await findUserRecord(store, recovery.email);
+      if (!found) {
+        return new Response(JSON.stringify({ error: "Utente non trovato" }), { status: 404, headers: cors });
+      }
+
+      const user = found.user;
       const salt = randomBytes(16).toString("hex");
-      const hash = await hashPass(password, salt);
+      const hash = await hashPass(newPassword, salt);
       const updated = clearRecoveryFields({
         ...user,
         salt,
