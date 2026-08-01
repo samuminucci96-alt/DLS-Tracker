@@ -3437,6 +3437,7 @@ let searchCtrl      = null;   // AbortController for main search
 let pokemonSearchInFlight = false;
 let searchGen       = 0;
 let searchLangFilter = '';
+let pokemonPreferredLang = '';
 let searchEditionFilter = '';
 let suggCtrl        = null;   // AbortController for suggestions
 let priceFetchGen   = 0;
@@ -3510,9 +3511,9 @@ const suggCache     = new Map();
 const pokemonQueryCache = new Map();
 const pokemonSetCache = new Map();
 const pokemonSetPreloadInFlight = new Map();
-const NAME_SUGG_DEBOUNCE_MS = 45;
+const NAME_SUGG_DEBOUNCE_MS = 20;
 const NAME_SUGG_PAGE_SIZE = 12;
-const TCG_NAME_SUGG_DEBOUNCE_MS = 55;
+const TCG_NAME_SUGG_DEBOUNCE_MS = 25;
 const POKEMON_QUERY_CACHE_TTL_MS = 2 * 60 * 1000;
 const POKEMON_QUERY_CACHE_MAX = 180;
 const POKEMON_SET_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -4235,6 +4236,16 @@ function bfq(field, value, wild = false) {
   return `${field}:"${v.replace(/"/g, '')}"`;
 }
 
+function buildPokemonSuggestionQueries(name) {
+  const tokens = escNameQ(name).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  const prefixQuery = tokens
+    .map((token, index) => index === 0 ? `name:${token}*` : `name:*${token}*`)
+    .join(' ');
+  const containsQuery = tokens.map(token => `name:*${token}*`).join(' ');
+  return prefixQuery === containsQuery ? [prefixQuery] : [prefixQuery, containsQuery];
+}
+
 function bnq(value) {
   const v = escNum(value);
   if (!v) return '';
@@ -4349,7 +4360,7 @@ function resetPokemonSearchFields() {
   pokemonSelectedQty = 1;
   pokemonGraded = false;
   pokemonGradeScore = 10;
-  searchLangFilter = '';
+  searchLangFilter = pokemonPreferredLang;
   searchEditionFilter = '';
   maybeSeedCards = [];
   choicePriceCache.clear();
@@ -5668,8 +5679,12 @@ async function loadSuggestions(name) {
   if (suggCtrl) suggCtrl.abort();
   suggCtrl = new AbortController();
   try {
-    const cards = await fetchCards(`name:*${escNameQ(name)}*`, null, suggCtrl.signal, NAME_SUGG_PAGE_SIZE);
-    const names = [...new Set(cards.map(c => c.name))].sort().slice(0, 10);
+    let names = [];
+    for (const query of buildPokemonSuggestionQueries(name)) {
+      const cards = await fetchCards(query, null, suggCtrl.signal, NAME_SUGG_PAGE_SIZE);
+      names = [...new Set(cards.map(c => c.name))].sort().slice(0, 10);
+      if (names.length) break;
+    }
     suggCache.set(key, names);
     suggLastNames = names;
     if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === key) {
@@ -6448,7 +6463,7 @@ async function doSearch() {
   }
 
   const myGen = ++searchGen;
-  searchLangFilter = '';
+  searchLangFilter = pokemonPreferredLang;
   searchEditionFilter = '';
   priceFetchGen++;
 
@@ -6945,6 +6960,7 @@ function renderResult() {
   });
   $('cardLanguage')?.addEventListener('change', () => {
     searchLangFilter = $('cardLanguage')?.value?.trim() || '';
+    pokemonPreferredLang = searchLangFilter;
     refreshSelectedCardCtPrice('lang');
   });
   $('cardEdition')?.addEventListener('change', () => {
@@ -7150,6 +7166,7 @@ function fillPokemonSearchFromItem(item) {
   if ($('cardNumber')) $('cardNumber').value = item.number && item.number !== '-' ? item.number : '';
   const lang = item.lang || item.language || '';
   searchLangFilter = lang === 'Any' ? '' : lang;
+  pokemonPreferredLang = searchLangFilter;
   if (item.edition === '1st' || item.firstEdition === true) searchEditionFilter = '1st';
   else if (item.edition === 'unlimited' || item.firstEdition === false) searchEditionFilter = 'unlimited';
   else searchEditionFilter = '';
@@ -8935,7 +8952,7 @@ function initCtTcgGame(gameKey) {
   $(`${cfg.prefix}CardName`)?.addEventListener('input', () => {
     const name = $(`${cfg.prefix}CardName`).value.trim();
     clearTimeout(ctTcgState[gameKey].suggTimer);
-    if (name.length < 2) { $(`${cfg.prefix}NameSuggestions`).hidden = true; return; }
+    if (name.length < 1) { $(`${cfg.prefix}NameSuggestions`).hidden = true; return; }
 
     const fast = getFastTcgNameSuggestions(gameKey, name);
     if (fast.length) tcgRenderNameSuggestions(gameKey, fast);
@@ -8945,7 +8962,7 @@ function initCtTcgGame(gameKey) {
   });
   $(`${cfg.prefix}CardName`)?.addEventListener('focus', () => {
     const name = $(`${cfg.prefix}CardName`).value.trim();
-    if (name.length < 2) return;
+    if (name.length < 1) return;
 
     const fast = getFastTcgNameSuggestions(gameKey, name);
     if (fast.length) tcgRenderNameSuggestions(gameKey, fast);
