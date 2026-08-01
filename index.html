@@ -1958,6 +1958,22 @@
     }
     .auth-toggle { font-size: 0.8rem; color: var(--text-muted); text-align: center; }
     .auth-toggle a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .auth-recovery-info {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      line-height: 1.45;
+      margin-bottom: 12px;
+    }
+    .auth-recovery-code {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .auth-recovery-code input { flex: 1; }
 
     .manual-price-modal {
       width: min(380px, 100%);
@@ -2653,7 +2669,7 @@
     <div class="auth-sub" id="authSub">La tua collezione sincronizzata su tutti i dispositivi</div>
 
     <!-- Email panel -->
-    <div>
+    <div id="authLoginPanel">
       <div class="auth-field" id="displayNameField" style="display:none">
         <label>Nome (opzionale)</label>
         <input id="authDisplayName" type="text" placeholder="Es. Marco" autocomplete="name">
@@ -2675,6 +2691,41 @@
         <span id="emailToggleText">Non hai un account?</span>
         <a id="emailToggleLink"> Registrati</a>
       </div>
+      <div class="auth-toggle" style="margin-top:10px">
+        <a id="forgotPasswordLink">Password dimenticata?</a>
+      </div>
+    </div>
+
+    <div id="authRecoveryPanel" hidden>
+      <div class="auth-recovery-info">
+        Genera un codice di recupero, poi usalo qui sotto per impostare una nuova password.
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input id="recoveryEmail" type="email" placeholder="nome@esempio.it" autocomplete="email">
+      </div>
+      <div class="auth-actions" style="margin-top:12px">
+        <button type="button" class="btn" id="recoveryRequestBtn" style="width:100%">Richiedi codice</button>
+        <button type="button" class="btn btn-outline" id="recoveryBackBtn" style="width:100%">Torna al login</button>
+      </div>
+      <div class="auth-recovery-info" id="recoveryTokenBox" hidden style="margin-top:12px"></div>
+      <div id="recoveryConfirmFields" hidden>
+        <div class="auth-field">
+          <label>Codice recupero</label>
+          <div class="auth-recovery-code">
+            <input id="recoveryToken" type="text" placeholder="Incolla il codice" autocomplete="one-time-code">
+            <button type="button" class="btn btn-outline" id="recoveryPasteBtn" style="white-space:nowrap">Incolla</button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label>Nuova password</label>
+          <input id="recoveryPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="new-password">
+        </div>
+        <div class="auth-actions" style="margin-top:12px">
+          <button type="button" class="btn" id="recoveryConfirmBtn" style="width:100%">Conferma recupero</button>
+        </div>
+      </div>
+      <div class="auth-err" id="recoveryErr" style="margin-top:12px"></div>
     </div>
 
 
@@ -6151,6 +6202,7 @@ function shouldTryCtPromoSearch(cardSet) {
 
 function shouldTryCtFallback(name, number, cardSet) {
   if (shouldTryCtPromoSearch(cardSet)) return true;
+  if (name && cardSet) return true;
   if (name && number) return true;
   if (number && cardSet) return true;
   return false;
@@ -9906,8 +9958,52 @@ function closeAuthModal() {
 
 // ── Login/Register toggle
 let emailIsRegister = false;
+let authRecoveryActive = false;
+let authRecoveryStep = 'request';
+
+function setAuthRecoveryStep(step = 'request') {
+  authRecoveryStep = step;
+  authRecoveryActive = true;
+  const loginPanel = $('authLoginPanel');
+  const recoveryPanel = $('authRecoveryPanel');
+  if (loginPanel) loginPanel.hidden = true;
+  if (recoveryPanel) recoveryPanel.hidden = false;
+  $('authTitle').textContent = 'Recupero password';
+  $('authSub').textContent = step === 'confirm'
+    ? 'Inserisci il codice ricevuto e imposta una nuova password'
+    : 'Genera un codice di recupero e poi imposta una nuova password';
+  const confirmFields = $('recoveryConfirmFields');
+  if (confirmFields) confirmFields.hidden = step !== 'confirm';
+  const tokenBox = $('recoveryTokenBox');
+  if (tokenBox && step !== 'confirm') {
+    tokenBox.hidden = true;
+    tokenBox.textContent = '';
+  }
+  const err = $('recoveryErr');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+  if ($('recoveryEmail') && $('authEmail')) $('recoveryEmail').value = $('authEmail').value.trim();
+  if (step === 'request') setTimeout(() => $('recoveryEmail')?.focus(), 50);
+  else setTimeout(() => $('recoveryToken')?.focus(), 50);
+}
+
+function showLoginPanel() {
+  authRecoveryActive = false;
+  authRecoveryStep = 'request';
+  const loginPanel = $('authLoginPanel');
+  const recoveryPanel = $('authRecoveryPanel');
+  if (loginPanel) loginPanel.hidden = false;
+  if (recoveryPanel) recoveryPanel.hidden = true;
+  const tokenBox = $('recoveryTokenBox');
+  if (tokenBox) { tokenBox.hidden = true; tokenBox.textContent = ''; }
+  const confirmFields = $('recoveryConfirmFields');
+  if (confirmFields) confirmFields.hidden = true;
+  const err = $('recoveryErr');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+}
+
 function setEmailMode(reg) {
   emailIsRegister = reg;
+  showLoginPanel();
   $('authTitle').textContent  = reg ? 'Crea account' : 'Accedi a DLS Tracker';
   $('authSub').textContent    = reg ? 'Registrati con email e password' : 'La tua collezione sincronizzata ovunque';
   $('emailLoginBtn').textContent      = reg ? 'Crea account' : 'Accedi';
@@ -9915,6 +10011,90 @@ function setEmailMode(reg) {
   $('emailToggleText').textContent = reg ? 'Hai già un account?' : 'Non hai un account?';
   $('emailToggleLink').textContent = reg ? ' Accedi' : ' Registrati';
   if ($('displayNameField')) $('displayNameField').style.display = reg ? '' : 'none';
+}
+
+async function requestPasswordReset() {
+  const email = $('recoveryEmail')?.value.trim();
+  if (!email) { showAuthErr('recoveryErr', 'Inserisci l’email dell’account'); return; }
+  const btn = $('recoveryRequestBtn');
+  const origText = btn?.textContent || 'Richiedi codice';
+  if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
+  try {
+    const res = await authFetch(API_AUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request-reset', email })
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      showAuthErr('recoveryErr', data.error || 'Impossibile generare il codice di recupero');
+      return;
+    }
+    setAuthRecoveryStep('confirm');
+    $('recoveryEmail').value = data.email || email;
+    $('recoveryToken').value = data.resetToken || '';
+    const tokenBox = $('recoveryTokenBox');
+    if (tokenBox) {
+      tokenBox.hidden = false;
+      tokenBox.textContent = data.resetToken
+        ? `Codice generato. Copialo subito: ${data.resetToken} (valido ${data.expiresInMinutes || 15} minuti).`
+        : 'Codice generato. Copialo per completare il recupero.';
+    }
+    showAuthErr('recoveryErr', '');
+    setTimeout(() => $('recoveryToken')?.focus(), 50);
+  } catch (e) {
+    console.error('requestPasswordReset:', e);
+    showAuthErr('recoveryErr', API_BASE_URL
+      ? 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.'
+      : 'Errore di rete. Riprova.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
+}
+
+async function confirmPasswordReset() {
+  const email = $('recoveryEmail')?.value.trim();
+  const resetToken = $('recoveryToken')?.value.trim();
+  const pass = $('recoveryPassword')?.value;
+  if (!email || !resetToken || !pass) {
+    showAuthErr('recoveryErr', 'Compila email, codice e nuova password');
+    return;
+  }
+  const btn = $('recoveryConfirmBtn');
+  const origText = btn?.textContent || 'Conferma recupero';
+  if (btn) { btn.disabled = true; btn.textContent = '⌛ …'; }
+  try {
+    const res = await authFetch(API_AUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'confirm-reset', email, resetToken, password: pass })
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      showAuthErr('recoveryErr', data.error || 'Recupero password fallito');
+      return;
+    }
+    try {
+      saveSession(data);
+    } catch (e) {
+      showAuthErr('recoveryErr', e.message || 'Impossibile salvare la sessione.');
+      return;
+    }
+    closeAuthModal();
+    updateAuthUI();
+    showMsg(`✅ Password aggiornata! Benvenuto, ${data.displayName || data.email}`, 'success');
+    await loadUserProfile();
+    await loadCloudCollection();
+  } catch (e) {
+    console.error('confirmPasswordReset:', e);
+    showAuthErr('recoveryErr', API_BASE_URL
+      ? 'Backend non raggiungibile. Avvia "netlify dev" (porta 8888) e riprova.'
+      : 'Errore di rete. Riprova.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
 }
 
 async function submitAuthForm() {
@@ -9971,6 +10151,7 @@ async function submitAuthForm() {
 
 function showAuthErr(id, msg) {
   const el = $(id); if (!el) return;
+  if (!msg) { el.textContent = ''; el.style.display = 'none'; return; }
   el.textContent = msg; el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 8000);
 }
@@ -9985,6 +10166,19 @@ document.getElementById('emailRegisterBtn')?.addEventListener('click', () => set
 document.getElementById('authPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
 document.getElementById('authEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuthForm(); });
 document.getElementById('emailToggleLink')?.addEventListener('click', () => setEmailMode(!emailIsRegister));
+document.getElementById('forgotPasswordLink')?.addEventListener('click', () => setAuthRecoveryStep('request'));
+document.getElementById('recoveryBackBtn')?.addEventListener('click', () => setEmailMode(false));
+document.getElementById('recoveryRequestBtn')?.addEventListener('click', requestPasswordReset);
+document.getElementById('recoveryConfirmBtn')?.addEventListener('click', confirmPasswordReset);
+document.getElementById('recoveryPasteBtn')?.addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard?.readText?.();
+    if (text) $('recoveryToken').value = text.trim();
+  } catch {}
+});
+document.getElementById('recoveryEmail')?.addEventListener('keydown', e => { if (e.key === 'Enter') requestPasswordReset(); });
+document.getElementById('recoveryToken')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
+document.getElementById('recoveryPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') confirmPasswordReset(); });
 
 document.getElementById('profileClose')?.addEventListener('click', closeProfilePanel);
 const profileOverlayEl = document.getElementById('profileOverlay');

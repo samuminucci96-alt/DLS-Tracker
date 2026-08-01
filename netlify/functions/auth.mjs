@@ -11,6 +11,24 @@ async function hashPass(pass, salt) {
   return key.toString("hex");
 }
 
+function authResponse(user, email) {
+  return new Response(JSON.stringify({
+    token: signJwt({ type: "user", email }, 90 * 24 * 3600),
+    email,
+    displayName: user.displayName,
+    avatar: user.avatar || null,
+  }), { headers: corsHeaders });
+}
+
+function clearRecoveryFields(user) {
+  const next = { ...user };
+  delete next.recoverySalt;
+  delete next.recoveryHash;
+  delete next.recoveryExpiresAt;
+  delete next.recoveryIssuedAt;
+  return next;
+}
+
 function passMatches(storedHash, candidateHash) {
   if (!storedHash || !candidateHash) return false;
   const a = Buffer.from(storedHash, "hex");
@@ -28,9 +46,10 @@ export default async (req) => {
     try { body = await req.json(); }
     catch { return new Response(JSON.stringify({ error: "Body non valido" }), { status: 400, headers: cors }); }
 
-    const { action, email, password, displayName } = body || {};
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email e password richieste" }), { status: 400, headers: cors });
+    const { action, email, password, displayName, resetToken } = body || {};
+    const needsPassword = action === "register" || action === "login" || action === "confirm-reset";
+    if (!email || (needsPassword && !password)) {
+      return new Response(JSON.stringify({ error: needsPassword ? "Email e password richieste" : "Email richiesta" }), { status: 400, headers: cors });
     }
 
     const store = getStore({ name: "dls-users", consistency: "strong" });
@@ -78,6 +97,70 @@ export default async (req) => {
         displayName: user.displayName,
         avatar: user.avatar || null,
       }), { headers: cors });
+    }
+
+    if (action === "request-reset") {
+      const found = await findUserRecord(store, email);
+      if (!found) {
+        return new Response(JSON.stringify({ error: "Nessun account trovato con questa email." }), { status: 404, headers: cors });
+      }
+      const recoveryToken = randomBytes(18).toString("hex");
+      const recoverySalt = randomBytes(16).toString("hex");
+      const recoveryHash = await hashPass(recoveryToken, recoverySalt);
+      const next = {
+        ...found.user,
+        recoverySalt,
+        recoveryHash,
+        recoveryIssuedAt: new Date().toISOString(),
+        recoveryExpiresAt: Date.now() + (15 * 60 * 1000),
+      };
+      if (found.key !== found.normalized) {
+        await saveUserRecord(store, found.normalized, next, found.key);
+      } else {
+        await store.setJSON(found.normalized, next);
+      }
+      return new Response(JSON.stringify({
+        email: found.normalized,
+        resetToken: recoveryToken,
+        expiresInMinutes: 15,
+        message: "Codice di recupero generato. Copialo per impostare una nuova password.",
+      }), { headers: cors });
+    }
+
+    if (action === "confirm-reset") {
+      const found = await findUserRecord(store, email);
+      if (!found) {
+        return new Response(JSON.stringify({ error: "Nessun account trovato con questa email." }), { status: 404, headers: cors });
+      }
+      const user = found.user;
+      if (!user.recoverySalt || !user.recoveryHash || !user.recoveryExpiresAt) {
+        return new Response(JSON.stringify({ error: "Richiedi prima un nuovo codice di recupero." }), { status: 400, headers: cors });
+      }
+      if (Date.now() > Number(user.recoveryExpiresAt)) {
+        return new Response(JSON.stringify({ error: "Il codice di recupero è scaduto. Richiedine uno nuovo." }), { status: 400, headers: cors });
+      }
+      const candidate = await hashPass(resetToken || "", user.recoverySalt);
+      if (!passMatches(user.recoveryHash, candidate)) {
+        await new Promise(r => setTimeout(r, 500));
+        return new Response(JSON.stringify({ error: "Codice di recupero non valido." }), { status: 401, headers: cors });
+      }
+      if (String(password || '').length < 6) {
+        return new Response(JSON.stringify({ error: "Password troppo corta (min 6 caratteri)" }), { status: 400, headers: cors });
+      }
+      const salt = randomBytes(16).toString("hex");
+      const hash = await hashPass(password, salt);
+      const updated = clearRecoveryFields({
+        ...user,
+        salt,
+        hash,
+        updatedAt: new Date().toISOString(),
+      });
+      if (found.key !== found.normalized) {
+        await saveUserRecord(store, found.normalized, updated, found.key);
+      } else {
+        await store.setJSON(found.normalized, updated);
+      }
+      return authResponse(updated, found.normalized);
     }
 
     return new Response(JSON.stringify({ error: "Azione non valida" }), { status: 400, headers: cors });
