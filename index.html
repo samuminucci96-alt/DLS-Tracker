@@ -6151,6 +6151,7 @@ function shouldTryCtPromoSearch(cardSet) {
 
 function shouldTryCtFallback(name, number, cardSet) {
   if (shouldTryCtPromoSearch(cardSet)) return true;
+  if (name && cardSet) return true;
   if (name && number) return true;
   if (number && cardSet) return true;
   return false;
