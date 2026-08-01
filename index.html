@@ -673,6 +673,13 @@
     }
     .btn-outline:not(:disabled):hover { background: var(--surface-2); color: var(--text); }
 
+    .collection-filter-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
     .search-mode-toggle {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1194,11 +1201,19 @@
       gap: 3px;
     }
     .collection-graded-label {
-      font-size: 0.69rem;
-      font-weight: 700;
-      color: var(--gold);
-      letter-spacing: 0.01em;
-      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--border));
+      background: color-mix(in srgb, var(--gold-dim) 78%, transparent);
+      color: color-mix(in srgb, var(--gold) 88%, var(--text));
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+      text-transform: uppercase;
     }
 
     /* ─── Collection table ───────────────────────────────────────── */
@@ -2087,7 +2102,25 @@
       max-width: 140px;
       justify-content: center;
     }
+    #userLabel {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: inherit;
+      font-weight: 600;
+    }
     .user-btn:hover { border-color: var(--accent); color: var(--text); }
+    html[data-theme="dark"] .user-btn {
+      background: rgba(121, 167, 255, 0.18);
+      border-color: rgba(121, 167, 255, 0.42);
+      color: #f4f8ff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    html[data-theme="dark"] .user-btn:hover {
+      background: rgba(121, 167, 255, 0.26);
+      border-color: rgba(121, 167, 255, 0.62);
+      color: #ffffff;
+    }
     .user-avatar {
       width: 24px; height: 24px; border-radius: 50%;
       background: linear-gradient(135deg, var(--accent), #c9920a);
@@ -2097,6 +2130,9 @@
     .sync-dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: var(--success); display: inline-block;
+    }
+    html[data-theme="dark"] .sync-dot {
+      box-shadow: 0 0 0 2px rgba(11, 20, 36, 0.75);
     }
     .user-avatar img {
       width: 100%;
@@ -2347,6 +2383,14 @@
     .price-refresh-row {
       display: flex; align-items: center; justify-content: space-between;
       flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+    }
+    .price-refresh-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-left: auto;
     }
     .price-status { font-size: 0.76rem; color: var(--text-muted); }
     .ct-price-cell {
@@ -2996,7 +3040,7 @@
             <div class="field">
               <label for="pokemonQuickCode">Codice carta</label>
               <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off">
-              <p class="quick-search-hint">Inserisci solo codice set + numero carta. Esempio: PBL 048.</p>
+              <p class="quick-search-hint">Inserisci solo codice set + numero carta. Esempi: TM 074 (Trionfante), TWM 074 (Twilight Masquerade), PBL 048.</p>
             </div>
           </div>
 
@@ -3225,9 +3269,12 @@
         <!-- Prezzo aggiornamento real-time -->
         <div class="price-refresh-row" id="priceRefreshRow" style="display:none">
           <div class="price-status" id="priceStatus">—</div>
-          <button class="btn btn-outline" id="refreshPricesBtn" style="padding:6px 12px;font-size:0.78rem;">
-            🔄 Aggiorna prezzi
-          </button>
+          <div class="price-refresh-actions">
+            <button class="btn btn-outline collection-filter-btn" id="collectionGradedFilterBtn" aria-pressed="false">Solo gradate</button>
+            <button class="btn btn-outline" id="refreshPricesBtn" style="padding:6px 12px;font-size:0.78rem;">
+              🔄 Aggiorna prezzi
+            </button>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -3720,6 +3767,30 @@ let pokemonGraded = false;
 let pokemonGradeScore = 10;
 const POKEMON_SEARCH_MODE_STORAGE_KEY = 'dls_pokemon_search_mode';
 let pokemonQuickSearchMode = false;
+const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only';
+let collectionOnlyGraded = false;
+
+function updateCollectionGradeFilterButton() {
+  const btn = $('collectionGradedFilterBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', collectionOnlyGraded);
+  btn.setAttribute('aria-pressed', collectionOnlyGraded.toString());
+  btn.textContent = collectionOnlyGraded ? 'Solo gradate: ON' : 'Solo gradate';
+}
+
+function bindCollectionGradeFilterToggle() {
+  const btn = $('collectionGradedFilterBtn');
+  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', () => {
+    collectionOnlyGraded = !collectionOnlyGraded;
+    try {
+      localStorage.setItem(COLLECTION_GRADED_FILTER_STORAGE_KEY, collectionOnlyGraded ? '1' : '0');
+    } catch {}
+    updateCollectionGradeFilterButton();
+    renderCollection();
+  });
+}
 
 function normalizeGradeScore(v) {
   const raw = String(v ?? '').trim().replace(',', '.');
@@ -3921,6 +3992,27 @@ function pokemonManualPriceUnit() {
   return parsed;
 }
 
+function resolveGradedPriceHint(ctData, score) {
+  const scoreKey = formatGradeScore(score);
+  if (!scoreKey) return null;
+  const hints = Array.isArray(ctData?.gradedHints) ? ctData.gradedHints : [];
+  const hit = hints.find(h => String(h?.score) === scoreKey);
+  if (!hit) return null;
+
+  const unitRaw = Number(hit.medianPrice ?? hit.minPrice);
+  if (!Number.isFinite(unitRaw) || unitRaw <= 0) return null;
+  const unit = parseFloat(unitRaw.toFixed(2));
+  return {
+    score: scoreKey,
+    count: Number(hit.count || 0),
+    unit,
+    minPrice: Number(hit.minPrice || unit),
+    maxPrice: Number(hit.maxPrice || unit),
+    avgPrice: Number(hit.avgPrice || unit),
+    medianPrice: Number(hit.medianPrice || unit),
+  };
+}
+
 function pokemonEffectivePrice(selectedPrice) {
   const manualUnit = pokemonManualPriceUnit();
   if (manualUnit != null) {
@@ -3932,6 +4024,21 @@ function pokemonEffectivePrice(selectedPrice) {
       condition: null,
     };
   }
+
+  if (pokemonGraded) {
+    const gradedHint = resolveGradedPriceHint(ctPriceData, pokemonGradeScore);
+    if (gradedHint) {
+      return {
+        unit: gradedHint.unit,
+        manual: false,
+        source: `CardTrader · graded ${gradedHint.score} (${gradedHint.count} ann.)`,
+        fromCt: true,
+        condition: null,
+        gradedHint,
+      };
+    }
+  }
+
   return {
     ...selectedPrice,
     manual: false,
@@ -4474,24 +4581,41 @@ function resolvePokemonSetIdFromQuickCode(codeToken) {
   const token = normalizeTcgSetCode(codeToken);
   if (!token) return '';
 
-  const byInput = resolveTcgSetFromInput(codeToken, POKEMON_SETS) || resolveTcgSetFromInput(token, POKEMON_SETS);
-  if (byInput?.id) return byInput.id;
+  const quickAlias = (typeof POKEMON_QUICK_SET_ALIASES !== 'undefined')
+    ? POKEMON_QUICK_SET_ALIASES[token]
+    : '';
+  if (quickAlias) return quickAlias;
 
-  const byMappedCode = POKEMON_SETS.find(setRow => {
+  // Quick mode expects compact set codes (es. ASC, PBL): usa match stretti prima
+  // di qualsiasi fuzzy search per evitare collisioni con parole tipo "nascente".
+  const byStrictCode = POKEMON_SETS.find(setRow => {
     const setCodes = new Set();
-    setCodes.add(normalizeTcgSetCode(setRow.id || ''));
-    setCodes.add(normalizeTcgSetCode(setRow.code || ''));
-    const ctCode = resolveCtCodeForPokemonSet(setRow.id || '', setRow.text || '');
+    const setId = String(setRow.id || '').trim();
+    const setIdNorm = normalizeTcgSetCode(setId);
+    if (setIdNorm) {
+      setCodes.add(setIdNorm);
+      setCodes.add(setIdNorm.replace(/[^a-z0-9]/g, ''));
+    }
+    const setCode = normalizeTcgSetCode(setRow.code || '');
+    if (setCode) setCodes.add(setCode);
+    const ctCode = resolveCtCodeForPokemonSet(setId, setRow.text || '');
     if (ctCode) setCodes.add(normalizeTcgSetCode(ctCode));
+    const overrideCode = (typeof POKEMON_SET_CODE_OVERRIDES !== 'undefined')
+      ? POKEMON_SET_CODE_OVERRIDES[String(setId).toLowerCase()]
+      : '';
+    if (overrideCode) setCodes.add(normalizeTcgSetCode(overrideCode));
     return setCodes.has(token);
   });
-  return byMappedCode?.id || '';
+  if (byStrictCode?.id) return byStrictCode.id;
+
+  // Nessun fuzzy fallback: in ricerca veloce sono ammessi solo codici/alias esatti.
+  return '';
 }
 
 function parsePokemonQuickCodeInput(rawValue) {
   const raw = String(rawValue || '').trim().toUpperCase();
   if (!raw) {
-    return { error: 'Inserisci il codice carta, ad esempio PBL 048.' };
+    return { error: 'Inserisci il codice carta, ad esempio TM 074, TWM 074 o PBL 048.' };
   }
 
   const cleaned = raw.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
@@ -4500,14 +4624,14 @@ function parsePokemonQuickCodeInput(rawValue) {
     match = cleaned.match(/^([A-Z0-9.\-]{2,12})-([0-9]{1,4}[A-Z]?(?:\/[0-9]{1,4})?)$/);
   }
   if (!match) {
-    return { error: 'Formato non valido. Usa ad esempio: PBL 048.' };
+    return { error: 'Formato non valido. Usa ad esempio: TM 074, TWM 074 o PBL 048.' };
   }
 
   const setToken = match[1];
   const number = match[2];
   const cardSet = resolvePokemonSetIdFromQuickCode(setToken);
   if (!cardSet) {
-    return { error: `Codice set "${setToken}" non riconosciuto. Esempio valido: PBL 048.` };
+    return { error: `Codice set "${setToken}" non riconosciuto. In ricerca veloce sono accettati solo codici/alias esatti (es.: TM 074, TWM 074, PBL 048).` };
   }
 
   const setRow = POKEMON_SETS.find(s => norm(s.id) === norm(cardSet));
@@ -5543,6 +5667,128 @@ function ctListingPriceEur(listing) {
   return cents / 100;
 }
 
+function ctListingNoteText(listing) {
+  if (!listing || typeof listing !== 'object') return '';
+
+  const chunks = [];
+  const pushText = (v) => {
+    if (typeof v !== 'string') return;
+    const t = v.trim();
+    if (t) chunks.push(t);
+  };
+
+  [
+    listing.comment,
+    listing.comments,
+    listing.note,
+    listing.notes,
+    listing.description,
+    listing.title,
+    listing.public_note,
+    listing.private_note,
+    listing.seller_note,
+    listing.remarks,
+    listing.details,
+    listing.text,
+  ].forEach(pushText);
+
+  const props = listing.properties_hash;
+  if (props && typeof props === 'object') {
+    Object.entries(props).forEach(([key, value]) => {
+      const k = String(key || '').toLowerCase();
+      if (!/(note|comment|remark|description|descrizione|grado|grade|grading|psa|bgs|cgc|sgc|certificate|cert)/.test(k)) {
+        return;
+      }
+      if (typeof value === 'string') pushText(value);
+      else if (Array.isArray(value)) value.forEach(pushText);
+      else if (value && typeof value === 'object') {
+        Object.values(value).forEach(pushText);
+      }
+    });
+  }
+
+  return chunks.join(' · ');
+}
+
+function gradeScoreRegex(score) {
+  const n = normalizeGradeScore(score);
+  if (n == null) return null;
+  const [intPart, fracPart = ''] = String(n).split('.');
+  if (!fracPart) return `${intPart}(?:[.,]0)?`;
+  return `${intPart}[.,]${fracPart}`;
+}
+
+function ctListingMentionedGrades(listing) {
+  const text = ctListingNoteText(listing);
+  if (!text) return [];
+
+  const cleaned = text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/½/g, '.5');
+
+  const companyToken = String.raw`(?:psa|bgs|cgc|sgc|beckett|ai\s*grading|aigrading|graad|ags|gma|ace|ksa|hga|pgs|ugc|mgs|rcg|ccg)`;
+  const gradeWordToken = String.raw`(?:graded|gradata|grading|grade|voto|valutazione|gem\s*mint|mint|slab(?:bed)?|cert(?:ificate|ificato)?|encapsulated)`;
+  const hasGradeContext = new RegExp(String.raw`\b(?:${companyToken}|${gradeWordToken})\b`, 'i').test(cleaned);
+  if (!hasGradeContext) return [];
+
+  const scores = [];
+  for (let step = 2; step <= 20; step++) {
+    const score = step / 2;
+    const scoreText = formatGradeScore(score);
+    const sr = gradeScoreRegex(score);
+    if (!sr) continue;
+
+    // Copre pattern tipo "aigrading 10", "BGS 9", "psa 8.5", "graad 9"
+    // e varianti con simboli/separatori (es. "PSA-10", "grade: 9.5").
+    const patterns = [
+      new RegExp(String.raw`\b${companyToken}\b\s*[:=\-#]?\s*${sr}\b`, 'i'),
+      new RegExp(String.raw`\b${gradeWordToken}\b\s*[:=\-#]?\s*${sr}\b`, 'i'),
+      new RegExp(String.raw`\b${sr}\b\s*[:=\-#]?\s*\b${companyToken}\b`, 'i'),
+      new RegExp(String.raw`\b${sr}\b\s*[:=\-#]?\s*\b${gradeWordToken}\b`, 'i'),
+      new RegExp(String.raw`\b${companyToken}${sr}\b`, 'i'),
+    ];
+    if (patterns.some(rx => rx.test(cleaned))) scores.push(scoreText);
+  }
+  return [...new Set(scores)];
+}
+
+function ctExtractGradedHintsFromPriced(pricedRows = []) {
+  const buckets = new Map();
+
+  pricedRows.forEach(({ listing, price }) => {
+    if (!listing || !Number.isFinite(price) || price <= 0) return;
+    const grades = ctListingMentionedGrades(listing);
+    if (!grades.length) return;
+
+    grades.forEach(score => {
+      if (!buckets.has(score)) buckets.set(score, []);
+      buckets.get(score).push({
+        price,
+        seller: listing?.user?.username || listing?.seller?.username || '?',
+        url: listing?.url || listing?.card_url || '',
+      });
+    });
+  });
+
+  return [...buckets.entries()].map(([score, rows]) => {
+    const prices = rows.map(r => r.price).sort((a, b) => a - b);
+    const minPrice = prices[0];
+    const maxPrice = prices[prices.length - 1];
+    const avgPrice = prices.reduce((sum, v) => sum + v, 0) / prices.length;
+    const medianPrice = prices[Math.floor(prices.length / 2)];
+    return {
+      score,
+      count: rows.length,
+      minPrice,
+      maxPrice,
+      avgPrice,
+      medianPrice,
+      listings: rows.slice(0, 8),
+    };
+  }).sort((a, b) => Number(b.score) - Number(a.score));
+}
+
 function ctAverageConditions(listings, langFilter = searchLangFilter, editionFilter = searchEditionFilter) {
   const valid = listings
     .map(l => ({
@@ -5566,6 +5812,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
 
   const eur = valid.filter(x => x.currency === 'EUR');
   const priced = eur.length ? eur : valid;
+  const gradedHints = ctExtractGradedHintsFromPriced(priced);
   const byCondition = {};
 
   for (const x of priced) {
@@ -5645,6 +5892,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
 
   return {
     conditions,
+    gradedHints,
     lowestAny: priced.length ? Math.min(...priced.map(x => x.price)) : 0,
     totalPriced: priced.length
   };
@@ -5707,7 +5955,7 @@ async function ctGetPriceByBlueprintId(blueprintId) {
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
 
-    const { conditions, lowestAny } = ctAverageConditions(listings);
+    const { conditions, gradedHints, lowestAny } = ctAverageConditions(listings);
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
     if (!nm) return {
       error: 'Nessun prezzo valido trovato su CardTrader',
@@ -5726,6 +5974,7 @@ async function ctGetPriceByBlueprintId(blueprintId) {
       total: listings.length,
       lowestAny,
       conditions,
+      gradedHints,
       blueprintId,
       url: `https://www.cardtrader.com/en/cards/${blueprintId}`,
     };
@@ -5821,7 +6070,7 @@ async function ctGetPrice(card, game = 'pokemon') {
       };
     }
 
-    const { conditions, lowestAny } = ctAverageConditions(listings);
+    const { conditions, gradedHints, lowestAny } = ctAverageConditions(listings);
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
 
     if (!nm) {
@@ -5853,6 +6102,7 @@ async function ctGetPrice(card, game = 'pokemon') {
       total:       listings.length,
       lowestAny,
       conditions,
+      gradedHints,
       blueprintId: bp.id,
       expansionName,
       setMatchWarning,
@@ -6277,6 +6527,19 @@ const POKEMON_SET_CODE_OVERRIDES = {
   me3: 'POR',
   me4: 'CRI',
   me5: 'PBL',
+};
+
+// Alias compatti per ricerca veloce (input utente), es. "TM 074".
+const POKEMON_QUICK_SET_ALIASES = {
+  // TM = Trionfante / Triumphant (HGSS), richiesto per ricerche tipo "TM 74".
+  tm: 'hgss4',
+  trionfante: 'hgss4',
+  triumphant: 'hgss4',
+  battaglietrionfali: 'hgss4',
+  // Twilight Masquerade usa sigla estesa per evitare conflitto con TM.
+  twm: 'sv6',
+  twilightmasquerade: 'sv6',
+  crepuscolomascherato: 'sv6',
 };
 
 function looksItalianSetName(v) {
@@ -7263,6 +7526,7 @@ function renderResult() {
   const img  = getImg(card);
   const selectedPrice = getSelectedUnitPrice();
   const effectivePrice = pokemonEffectivePrice(selectedPrice);
+  const gradedHint = pokemonGraded ? resolveGradedPriceHint(ctPriceData, pokemonGradeScore) : null;
   const calc = effectivePrice.unit;
   const qty  = Math.max(1, Math.min(99, parseInt(pokemonSelectedQty, 10) || 1));
   const isEditMode = isCollectionEditActive('pokemon');
@@ -7338,6 +7602,13 @@ function renderResult() {
             <span class="price-lbl">Fonte</span>
             <span>${srcLabel}</span>
           </div>
+          ${gradedHint ? `
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Suggerimento graded ${escHtml(gradedHint.score)}</span>
+            <span class="price-val" title="Rilevato da note/commenti annunci CT">${fmt(gradedHint.unit)}</span>
+            <span style="color:var(--text-muted);font-size:.78rem;">${gradedHint.count} annunci · min ${fmt(gradedHint.minPrice)} · mediana ${fmt(gradedHint.medianPrice)}</span>
+            <button id="usePokemonGradedHintBtn" type="button" class="btn btn-outline" style="padding:6px 10px;font-size:.76rem;">Usa come manuale</button>
+          </div>` : ''}
           <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <span class="price-lbl" style="min-width:140px;">Prezzo manuale (€)</span>
             <input id="manualPokemonPriceInput" type="text" inputmode="decimal" placeholder="Es. 12,50" value="${escHtml(manualPokemonPriceRaw)}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
@@ -7395,6 +7666,13 @@ function renderResult() {
       e.preventDefault();
       applyPokemonManualPrice();
     }
+  });
+  $('usePokemonGradedHintBtn')?.addEventListener('click', () => {
+    if (!gradedHint?.unit) return;
+    manualPokemonPriceRaw = String(gradedHint.unit).replace('.', ',');
+    manualPokemonPrice = gradedHint.unit;
+    showMsg(`Suggerimento graded ${gradedHint.score} applicato: ${fmt(gradedHint.unit)}.`, 'info');
+    renderResult();
   });
   $('applyPokemonManualPriceBtn')?.addEventListener('click', applyPokemonManualPrice);
   $('clearPokemonManualPriceBtn')?.addEventListener('click', clearPokemonManualPrice);
@@ -8904,10 +9182,10 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
       langFallback = listings.length > 0;
     }
 
-    let { conditions } = ctAverageConditions(listings, usedLang, '');
+    let { conditions, gradedHints } = ctAverageConditions(listings, usedLang, '');
     if (!conditions.length && listings.length && lang && !langFallback) {
       // Annunci presenti ma scartati dal match lingua client (es. jp vs ja)
-      ({ conditions } = ctAverageConditions(listings, '', ''));
+      ({ conditions, gradedHints } = ctAverageConditions(listings, '', ''));
       langFallback = conditions.length > 0;
       usedLang = '';
     }
@@ -8921,6 +9199,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
     if (conditions.length) {
       ctTcgState[gameKey].prices = {
         conditions,
+        gradedHints,
         total: listings.length,
         url,
         expansionName,
@@ -8944,6 +9223,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
             listings: [],
             foil: false,
           }],
+          gradedHints,
           total: listings.length,
           url,
           expansionName,
@@ -9002,6 +9282,21 @@ function getTcgUnitPrice(gameKey) {
       ctCond: null,
     };
   }
+
+  if (ctTcgState[gameKey].graded) {
+    const gradedHint = resolveGradedPriceHint(prices, ctTcgState[gameKey].gradeScore);
+    if (gradedHint) {
+      return {
+        unit: gradedHint.unit,
+        fromCt: true,
+        manual: false,
+        source: `CardTrader · graded ${gradedHint.score} (${gradedHint.count} ann.)`,
+        ctCond: null,
+        gradedHint,
+      };
+    }
+  }
+
   if (!prices || prices.error) return null;
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const picked = ctTcgState[gameKey].selectedListing;
@@ -9027,6 +9322,7 @@ function tcgRenderResult(gameKey, bp, prices) {
   const qKey = tcgGetQuality(gameKey);
   const qLabel = QUALITY[qKey]?.label || qKey;
   const selPrice = getTcgUnitPrice(gameKey);
+  const gradedHint = ctTcgState[gameKey].graded ? resolveGradedPriceHint(prices, ctTcgState[gameKey].gradeScore) : null;
   const isEditMode = isCollectionEditActive(cfg.game);
   const selectedCtCond = CT_QUALITY_TO_COND[qKey] || 'NM';
   const qty = tcgGetQty(gameKey);
@@ -9141,6 +9437,13 @@ function tcgRenderResult(gameKey, bp, prices) {
           ${priceHtml}
         </div>
         <div class="price-box" style="margin-top:10px;">
+          ${gradedHint ? `
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Suggerimento graded ${escHtml(gradedHint.score)}</span>
+            <span class="price-val">${fmt(gradedHint.unit)}</span>
+            <span style="color:var(--text-muted);font-size:.78rem;">${gradedHint.count} annunci · min ${fmt(gradedHint.minPrice)} · mediana ${fmt(gradedHint.medianPrice)}</span>
+            <button id="${cfg.prefix}UseGradedHintBtn" type="button" class="btn btn-outline" style="padding:6px 10px;font-size:.76rem;">Usa come manuale</button>
+          </div>` : ''}
           <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <span class="price-lbl" style="min-width:140px;">Prezzo manuale (€)</span>
             <input id="${cfg.prefix}ManualPriceInput" type="text" inputmode="decimal" placeholder="Es. 7,90" value="${escHtml(ctTcgState[gameKey].manualPriceRaw || '')}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
@@ -9171,6 +9474,13 @@ function tcgRenderResult(gameKey, bp, prices) {
       e.preventDefault();
       applyTcgManualPrice(gameKey);
     }
+  });
+  $(`${cfg.prefix}UseGradedHintBtn`)?.addEventListener('click', () => {
+    if (!gradedHint?.unit) return;
+    ctTcgState[gameKey].manualPriceRaw = String(gradedHint.unit).replace('.', ',');
+    ctTcgState[gameKey].manualPrice = gradedHint.unit;
+    tcgRenderResult(gameKey, bp, prices);
+    tcgShowMsg(gameKey, `Suggerimento graded ${gradedHint.score} applicato: ${fmt(gradedHint.unit)}.`, 'info');
   });
   $(`${cfg.prefix}ApplyManualPriceBtn`)?.addEventListener('click', () => applyTcgManualPrice(gameKey));
   $(`${cfg.prefix}ClearManualPriceBtn`)?.addEventListener('click', () => clearTcgManualPrice(gameKey));
@@ -9447,9 +9757,13 @@ function renderGrandTotal() {
 
 function renderCollection() {
   renderGrandTotal();
-  const visible = collection
+  const gameItems = collection
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => (item.game || 'pokemon') === activeGame);
+
+  const visible = collectionOnlyGraded
+    ? gameItems.filter(({ item }) => !!item.graded)
+    : gameItems;
 
   const total = visible.reduce((s, { item }) => s + (Number(item.price) || 0), 0);
   const avg   = visible.length ? total / visible.length : 0;
@@ -9462,25 +9776,30 @@ function renderCollection() {
   if (totalLabel) totalLabel.textContent = `Totale ${GAME_UI[activeGame]?.label || 'sezione'}: ${fmt(total)}`;
 
   const hasItems = visible.length > 0;
+  const hasGameItems = gameItems.length > 0;
   const exportCsvBtn = $('exportCsvBtn');
   const clearBtn = $('clearBtn');
   if (exportCsvBtn) exportCsvBtn.disabled = !hasItems;
-  if (clearBtn) clearBtn.disabled = !hasItems;
+  if (clearBtn) clearBtn.disabled = !hasGameItems;
+  updateCollectionGradeFilterButton();
 
   const collBody = $('collBody');
   const priceRefreshRow = $('priceRefreshRow');
   if (!collBody) return;
 
   if (!visible.length) {
-    const emptyMsg = activeGame === 'pokemon'
+    const emptyByGame = activeGame === 'pokemon'
       ? 'Nessuna carta Pokémon aggiunta ancora.'
       : activeGame === 'sealed'
         ? 'Nessun prodotto Sealed aggiunto ancora.'
       : activeGame === 'onepiece'
         ? 'Nessuna carta One Piece aggiunta ancora.'
         : 'Nessuna carta Riftbound aggiunta ancora.';
+    const emptyMsg = collectionOnlyGraded
+      ? 'Nessuna carta gradata per questo gioco con il filtro attivo.'
+      : emptyByGame;
     collBody.innerHTML = `<tr><td colspan="6" class="tbl-empty">${emptyMsg}<small>Cerca e aggiungi dalla lista a sinistra.</small></td></tr>`;
-    if (priceRefreshRow) priceRefreshRow.style.display = 'none';
+    if (priceRefreshRow) priceRefreshRow.style.display = hasGameItems ? 'flex' : 'none';
     return;
   }
 
@@ -9519,7 +9838,7 @@ function renderCollection() {
         <div class="collection-cond-wrap">
           <span class="cond-badge cond-${item.quality || item.condition}">${item.quality || item.condition || '—'}</span>
           ${item.graded
-            ? `<span class="collection-graded-label">Graded${formatGradeScore(item.gradeScore) ? ` ${formatGradeScore(item.gradeScore)}` : ''}</span>`
+            ? `<span class="collection-graded-label">GRADATA${formatGradeScore(item.gradeScore) ? ` · VOTO ${formatGradeScore(item.gradeScore)}` : ''}</span>`
             : ''}
         </div>
       </td>
@@ -9671,6 +9990,10 @@ function applyGameFromUrl() {
 function initApp() {
   updateThemeToggleButton();
   initPokemonSearchMode();
+  try {
+    collectionOnlyGraded = localStorage.getItem(COLLECTION_GRADED_FILTER_STORAGE_KEY) === '1';
+  } catch {}
+  updateCollectionGradeFilterButton();
   localStorage.removeItem('dls_ct_token');
   localStorage.removeItem('dls_pt_token');
   sessionStorage.removeItem('dls_gate_token');
@@ -9689,6 +10012,7 @@ function initApp() {
 }
 
 bindCollectionActions();
+bindCollectionGradeFilterToggle();
 
 // ── Canvas Background ─────────────────────────────────────────────────
 (function initBackground() {
@@ -11123,7 +11447,7 @@ try {
 } catch (err) {
   console.error('[DLS] initApp fallita:', err);
   try { alert('🚨 Init fallita:\n' + (err?.message || err)); } catch (_) {}
-  try { resetModalLocks(); bindGameTabs(); bindThemeToggle(); bindPokemonSearchModeToggle(); bindAccountButton(); } catch (_) {}
+  try { resetModalLocks(); bindGameTabs(); bindThemeToggle(); bindPokemonSearchModeToggle(); bindAccountButton(); bindCollectionGradeFilterToggle(); } catch (_) {}
 }
 window.removeItem = removeItem;
 window.openAuthModal = openAuthModal;
