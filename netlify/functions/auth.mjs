@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import { randomBytes, pbkdf2 as _pbkdf2, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { signJwt, corsHeaders } from "./_lib/jwt.mjs";
+import { signJwt, corsHeaders, requireUser } from "./_lib/jwt.mjs";
 import { findUserRecord, saveUserRecord, normalizeEmail } from "./_lib/users.mjs";
 
 const pbkdf2 = promisify(_pbkdf2);
@@ -46,9 +46,10 @@ export default async (req) => {
     try { body = await req.json(); }
     catch { return new Response(JSON.stringify({ error: "Body non valido" }), { status: 400, headers: cors }); }
 
-    const { action, email, password, displayName, resetToken } = body || {};
+    const { action, email, password, displayName, resetToken, currentPassword, newPassword } = body || {};
     const needsPassword = action === "register" || action === "login" || action === "confirm-reset";
-    if (!email || (needsPassword && !password)) {
+    const needsEmail = action !== "change-password";
+    if ((needsEmail && !email) || (needsPassword && !password)) {
       return new Response(JSON.stringify({ error: needsPassword ? "Email e password richieste" : "Email richiesta" }), { status: 400, headers: cors });
     }
 
@@ -163,8 +164,53 @@ export default async (req) => {
       return authResponse(updated, found.normalized);
     }
 
+    if (action === "change-password") {
+      const sessionUser = requireUser(req);
+      if (!currentPassword || !newPassword) {
+        return new Response(JSON.stringify({ error: "Password attuale e nuova password richieste" }), { status: 400, headers: cors });
+      }
+      if (String(newPassword).length < 6) {
+        return new Response(JSON.stringify({ error: "Password troppo corta (min 6 caratteri)" }), { status: 400, headers: cors });
+      }
+      if (currentPassword === newPassword) {
+        return new Response(JSON.stringify({ error: "La nuova password deve essere diversa da quella attuale" }), { status: 400, headers: cors });
+      }
+
+      const found = await findUserRecord(store, sessionUser.email);
+      if (!found) {
+        return new Response(JSON.stringify({ error: "Utente non trovato" }), { status: 404, headers: cors });
+      }
+
+      const user = found.user;
+      const currentHash = await hashPass(currentPassword, user.salt);
+      if (!passMatches(user.hash, currentHash)) {
+        await new Promise(r => setTimeout(r, 500));
+        return new Response(JSON.stringify({ error: "Password attuale errata." }), { status: 401, headers: cors });
+      }
+
+      const salt = randomBytes(16).toString("hex");
+      const hash = await hashPass(newPassword, salt);
+      const updated = clearRecoveryFields({
+        ...user,
+        salt,
+        hash,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (found.key !== found.normalized) {
+        await saveUserRecord(store, found.normalized, updated, found.key);
+      } else {
+        await store.setJSON(found.normalized, updated);
+      }
+
+      return authResponse(updated, found.normalized);
+    }
+
     return new Response(JSON.stringify({ error: "Azione non valida" }), { status: 400, headers: cors });
   } catch (e) {
+    if (e.message?.includes("Token") || e.message?.includes("Accesso") || e.message?.includes("Sessione")) {
+      return new Response(JSON.stringify({ error: "Non autorizzato: " + e.message }), { status: 401, headers: cors });
+    }
     console.error("Auth function error:", e);
     return new Response(JSON.stringify({ error: "Errore server autenticazione. Riprova tra poco." }), { status: 500, headers: cors });
   }

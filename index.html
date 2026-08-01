@@ -2110,6 +2110,24 @@
       color: var(--text-muted);
       margin: 0 0 10px;
     }
+    .profile-pass-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .profile-pass-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .profile-pass-actions .btn {
+      width: 100%;
+    }
+    .profile-pass-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin: 0;
+    }
     .feedback-box {
       padding: 14px;
       border-radius: 14px;
@@ -2767,6 +2785,25 @@
     <div class="profile-section">
       <h3 class="profile-section-title">Community &amp; canali</h3>
       <div class="community-grid" id="profileCommunityGrid"></div>
+    </div>
+
+    <div class="profile-section">
+      <h3 class="profile-section-title">Sicurezza account</h3>
+      <div class="profile-pass-grid">
+        <p class="profile-pass-note">Cambia la password del tuo account inserendo prima quella attuale.</p>
+        <div class="auth-field">
+          <label for="profileCurrentPassword">Password attuale</label>
+          <input id="profileCurrentPassword" type="password" placeholder="Password attuale" autocomplete="current-password">
+        </div>
+        <div class="auth-field">
+          <label for="profileNewPassword">Nuova password</label>
+          <input id="profileNewPassword" type="password" placeholder="Almeno 6 caratteri" autocomplete="new-password">
+        </div>
+        <div class="auth-err" id="profilePassErr"></div>
+        <div class="profile-pass-actions">
+          <button type="button" class="btn" id="profileChangePasswordBtn">Aggiorna password</button>
+        </div>
+      </div>
     </div>
 
     <button type="button" class="btn profile-logout" id="profileLogoutBtn">Esci dall'account</button>
@@ -9824,6 +9861,54 @@ async function saveUserProfile(patch) {
   return data;
 }
 
+async function changeLoggedUserPassword() {
+  const token = getToken();
+  if (!token || !dlsUser?.email) {
+    showAuthErr('profilePassErr', 'Sessione non valida, esegui di nuovo il login.');
+    return;
+  }
+  const currentPassword = $('profileCurrentPassword')?.value || '';
+  const newPassword = $('profileNewPassword')?.value || '';
+  if (!currentPassword || !newPassword) {
+    showAuthErr('profilePassErr', 'Inserisci password attuale e nuova password.');
+    return;
+  }
+  const btn = $('profileChangePasswordBtn');
+  const originalText = btn?.textContent || 'Aggiorna password';
+  if (btn) { btn.disabled = true; btn.textContent = '⌛ Aggiornamento…'; }
+  try {
+    const res = await authFetch(API_AUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-DLS-Session': token },
+      body: JSON.stringify({ action: 'change-password', currentPassword, newPassword })
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      showAuthErr('profilePassErr', data.error || 'Impossibile aggiornare la password.');
+      return;
+    }
+    try {
+      saveSession(data);
+    } catch (e) {
+      showAuthErr('profilePassErr', e.message || 'Password aggiornata ma sessione non salvata.');
+      return;
+    }
+    if ($('profileCurrentPassword')) $('profileCurrentPassword').value = '';
+    if ($('profileNewPassword')) $('profileNewPassword').value = '';
+    showAuthErr('profilePassErr', '');
+    updateAuthUI();
+    showMsg('✅ Password aggiornata correttamente.', 'success');
+  } catch (e) {
+    console.error('changeLoggedUserPassword:', e);
+    showAuthErr('profilePassErr', e.message?.includes('Failed to fetch')
+      ? 'Connessione non disponibile. Controlla internet e riprova.'
+      : 'Errore di rete. Riprova.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  }
+}
+
 function renderCommunityLinks() {
   const box = $('profileCommunityGrid');
   if (!box) return;
@@ -9855,6 +9940,9 @@ function openProfilePanel() {
   $('profileEmail').textContent = dlsUser.email || '';
   renderUserAvatar($('profileAvatarLg'), dlsUser);
   $('profileAvatarRemoveBtn').hidden = !dlsUser.avatar;
+  if ($('profileCurrentPassword')) $('profileCurrentPassword').value = '';
+  if ($('profileNewPassword')) $('profileNewPassword').value = '';
+  showAuthErr('profilePassErr', '');
   const overlay = $('profileOverlay');
   if (overlay) {
     overlay.classList.remove('is-closed');
@@ -10208,6 +10296,13 @@ document.getElementById('profileAvatarRemoveBtn')?.addEventListener('click', asy
   } catch (e) {
     showMsg(e.message || 'Errore', 'error');
   }
+});
+document.getElementById('profileChangePasswordBtn')?.addEventListener('click', changeLoggedUserPassword);
+document.getElementById('profileCurrentPassword')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') changeLoggedUserPassword();
+});
+document.getElementById('profileNewPassword')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') changeLoggedUserPassword();
 });
 
 document.getElementById('manualPriceClose')?.addEventListener('click', closeManualPriceModal);
