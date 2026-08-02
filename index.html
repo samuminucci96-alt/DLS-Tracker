@@ -3887,6 +3887,69 @@ function scoreBlueprintForCard(card, bp) {
   return score;
 }
 
+function scoreBlueprintForCardVariant(card, bp, opts = {}) {
+  const allowNumberMismatch = !!opts.allowNumberMismatch;
+  const cardName = norm(card.name || '');
+  const bn = ctBpName(bp);
+  const rawNum = (card.number || '').split('/')[0].replace(/^0+/, '');
+
+  if (cardName) {
+    if (!bn) return 0;
+    if (bn !== cardName && !bn.includes(cardName) && !cardName.includes(bn)) return 0;
+  } else if (!rawNum) {
+    return 0;
+  }
+
+  let score = cardName ? (bn === cardName ? 12 : 7) : 5;
+  const bpNum = ctBpNumber(bp);
+  let numberMatched = false;
+
+  if (rawNum) {
+    if (!bpNum) {
+      if (!isPokemonPromoSet(card)) {
+        if (!allowNumberMismatch) return 0;
+        score -= 6;
+      } else {
+        score += 4;
+      }
+    } else if (bpNum !== rawNum) {
+      if (promoNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(bpNum, rawNum)) {
+        score += 22;
+        numberMatched = true;
+      } else if (!allowNumberMismatch) {
+        return 0;
+      } else {
+        score -= 6;
+      }
+    } else {
+      score += 30;
+      numberMatched = true;
+    }
+  }
+
+  const meta = ctBpMeta(bp);
+  const cat = norm(bp?.category_name || '');
+  const profile = pokemonRarityProfile(card);
+  let rarityHits = 0;
+  profile.tokens.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) {
+      score += 18;
+      rarityHits++;
+    }
+  });
+  profile.avoid.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) score -= 20;
+  });
+
+  if (allowNumberMismatch && rawNum && !numberMatched && profile.tokens.length && rarityHits === 0) {
+    return 0;
+  }
+
+  return score;
+}
+
 const LOCAL_CATALOG = [
   {
     id: 'obf-199/197', name: 'Ninetales',
@@ -5975,8 +6038,12 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
   const tried = new Set();
   if (preferredBpId) tried.add(String(preferredBpId));
 
-  // Limita il probing: max 2 blueprint alternativi (evita N+1 fino a 8× marketplace).
-  for (const bp of ranked.slice(0, 2)) {
+  const hasLangFilter = !!ctLanguageApiCode(searchLangFilter);
+  const probeLimit = hasLangFilter ? Math.min(10, ranked.length) : 2;
+
+  // Con filtro lingua (es. giapponese) CardTrader puo' separare la carta su blueprint diversi.
+  // In quel caso allarghiamo il probing degli alternativi nella stessa espansione.
+  for (const bp of ranked.slice(0, probeLimit)) {
     const id = String(bp?.id || '');
     if (!id || tried.has(id)) continue;
     tried.add(id);
@@ -5986,6 +6053,74 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
       return { bp, probe };
     }
   }
+  return null;
+}
+
+function ctPokemonAltExpansionCandidates(card, expansions = [], preferredExpansion = null) {
+  const setName = norm(card?.set?.name || '');
+  const enName = norm(pokemonSetEnglishName(card?.set?.id, card?.set?.name || ''));
+  const mappedCode = norm(resolveCtCodeForPokemonSet(card?.set?.id, card?.set?.name || '') || '');
+  const seedTokens = [setName, enName, mappedCode].filter(Boolean);
+  const seen = new Set();
+  const out = [];
+
+  const push = (exp, scoreBoost = 0) => {
+    if (!exp?.id) return;
+    const key = String(exp.id);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ exp, scoreBoost });
+  };
+
+  if (preferredExpansion) push(preferredExpansion, 60);
+
+  expansions.forEach(exp => {
+    const expCode = norm(exp.code || '');
+    const expName = norm(ctExpName(exp));
+    let scoreBoost = 0;
+    seedTokens.forEach(tok => {
+      if (!tok) return;
+      if (expCode && (expCode === tok || expCode.includes(tok) || tok.includes(expCode))) scoreBoost += 45;
+      if (expName && (expName === tok || expName.includes(tok) || tok.includes(expName))) scoreBoost += 35;
+    });
+    if (scoreBoost > 0) push(exp, scoreBoost);
+  });
+
+  return out.sort((a, b) => b.scoreBoost - a.scoreBoost).map(x => x.exp);
+}
+
+async function ctTryLanguageVariantBlueprintPrice(card, preferredExpansion = null, preferredBpId = null, token = null, game = 'pokemon') {
+  const langCode = ctLanguageApiCode(searchLangFilter);
+  if (game !== 'pokemon' || (langCode !== 'ja' && langCode !== 'jp')) return null;
+
+  const expansions = await ctGetExpansions(token, game);
+  const candidates = ctPokemonAltExpansionCandidates(card, expansions, preferredExpansion).slice(0, 5);
+  if (!candidates.length) return null;
+
+  const triedBp = new Set(preferredBpId ? [String(preferredBpId)] : []);
+  const ranked = [];
+
+  for (const exp of candidates) {
+    const bps = await ctGetBlueprints(exp.id, token);
+    for (const bp of bps) {
+      const score = scoreBlueprintForCardVariant(card, bp, { allowNumberMismatch: true });
+      if (score <= 0) continue;
+      ranked.push({ bp, score, exp });
+    }
+  }
+
+  ranked.sort((a, b) => b.score - a.score);
+
+  for (const { bp, exp } of ranked.slice(0, 10)) {
+    const id = String(bp?.id || '');
+    if (!id || triedBp.has(id)) continue;
+    triedBp.add(id);
+    const probe = await ctGetPriceByBlueprintId(id);
+    if (probe && !probe.error && !probe.authError && !probe.corsError && Array.isArray(probe.conditions) && probe.conditions.length) {
+      return { bp: { ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }, probe };
+    }
+  }
+
   return null;
 }
 
@@ -6117,7 +6252,7 @@ function gradeScoreRegex(score) {
 }
 
 function ctListingMentionedGrades(listing) {
-  const text = ctListingNoteText(listing);
+  const text = ctListingNoteText(listing?.rawListing || listing);
   if (!text) return [];
 
   const cleaned = text
@@ -6187,6 +6322,50 @@ function ctExtractGradedHintsFromPriced(pricedRows = []) {
   }).sort((a, b) => Number(b.score) - Number(a.score));
 }
 
+function ctListingIsGraded(listing) {
+  const src = listing?.rawListing || listing;
+  if (src?.graded === true || src?.graded === 'true' || src?.graded === 1 || src?.graded === '1') return true;
+  return ctListingMentionedGrades(src).length > 0;
+}
+
+function ctVisibleListingRows(data, condKey, opts = {}) {
+  const gradedOnly = !!opts.gradedOnly;
+  const selectedCond = (data?.conditions || []).find(c => c.key === condKey);
+  const sourceConds = gradedOnly ? (data?.conditions || []) : (selectedCond ? [selectedCond] : []);
+  const rows = [];
+
+  sourceConds.forEach(cond => {
+    const sourceListings = gradedOnly ? (cond?.allListings || cond?.listings || []) : (cond?.listings || []);
+    sourceListings.forEach((listing, originalIndex) => {
+      rows.push({
+        listing,
+        originalIndex,
+        condKey: cond.key,
+        condLabel: cond.label,
+        grades: ctListingMentionedGrades(listing),
+        isGraded: ctListingIsGraded(listing),
+      });
+    });
+  });
+
+  if (!gradedOnly) return rows.slice(0, 50);
+
+  const targetScore = formatGradeScore(opts.gradeScore);
+  const gradedRows = rows
+    .filter(row => row.isGraded)
+    .sort((a, b) => {
+      const aMatch = targetScore && a.grades.includes(targetScore) ? 1 : 0;
+      const bMatch = targetScore && b.grades.includes(targetScore) ? 1 : 0;
+      if (aMatch !== bMatch) return bMatch - aMatch;
+      return a.listing.price - b.listing.price;
+    });
+
+  if (!targetScore) return gradedRows.slice(0, 50);
+
+  const exactRows = gradedRows.filter(row => row.grades.includes(targetScore));
+  return (exactRows.length ? exactRows : gradedRows).slice(0, 50);
+}
+
 function ctAverageConditions(listings, langFilter = searchLangFilter, editionFilter = searchEditionFilter) {
   const valid = listings
     .map(l => ({
@@ -6251,7 +6430,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
       foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
       firstEdition,
       quantity: l.quantity || 1,
-      url: l.url || l.card_url || ''
+      url: l.url || l.card_url || '',
+      rawListing: l,
     });
 
     if (x.price === row.minPrice) {
@@ -6264,7 +6444,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
 
   Object.values(byCondition).forEach(row => {
     row.listings.sort((a, b) => a.price - b.price);
-    row.listings = ctTrimListingOutliers(row.listings).slice(0, 50);
+    row.allListings = ctTrimListingOutliers([...row.listings]);
+    row.listings = row.allListings.slice(0, 50);
     row.count = row.listings.length;
     if (row.listings.length) {
       row.minPrice = row.listings[0].price;
@@ -6434,6 +6615,16 @@ async function ctGetPrice(card, game = 'pokemon') {
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
 
     if (!listings.length) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6453,6 +6644,16 @@ async function ctGetPrice(card, game = 'pokemon') {
 
     const filterErr = ctListingFilterError(listings);
     if (filterErr) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6474,6 +6675,16 @@ async function ctGetPrice(card, game = 'pokemon') {
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
 
     if (!nm) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6520,53 +6731,59 @@ async function ctGetPrice(card, game = 'pokemon') {
   }
 }
 
-function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
+function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false, opts = {}) {
   const cond = (d.conditions || []).find(c => c.key === condKey);
   const condLabel = QUALITY[qualityKeyFromCtCond(condKey)]?.label || condKey;
+  const gradedOnly = !!opts.gradedOnly;
+  const emptyText = gradedOnly
+    ? 'Nessun annuncio gradata per questa condizione.'
+    : 'Nessun annuncio per questa condizione.';
   if (!cond) {
     return `
       <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
         <div class="ct-market-title">
-          <span>Annunci CT · ${escHtml(condLabel)} (max 50)</span>
+          <span>Annunci CT${gradedOnly ? ' · solo gradate' : ''} · ${escHtml(condLabel)} (max 50)</span>
           <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
             ${isOpen ? 'Chiudi menu' : 'Apri menu'} · 0
           </button>
         </div>
         <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
           <div class="ct-listing-list">
-            <p class="ct-msg info">Nessun annuncio per questa condizione.</p>
+            <p class="ct-msg info">${emptyText}</p>
           </div>
         </div>
       </div>`;
   }
-  const listingRows = (cond.listings || []).slice(0, 50);
+  const listingRows = ctVisibleListingRows(d, condKey, opts);
   const shownCount = listingRows.length;
-  const rows = listingRows.map((l, idx) => {
+  const rows = listingRows.map(({ listing: l, originalIndex, condKey: rowCondKey, condLabel: rowCondLabel, grades, isGraded }) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
     const edition = l.firstEdition ? ' · 1ª' : '';
     const qty = l.quantity > 1 ? ` · x${l.quantity}` : '';
-    const isSelected = selectedListing?.condKey === condKey && selectedListing?.index === idx;
+    const gradedMeta = grades.length ? ` · grad ${grades.join('/')}` : (isGraded ? ' · graded' : '');
+    const condMeta = gradedOnly && rowCondKey !== condKey ? ` · ${rowCondLabel}` : '';
+    const isSelected = selectedListing?.condKey === rowCondKey && selectedListing?.index === originalIndex;
     return `
       <button type="button" class="ct-listing-row${isSelected ? ' ct-listing-selected' : ''}"
-        data-listing-index="${idx}" data-cond-key="${escHtml(condKey)}" aria-pressed="${isSelected}">
+        data-listing-index="${originalIndex}" data-cond-key="${escHtml(rowCondKey)}" aria-pressed="${isSelected}">
         <span class="ct-listing-price">${fmt(l.price)}${isSelected ? ' ←' : ''}</span>
         <span class="ct-listing-seller" title="${escHtml(l.seller)}">${escHtml(l.seller)}</span>
-        <span class="ct-listing-meta">${lang}${edition}${foil}${qty}</span>
+        <span class="ct-listing-meta">${lang}${edition}${foil}${qty}${condMeta}${gradedMeta}</span>
       </button>`;
   }).join('');
 
   return `
     <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
       <div class="ct-market-title">
-        <span>Annunci CT · ${escHtml(cond.label)} (max 50)</span>
+        <span>Annunci CT${gradedOnly ? ' · solo gradate' : ''} · ${escHtml(cond.label)} (max 50)</span>
         <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
           ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${shownCount}
         </button>
       </div>
       <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
         <div class="ct-listing-list">
-          ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+          ${rows || `<p class="ct-msg info">${emptyText}</p>`}
         </div>
       </div>
     </div>`;
@@ -6663,7 +6880,7 @@ function renderCtSection() {
       <div class="ct-cond-grid">
         ${condRows || '<p class="ct-msg warn">Nessuna condizione disponibile</p>'}
       </div>
-      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen)}
+      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen, { gradedOnly: pokemonGraded, gradeScore: pokemonGradeScore })}
       <div class="ct-footer-row">
         <span class="ct-chip">${d.total} listino${d.total > 1 ? 'i' : ''} totali</span>
         <a class="ct-link" href="${d.url}" target="_blank">↗ Vedi su CardTrader</a>
@@ -9864,7 +10081,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           </button>`;
         }).join('')}
       </div>
-      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen)}
+      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen, { gradedOnly: !!ctTcgState[gameKey].graded, gradeScore: ctTcgState[gameKey].gradeScore })}
       <div class="ct-footer-row">
         <span class="ct-chip">${prices.total} annunci totali</span>
         <a class="ct-link" href="${prices.url}" target="_blank" rel="noopener noreferrer">↗ Vedi su CardTrader</a>
