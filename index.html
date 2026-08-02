@@ -3927,8 +3927,8 @@ let maybeSeedCards = [];
 let pokemonCtMarketMenuOpen = false;
 let pokemonGraded = false;
 let pokemonGradeScore = 10;
-const POKEMON_SEARCH_MODE_STORAGE_KEY = 'dls_pokemon_search_mode';
-let pokemonQuickSearchMode = true;
+const POKEMON_FULL_SEARCH_OPEN_KEY = 'dls_pokemon_full_search_open';
+let pokemonFullSearchOpen = false;
 const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only';
 const COLLECTION_SORT_STORAGE_KEY = 'dls_collection_sort_mode';
 let collectionOnlyGraded = false;
@@ -5102,44 +5102,40 @@ function setSearchLoading(on) {
   }
 }
 
-function setPokemonSearchMode(mode, opts = {}) {
-  const quick = mode === 'quick';
-  pokemonQuickSearchMode = quick;
+function setPokemonFullSearchOpen(open, opts = {}) {
+  pokemonFullSearchOpen = !!open;
 
   const fullToggle = $('pokemonFullSearchToggle');
   const standardFields = $('pokemonStandardFields');
   const quickField = $('pokemonQuickField');
 
-  // La ricerca veloce resta sempre in cima e visibile.
+  // La ricerca veloce resta sempre attiva e utilizzabile.
   if (quickField) quickField.hidden = false;
 
   if (fullToggle) {
-    fullToggle.classList.toggle('open', !quick);
-    fullToggle.setAttribute('aria-expanded', (!quick).toString());
-    fullToggle.innerHTML = !quick
+    fullToggle.classList.toggle('open', pokemonFullSearchOpen);
+    fullToggle.setAttribute('aria-expanded', pokemonFullSearchOpen.toString());
+    fullToggle.innerHTML = pokemonFullSearchOpen
       ? '<span class="chev">▼</span> Nascondi ricerca completa'
       : '<span class="chev">▼</span> Oppure ricerca completa (nome, numero, set)';
   }
-  if (standardFields) standardFields.hidden = quick;
+  if (standardFields) standardFields.hidden = !pokemonFullSearchOpen;
 
   hideAllSuggestions();
   if (!opts.skipPersist) {
     try {
-      localStorage.setItem(POKEMON_SEARCH_MODE_STORAGE_KEY, quick ? 'quick' : 'full');
+      localStorage.setItem(POKEMON_FULL_SEARCH_OPEN_KEY, pokemonFullSearchOpen ? '1' : '0');
     } catch {}
   }
 
-  if (opts.focus !== false) {
-    setTimeout(() => {
-      if (quick) $('pokemonQuickCode')?.focus();
-      else $('pokemonName')?.focus();
-    }, 0);
+  if (opts.focus !== false && pokemonFullSearchOpen) {
+    setTimeout(() => $('pokemonName')?.focus(), 0);
   }
 }
 
 function initPokemonSearchMode() {
-  // Sempre ricerca veloce per prima; la completa si apre solo a scelta.
-  setPokemonSearchMode('quick', { skipPersist: true, focus: false });
+  // Pannello completo chiuso di default; la ricerca veloce resta sempre attiva.
+  setPokemonFullSearchOpen(false, { skipPersist: true, focus: false });
 }
 
 function bindPokemonSearchModeToggle() {
@@ -5147,34 +5143,36 @@ function bindPokemonSearchModeToggle() {
   if (fullToggle && fullToggle.dataset.bound !== '1') {
     fullToggle.dataset.bound = '1';
     fullToggle.addEventListener('click', () => {
-      setPokemonSearchMode(pokemonQuickSearchMode ? 'full' : 'quick');
+      setPokemonFullSearchOpen(!pokemonFullSearchOpen, { focus: !pokemonFullSearchOpen });
     });
   }
 }
 
 function getPokemonSearchParams() {
-  if (!pokemonQuickSearchMode) {
-    const cardSet = getSelectedSetId();
-    if ($('cardSetId')) $('cardSetId').value = cardSet || '';
+  const quickRaw = ($('pokemonQuickCode')?.value || '').trim();
+  // Se c'è un codice veloce, ha sempre priorità (anche con ricerca completa aperta).
+  if (quickRaw) {
+    const parsed = parsePokemonQuickCodeInput(quickRaw);
+    if (parsed.error) return { error: parsed.error };
+
+    if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
+    if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
+    if ($('cardNumber')) $('cardNumber').value = parsed.number;
+
     return {
-      name: $('pokemonName').value.trim(),
-      number: $('cardNumber').value.trim(),
-      cardSet,
+      name: '',
+      number: parsed.number,
+      cardSet: parsed.cardSet,
       lang: '',
     };
   }
 
-  const parsed = parsePokemonQuickCodeInput($('pokemonQuickCode')?.value || '');
-  if (parsed.error) return { error: parsed.error };
-
-  if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
-  if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
-  if ($('cardNumber')) $('cardNumber').value = parsed.number;
-
+  const cardSet = getSelectedSetId();
+  if ($('cardSetId')) $('cardSetId').value = cardSet || '';
   return {
-    name: '',
-    number: parsed.number,
-    cardSet: parsed.cardSet,
+    name: ($('pokemonName')?.value || '').trim(),
+    number: ($('cardNumber')?.value || '').trim(),
+    cardSet,
     lang: '',
   };
 }
@@ -5212,8 +5210,7 @@ function resetPokemonSearchFields() {
   if ($('choicesCard')) $('choicesCard').hidden = true;
   hideAllSuggestions();
   showMsg('', 'info');
-  if (pokemonQuickSearchMode) $('pokemonQuickCode')?.focus();
-  else $('pokemonName')?.focus();
+  $('pokemonQuickCode')?.focus();
 }
 
 function resolveApiBaseUrl() {
