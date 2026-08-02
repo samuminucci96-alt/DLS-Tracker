@@ -726,6 +726,19 @@
       border-radius: 10px;
     }
 
+    .search-mode-quick {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .search-mode-label {
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
     .search-mode-advanced {
       display: flex;
       flex-direction: column;
@@ -3159,17 +3172,18 @@
         <div id="pokemonSearch">
         <div class="form-grid">
 
-          <div id="pokemonQuickField">
+          <div id="pokemonQuickField" class="search-mode-quick">
+            <p class="search-mode-label">Ricerca veloce</p>
             <div class="field">
               <label for="pokemonQuickCode">Codice carta</label>
               <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off" autocapitalize="characters" spellcheck="false">
-              <p class="quick-search-hint">Ricerca veloce: inserisci solo codice set + numero. Esempi: TM 074, TWM 074, PBL 048.</p>
+              <p class="quick-search-hint">Inserisci solo codice set + numero. Esempi: TM 074, TWM 074, PBL 048.</p>
             </div>
           </div>
 
           <div class="search-mode-advanced">
             <button type="button" class="adv-toggle" id="pokemonFullSearchToggle" aria-expanded="false" aria-controls="pokemonStandardFields">
-              <span class="chev">▼</span> Ricerca completa (nome, numero, set)
+              <span class="chev">▼</span> Oppure ricerca completa (nome, numero, set)
             </button>
             <div id="pokemonStandardFields" class="adv-body" hidden>
 
@@ -5096,15 +5110,17 @@ function setPokemonSearchMode(mode, opts = {}) {
   const standardFields = $('pokemonStandardFields');
   const quickField = $('pokemonQuickField');
 
+  // La ricerca veloce resta sempre in cima e visibile.
+  if (quickField) quickField.hidden = false;
+
   if (fullToggle) {
     fullToggle.classList.toggle('open', !quick);
     fullToggle.setAttribute('aria-expanded', (!quick).toString());
     fullToggle.innerHTML = !quick
       ? '<span class="chev">▼</span> Nascondi ricerca completa'
-      : '<span class="chev">▼</span> Ricerca completa (nome, numero, set)';
+      : '<span class="chev">▼</span> Oppure ricerca completa (nome, numero, set)';
   }
   if (standardFields) standardFields.hidden = quick;
-  if (quickField) quickField.hidden = !quick;
 
   hideAllSuggestions();
   if (!opts.skipPersist) {
@@ -5122,12 +5138,8 @@ function setPokemonSearchMode(mode, opts = {}) {
 }
 
 function initPokemonSearchMode() {
-  let saved = '';
-  try {
-    saved = localStorage.getItem(POKEMON_SEARCH_MODE_STORAGE_KEY) || '';
-  } catch {}
-  // Default: ricerca veloce. Completa solo se salvata esplicitamente.
-  setPokemonSearchMode(saved === 'full' ? 'full' : 'quick', { skipPersist: true, focus: false });
+  // Sempre ricerca veloce per prima; la completa si apre solo a scelta.
+  setPokemonSearchMode('quick', { skipPersist: true, focus: false });
 }
 
 function bindPokemonSearchModeToggle() {
@@ -6255,7 +6267,7 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
 
   Object.values(byCondition).forEach(row => {
     row.listings.sort((a, b) => a.price - b.price);
-    row.listings = ctTrimListingOutliers(row.listings).slice(0, 30);
+    row.listings = ctTrimListingOutliers(row.listings).slice(0, 50);
     row.count = row.listings.length;
     if (row.listings.length) {
       row.minPrice = row.listings[0].price;
@@ -6518,7 +6530,7 @@ function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) 
     return `
       <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
         <div class="ct-market-title">
-          <span>Annunci CT · ${escHtml(condLabel)} (max 30)</span>
+          <span>Annunci CT · ${escHtml(condLabel)} (max 50)</span>
           <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
             ${isOpen ? 'Chiudi menu' : 'Apri menu'} · 0
           </button>
@@ -6530,7 +6542,7 @@ function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) 
         </div>
       </div>`;
   }
-  const listingRows = (cond.listings || []).slice(0, 30);
+  const listingRows = (cond.listings || []).slice(0, 50);
   const shownCount = listingRows.length;
   const rows = listingRows.map((l, idx) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
@@ -6550,7 +6562,7 @@ function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) 
   return `
     <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
       <div class="ct-market-title">
-        <span>Annunci CT · ${escHtml(cond.label)} (max 30)</span>
+        <span>Annunci CT · ${escHtml(cond.label)} (max 50)</span>
         <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
           ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${shownCount}
         </button>
