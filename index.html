@@ -591,18 +591,18 @@
     }
 
     /* ─── Form ───────────────────────────────────────────────────── */
-    .form-grid { display: grid; gap: 13px; }
+    .form-grid { display: grid; gap: 16px; }
 
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 13px;
+      gap: 14px;
     }
 
     .field {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 8px;
       position: relative;
       overflow: visible;
     }
@@ -616,10 +616,12 @@
       pointer-events: none;
       user-select: none;
       cursor: default;
+      margin: 0 0 2px;
+      line-height: 1.3;
     }
 
     input, select {
-      padding: 10px 12px;
+      padding: 11px 13px;
       border: 1px solid var(--border);
       border-radius: 10px;
       background: var(--surface-2);
@@ -724,25 +726,51 @@
       border-radius: 10px;
     }
 
-    .search-mode-toggle {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .search-mode-quick {
+      display: flex;
+      flex-direction: column;
       gap: 8px;
     }
-    .search-mode-btn {
-      min-height: 40px;
+    .search-mode-label {
+      margin: 0;
+      font-size: 0.75rem;
       font-weight: 700;
-    }
-    .search-mode-btn.active {
-      background: var(--accent-dim);
-      border-color: var(--accent);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--accent);
     }
+    .search-mode-advanced {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .search-mode-advanced .adv-toggle {
+      align-self: flex-start;
+      padding: 4px 2px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .search-mode-advanced .adv-toggle.open {
+      color: var(--accent);
+    }
+    .search-mode-advanced .adv-body {
+      max-height: none;
+      opacity: 1;
+      overflow: visible;
+      display: grid;
+      gap: 14px;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+      margin-top: 2px;
+    }
+    .search-mode-advanced .adv-body[hidden] {
+      display: none !important;
+    }
     .quick-search-hint {
-      margin: 6px 0 0;
+      margin: 2px 0 0;
       font-size: 0.75rem;
       color: var(--text-muted);
-      line-height: 1.35;
+      line-height: 1.4;
     }
 
     .btn-ghost-danger {
@@ -1594,7 +1622,7 @@
       /* Form touch-friendly */
       .form-row { grid-template-columns: 1fr; gap: 10px; }
       .form-row[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
-      .form-grid { gap: 11px; }
+      .form-grid { gap: 14px; }
       input, select {
         font-size: 16px;
         min-height: 44px;
@@ -2002,7 +2030,7 @@
     .ct-listing-list {
       display: grid;
       gap: 5px;
-      max-height: 210px;
+      max-height: min(420px, 55vh);
       overflow: auto;
       padding-right: 2px;
     }
@@ -2724,7 +2752,7 @@
         grid-template-columns: 1fr !important;
         gap: 10px;
       }
-      .form-grid { gap: 11px; }
+      .form-grid { gap: 14px; }
 
       input, select {
         font-size: 16px;
@@ -3144,20 +3172,20 @@
         <div id="pokemonSearch">
         <div class="form-grid">
 
-          <div class="search-mode-toggle" role="group" aria-label="Modalita ricerca Pokemon">
-            <button type="button" class="btn btn-outline search-mode-btn active" id="pokemonModeStandardBtn" aria-pressed="true">Ricerca completa</button>
-            <button type="button" class="btn btn-outline search-mode-btn" id="pokemonModeQuickBtn" aria-pressed="false">Ricerca veloce</button>
-          </div>
-
-          <div id="pokemonQuickField" hidden>
+          <div id="pokemonQuickField" class="search-mode-quick">
+            <p class="search-mode-label">Ricerca veloce</p>
             <div class="field">
               <label for="pokemonQuickCode">Codice carta</label>
               <input id="pokemonQuickCode" type="text" placeholder="Es. PBL 048" autocomplete="off" autocapitalize="characters" spellcheck="false">
-              <p class="quick-search-hint">Inserisci solo codice set + numero carta. Esempi: TM 074 (Trionfante), TWM 074 (Twilight Masquerade), PBL 048.</p>
+              <p class="quick-search-hint">Inserisci solo codice set + numero. Esempi: TM 074, TWM 074, PBL 048.</p>
             </div>
           </div>
 
-          <div id="pokemonStandardFields">
+          <div class="search-mode-advanced">
+            <button type="button" class="adv-toggle" id="pokemonFullSearchToggle" aria-expanded="false" aria-controls="pokemonStandardFields">
+              <span class="chev">▼</span> Oppure ricerca completa (nome, numero, set)
+            </button>
+            <div id="pokemonStandardFields" class="adv-body" hidden>
 
           <div class="field">
             <label for="pokemonName">Nome Pokémon</label>
@@ -3178,6 +3206,7 @@
             </div>
           </div>
 
+            </div>
           </div>
 
           <button type="button" class="btn btn-primary" id="searchBtn">
@@ -3858,6 +3887,69 @@ function scoreBlueprintForCard(card, bp) {
   return score;
 }
 
+function scoreBlueprintForCardVariant(card, bp, opts = {}) {
+  const allowNumberMismatch = !!opts.allowNumberMismatch;
+  const cardName = norm(card.name || '');
+  const bn = ctBpName(bp);
+  const rawNum = (card.number || '').split('/')[0].replace(/^0+/, '');
+
+  if (cardName) {
+    if (!bn) return 0;
+    if (bn !== cardName && !bn.includes(cardName) && !cardName.includes(bn)) return 0;
+  } else if (!rawNum) {
+    return 0;
+  }
+
+  let score = cardName ? (bn === cardName ? 12 : 7) : 5;
+  const bpNum = ctBpNumber(bp);
+  let numberMatched = false;
+
+  if (rawNum) {
+    if (!bpNum) {
+      if (!isPokemonPromoSet(card)) {
+        if (!allowNumberMismatch) return 0;
+        score -= 6;
+      } else {
+        score += 4;
+      }
+    } else if (bpNum !== rawNum) {
+      if (promoNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(bpNum, rawNum)) {
+        score += 22;
+        numberMatched = true;
+      } else if (!allowNumberMismatch) {
+        return 0;
+      } else {
+        score -= 6;
+      }
+    } else {
+      score += 30;
+      numberMatched = true;
+    }
+  }
+
+  const meta = ctBpMeta(bp);
+  const cat = norm(bp?.category_name || '');
+  const profile = pokemonRarityProfile(card);
+  let rarityHits = 0;
+  profile.tokens.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) {
+      score += 18;
+      rarityHits++;
+    }
+  });
+  profile.avoid.forEach(tok => {
+    if (meta.includes(norm(tok)) || cat.includes(norm(tok))) score -= 20;
+  });
+
+  if (allowNumberMismatch && rawNum && !numberMatched && profile.tokens.length && rarityHits === 0) {
+    return 0;
+  }
+
+  return score;
+}
+
 const LOCAL_CATALOG = [
   {
     id: 'obf-199/197', name: 'Ninetales',
@@ -3898,8 +3990,8 @@ let maybeSeedCards = [];
 let pokemonCtMarketMenuOpen = false;
 let pokemonGraded = false;
 let pokemonGradeScore = 10;
-const POKEMON_SEARCH_MODE_STORAGE_KEY = 'dls_pokemon_search_mode';
-let pokemonQuickSearchMode = false;
+const POKEMON_FULL_SEARCH_OPEN_KEY = 'dls_pokemon_full_search_open';
+let pokemonFullSearchOpen = false;
 const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only';
 const COLLECTION_SORT_STORAGE_KEY = 'dls_collection_sort_mode';
 let collectionOnlyGraded = false;
@@ -5073,85 +5165,77 @@ function setSearchLoading(on) {
   }
 }
 
-function setPokemonSearchMode(mode, opts = {}) {
-  const quick = mode === 'quick';
-  pokemonQuickSearchMode = quick;
+function setPokemonFullSearchOpen(open, opts = {}) {
+  pokemonFullSearchOpen = !!open;
 
-  const standardBtn = $('pokemonModeStandardBtn');
-  const quickBtn = $('pokemonModeQuickBtn');
+  const fullToggle = $('pokemonFullSearchToggle');
   const standardFields = $('pokemonStandardFields');
   const quickField = $('pokemonQuickField');
 
-  if (standardBtn) {
-    standardBtn.classList.toggle('active', !quick);
-    standardBtn.setAttribute('aria-pressed', (!quick).toString());
+  // La ricerca veloce resta sempre attiva e utilizzabile.
+  if (quickField) quickField.hidden = false;
+
+  if (fullToggle) {
+    fullToggle.classList.toggle('open', pokemonFullSearchOpen);
+    fullToggle.setAttribute('aria-expanded', pokemonFullSearchOpen.toString());
+    fullToggle.innerHTML = pokemonFullSearchOpen
+      ? '<span class="chev">▼</span> Nascondi ricerca completa'
+      : '<span class="chev">▼</span> Oppure ricerca completa (nome, numero, set)';
   }
-  if (quickBtn) {
-    quickBtn.classList.toggle('active', quick);
-    quickBtn.setAttribute('aria-pressed', quick.toString());
-  }
-  if (standardFields) standardFields.hidden = quick;
-  if (quickField) quickField.hidden = !quick;
+  if (standardFields) standardFields.hidden = !pokemonFullSearchOpen;
 
   hideAllSuggestions();
   if (!opts.skipPersist) {
     try {
-      localStorage.setItem(POKEMON_SEARCH_MODE_STORAGE_KEY, quick ? 'quick' : 'full');
+      localStorage.setItem(POKEMON_FULL_SEARCH_OPEN_KEY, pokemonFullSearchOpen ? '1' : '0');
     } catch {}
   }
 
-  if (opts.focus !== false) {
-    setTimeout(() => {
-      if (quick) $('pokemonQuickCode')?.focus();
-      else $('pokemonName')?.focus();
-    }, 0);
+  if (opts.focus !== false && pokemonFullSearchOpen) {
+    setTimeout(() => $('pokemonName')?.focus(), 0);
   }
 }
 
 function initPokemonSearchMode() {
-  let saved = '';
-  try {
-    saved = localStorage.getItem(POKEMON_SEARCH_MODE_STORAGE_KEY) || '';
-  } catch {}
-  setPokemonSearchMode(saved === 'quick' ? 'quick' : 'full', { skipPersist: true, focus: false });
+  // Pannello completo chiuso di default; la ricerca veloce resta sempre attiva.
+  setPokemonFullSearchOpen(false, { skipPersist: true, focus: false });
 }
 
 function bindPokemonSearchModeToggle() {
-  const standardBtn = $('pokemonModeStandardBtn');
-  const quickBtn = $('pokemonModeQuickBtn');
-  if (standardBtn && standardBtn.dataset.bound !== '1') {
-    standardBtn.dataset.bound = '1';
-    standardBtn.addEventListener('click', () => setPokemonSearchMode('full'));
-  }
-  if (quickBtn && quickBtn.dataset.bound !== '1') {
-    quickBtn.dataset.bound = '1';
-    quickBtn.addEventListener('click', () => setPokemonSearchMode('quick'));
+  const fullToggle = $('pokemonFullSearchToggle');
+  if (fullToggle && fullToggle.dataset.bound !== '1') {
+    fullToggle.dataset.bound = '1';
+    fullToggle.addEventListener('click', () => {
+      setPokemonFullSearchOpen(!pokemonFullSearchOpen, { focus: !pokemonFullSearchOpen });
+    });
   }
 }
 
 function getPokemonSearchParams() {
-  if (!pokemonQuickSearchMode) {
-    const cardSet = getSelectedSetId();
-    if ($('cardSetId')) $('cardSetId').value = cardSet || '';
+  const quickRaw = ($('pokemonQuickCode')?.value || '').trim();
+  // Se c'è un codice veloce, ha sempre priorità (anche con ricerca completa aperta).
+  if (quickRaw) {
+    const parsed = parsePokemonQuickCodeInput(quickRaw);
+    if (parsed.error) return { error: parsed.error };
+
+    if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
+    if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
+    if ($('cardNumber')) $('cardNumber').value = parsed.number;
+
     return {
-      name: $('pokemonName').value.trim(),
-      number: $('cardNumber').value.trim(),
-      cardSet,
+      name: '',
+      number: parsed.number,
+      cardSet: parsed.cardSet,
       lang: '',
     };
   }
 
-  const parsed = parsePokemonQuickCodeInput($('pokemonQuickCode')?.value || '');
-  if (parsed.error) return { error: parsed.error };
-
-  if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
-  if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
-  if ($('cardNumber')) $('cardNumber').value = parsed.number;
-
+  const cardSet = getSelectedSetId();
+  if ($('cardSetId')) $('cardSetId').value = cardSet || '';
   return {
-    name: '',
-    number: parsed.number,
-    cardSet: parsed.cardSet,
+    name: ($('pokemonName')?.value || '').trim(),
+    number: ($('cardNumber')?.value || '').trim(),
+    cardSet,
     lang: '',
   };
 }
@@ -5189,8 +5273,7 @@ function resetPokemonSearchFields() {
   if ($('choicesCard')) $('choicesCard').hidden = true;
   hideAllSuggestions();
   showMsg('', 'info');
-  if (pokemonQuickSearchMode) $('pokemonQuickCode')?.focus();
-  else $('pokemonName')?.focus();
+  $('pokemonQuickCode')?.focus();
 }
 
 function resolveApiBaseUrl() {
@@ -5209,8 +5292,31 @@ function apiUrl(path) {
   return new URL(path, location.origin).href;
 }
 
+const SEARCH_REQUEST_TIMEOUT_MS = 10000;
+const SEARCH_DEADLINE_MS = 22000;
+const CT_REQUEST_TIMEOUT_MS = 10000;
+const SEARCH_TIMEOUT_MSG = 'Tempo di ricerca scaduto, riprova.';
+
+function isAbortError(err) {
+  return err?.name === 'AbortError' || err?.code === 20;
+}
+
+function isTimeoutError(err) {
+  return err?.name === 'TimeoutError' || err?.code === 'TIMEOUT' || Number(err?.status) === 504;
+}
+
+function makeTimeoutError(message = SEARCH_TIMEOUT_MSG) {
+  return Object.assign(new Error(message), { name: 'TimeoutError', code: 'TIMEOUT', status: 504 });
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+}
+
 function networkFetchErrorMessage(err, fallback) {
+  if (isTimeoutError(err)) return err.message || SEARCH_TIMEOUT_MSG;
   const msg = String(err?.message || err || '');
+  if (/timed?\s*out|scadut/i.test(msg)) return SEARCH_TIMEOUT_MSG;
   if (/failed to fetch|networkerror|load failed/i.test(msg)) {
     return 'Connessione non disponibile. Verifica internet e riprova.';
   }
@@ -5218,7 +5324,7 @@ function networkFetchErrorMessage(err, fallback) {
 }
 
 function rethrowNetworkError(err, fallback) {
-  if (err?.name === 'AbortError') throw err;
+  if (isAbortError(err) || isTimeoutError(err)) throw err;
   if (err?.status) throw err;
   throw Object.assign(new Error(networkFetchErrorMessage(err, fallback)), { cause: err });
 }
@@ -5250,9 +5356,13 @@ async function parsePokemonTcgResponse(res, fallbackMsg) {
   return Array.isArray(data.data) ? data.data : [];
 }
 
-async function fetchWithTimeout(url, opts = {}, ms = 15000) {
+async function fetchWithTimeout(url, opts = {}, ms = SEARCH_REQUEST_TIMEOUT_MS) {
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), ms);
+  let timedOut = false;
+  const tid = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, ms);
   const parent = opts.signal;
   const onParentAbort = () => ctrl.abort();
   if (parent?.aborted) {
@@ -5262,6 +5372,12 @@ async function fetchWithTimeout(url, opts = {}, ms = 15000) {
   parent?.addEventListener('abort', onParentAbort, { once: true });
   try {
     return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (isAbortError(e)) {
+      if (timedOut) throw makeTimeoutError();
+      throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    }
+    throw e;
   } finally {
     clearTimeout(tid);
     parent?.removeEventListener('abort', onParentAbort);
@@ -5295,7 +5411,7 @@ async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
   const netErrFallback = 'Connessione non disponibile. Verifica internet e riprova.';
 
   try {
-    const res = await fetchWithTimeout(proxyUrl.href, opts).catch(err => {
+    const res = await fetchWithTimeout(proxyUrl.href, opts, SEARCH_REQUEST_TIMEOUT_MS).catch(err => {
       rethrowNetworkError(err, netErrFallback);
     });
     if (!res.ok && res.status >= 500) {
@@ -5305,25 +5421,26 @@ async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
     if (!skipQueryCache) setPokemonQueryCache(queryCacheKey, cards);
     return cards;
   } catch (e) {
-    if (e.name === 'AbortError') throw e;
+    // Timeout / annullamento: non aggiungere un secondo round-trip (evita ~30s).
+    if (isAbortError(e) || isTimeoutError(e)) throw e;
     const status = Number(e?.status || 0);
-    // Per errori transitori del proxy (5xx/429/timeout), prova il fallback diretto.
+    // Per errori transitori del proxy (5xx/429), prova il fallback diretto.
     if (status && status !== 404 && !isTransientPokemonStatus(status)) {
       throw e;
     }
   }
 
-  // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile
+  // Fallback diretto (CORS aperto) se il proxy Netlify non è disponibile — budget breve.
   const directUrl = new URL(API_BASE);
   directUrl.searchParams.set('q', query);
   directUrl.searchParams.set('page', String(page));
   directUrl.searchParams.set('pageSize', String(pageSize));
-  let directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
+  let directRes = await fetchWithTimeout(directUrl.href, opts, 8000).catch(err => {
     rethrowNetworkError(err, netErrFallback);
   });
   if (!directRes.ok && directRes.status >= 500) {
-    await new Promise(resolve => setTimeout(resolve, 220));
-    directRes = await fetchWithTimeout(directUrl.href, opts).catch(err => {
+    await new Promise(resolve => setTimeout(resolve, 180));
+    directRes = await fetchWithTimeout(directUrl.href, opts, 6000).catch(err => {
       rethrowNetworkError(err, netErrFallback);
     });
   }
@@ -5331,7 +5448,7 @@ async function fetchCards(query, _unused, signal, pageSize = 20, options = {}) {
   try {
     cards = await parsePokemonTcgResponse(directRes, `Errore Pokémon TCG (${directRes.status})`);
   } catch (e) {
-    if (e?.name === 'AbortError') throw e;
+    if (isAbortError(e) || isTimeoutError(e)) throw e;
     if (isTransientPokemonStatus(e?.status)) {
       console.warn('[Pokemon] upstream transient error, fallback to empty result', e?.status, e?.message || e);
       return [];
@@ -5348,41 +5465,70 @@ const ctCache = {
   expansions: {},          // per game
   blueprints: new Map(),   // expansionId → []
   bpSearch:   new Map(),   // 'game:query' → []
+  products:   new Map(),   // marketplace path → { at, data }
 };
+const ctInflight = new Map(); // path → Promise (dedupe richieste identiche)
 let ctPriceData = null;
 let selectedCtListing = null;
 const choicePriceCache = new Map();
 
-async function ctFetch(path) {
-  const ctrl = new AbortController();
-  const tid  = setTimeout(() => ctrl.abort(), 12000);
-  try {
-    const url = new URL('/api/cardtrader', location.origin);
-    url.searchParams.set('path', path);
-    const res = await fetch(url.href, {
-      headers: { Accept: 'application/json' },
-      signal: ctrl.signal,
-      cache: 'no-store',
-      credentials: 'same-origin',
-    }).catch(err => {
-      if (err?.name === 'AbortError') throw err;
-      throw Object.assign(new Error('CardTrader non raggiungibile. Controlla la connessione.'), { cause: err });
-    });
-    if (!res.ok) {
-      if (res.status === 404) {
-        throw Object.assign(new Error('API CardTrader non disponibile. Usa la versione online o avvia netlify dev.'), { status: 404 });
-      }
-      await apiFetchError(res, `Errore CardTrader (${res.status})`);
-    }
-    return res.json();
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      throw Object.assign(new Error('Timeout CardTrader: la richiesta ha impiegato troppo tempo. Riprova.'), { name: 'AbortError' });
-    }
-    throw e;
-  } finally {
-    clearTimeout(tid);
+async function ctFetch(path, opts = {}) {
+  // Non riusare un AbortController già abortito (dopo timeout/stop ricerca).
+  const liveSearchSignal = (searchCtrl && !searchCtrl.signal.aborted) ? searchCtrl.signal : undefined;
+  const signal = opts.signal || liveSearchSignal;
+  throwIfAborted(signal);
+  const timeoutMs = opts.timeoutMs ?? CT_REQUEST_TIMEOUT_MS;
+  const skipDedupe = !!opts.skipDedupe;
+
+  if (!skipDedupe && ctInflight.has(path)) {
+    return ctInflight.get(path);
   }
+
+  const run = (async () => {
+    try {
+      const url = new URL('/api/cardtrader', location.origin);
+      url.searchParams.set('path', path);
+      const res = await fetchWithTimeout(url.href, {
+        headers: { Accept: 'application/json' },
+        signal,
+        cache: 'no-store',
+        credentials: 'same-origin',
+      }, timeoutMs).catch(err => {
+        if (isAbortError(err) || isTimeoutError(err)) throw err;
+        throw Object.assign(new Error('CardTrader non raggiungibile. Controlla la connessione.'), { cause: err });
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw Object.assign(new Error('API CardTrader non disponibile. Usa la versione online o avvia netlify dev.'), { status: 404 });
+        }
+        if (res.status === 504) {
+          throw makeTimeoutError('Timeout CardTrader: la richiesta ha impiegato troppo tempo. Riprova.');
+        }
+        await apiFetchError(res, `Errore CardTrader (${res.status})`);
+      }
+      return res.json();
+    } finally {
+      ctInflight.delete(path);
+    }
+  })();
+
+  if (!skipDedupe) ctInflight.set(path, run);
+  return run;
+}
+
+async function ctFetchMarketplaceProducts(blueprintId, opts = {}) {
+  const path = ctMarketplaceProductsPath(blueprintId, opts.lang);
+  const ttlMs = opts.ttlMs ?? 45000;
+  const hit = ctCache.products.get(path);
+  if (hit && (Date.now() - hit.at) < ttlMs) return hit.data;
+  const raw = await ctFetch(path, opts);
+  ctCache.products.set(path, { at: Date.now(), data: raw });
+  // Evita crescita illimitata della cache prezzi
+  if (ctCache.products.size > 120) {
+    const oldest = [...ctCache.products.entries()].sort((a, b) => a[1].at - b[1].at).slice(0, 40);
+    oldest.forEach(([k]) => ctCache.products.delete(k));
+  }
+  return raw;
 }
 
 function ctParseList(data) {
@@ -5498,28 +5644,39 @@ async function ctSearchBlueprintsByName(name, token, game = 'pokemon', card = nu
   const cardName = norm(name);
   const rawNum = (card?.number || '').split('/')[0].replace(/^0+/, '');
   const hits = [];
+  const maxExp = 6;
 
-  for (const exp of candidates.slice(0, 8)) {
-    const bps = await ctGetBlueprints(exp.id, token);
-    for (const bp of bps) {
-      const score = card ? scoreBlueprintForCard(card, bp) : 0;
-      if (card) {
-        if (score <= 0) continue;
-      } else if (!ctBpName(bp).includes(cardName) && !cardName.includes(ctBpName(bp))) {
-        continue;
+  for (let i = 0; i < Math.min(candidates.length, maxExp) && hits.length < 12; i += 3) {
+    const chunk = candidates.slice(i, i + 3);
+    const lists = await Promise.all(chunk.map(async exp => {
+      try {
+        return { exp, bps: await ctGetBlueprints(exp.id, token) };
+      } catch (e) {
+        if (isAbortError(e) || isTimeoutError(e)) throw e;
+        return { exp, bps: [] };
       }
-      if (!card && rawNum) {
-        const bpNum = ctBpNumber(bp);
-        if (bpNum
-          && bpNum !== rawNum
-          && !promoNumberMatches(rawNum, bpNum)
-          && !cardNumberMatches(rawNum, bpNum)
-          && !cardNumberMatches(bpNum, rawNum)) continue;
+    }));
+    for (const { exp, bps } of lists) {
+      for (const bp of bps) {
+        const score = card ? scoreBlueprintForCard(card, bp) : 0;
+        if (card) {
+          if (score <= 0) continue;
+        } else if (!ctBpName(bp).includes(cardName) && !cardName.includes(ctBpName(bp))) {
+          continue;
+        }
+        if (!card && rawNum) {
+          const bpNum = ctBpNumber(bp);
+          if (bpNum
+            && bpNum !== rawNum
+            && !promoNumberMatches(rawNum, bpNum)
+            && !cardNumberMatches(rawNum, bpNum)
+            && !cardNumberMatches(bpNum, rawNum)) continue;
+        }
+        hits.push({ bp, score: score || 1, expansion: exp });
+        if (hits.length >= 12) break;
       }
-      hits.push({ bp, score: score || 1, expansion: exp });
       if (hits.length >= 12) break;
     }
-    if (hits.length >= 12) break;
   }
 
   const result = hits
@@ -5585,7 +5742,7 @@ async function searchCtPromoBlueprints(stubCard, signal) {
   );
   const hits = [];
   for (const exp of promoExps) {
-    if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    throwIfAborted(signal);
     const bps = await ctGetBlueprints(exp.id);
     for (const bp of bps) {
       const score = scoreBlueprintForCard(stubCard, bp);
@@ -5881,8 +6038,12 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
   const tried = new Set();
   if (preferredBpId) tried.add(String(preferredBpId));
 
-  // Limita il probing per non rallentare troppo le ricerche.
-  for (const bp of ranked.slice(0, 8)) {
+  const hasLangFilter = !!ctLanguageApiCode(searchLangFilter);
+  const probeLimit = hasLangFilter ? Math.min(10, ranked.length) : 2;
+
+  // Con filtro lingua (es. giapponese) CardTrader puo' separare la carta su blueprint diversi.
+  // In quel caso allarghiamo il probing degli alternativi nella stessa espansione.
+  for (const bp of ranked.slice(0, probeLimit)) {
     const id = String(bp?.id || '');
     if (!id || tried.has(id)) continue;
     tried.add(id);
@@ -5892,6 +6053,74 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
       return { bp, probe };
     }
   }
+  return null;
+}
+
+function ctPokemonAltExpansionCandidates(card, expansions = [], preferredExpansion = null) {
+  const setName = norm(card?.set?.name || '');
+  const enName = norm(pokemonSetEnglishName(card?.set?.id, card?.set?.name || ''));
+  const mappedCode = norm(resolveCtCodeForPokemonSet(card?.set?.id, card?.set?.name || '') || '');
+  const seedTokens = [setName, enName, mappedCode].filter(Boolean);
+  const seen = new Set();
+  const out = [];
+
+  const push = (exp, scoreBoost = 0) => {
+    if (!exp?.id) return;
+    const key = String(exp.id);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ exp, scoreBoost });
+  };
+
+  if (preferredExpansion) push(preferredExpansion, 60);
+
+  expansions.forEach(exp => {
+    const expCode = norm(exp.code || '');
+    const expName = norm(ctExpName(exp));
+    let scoreBoost = 0;
+    seedTokens.forEach(tok => {
+      if (!tok) return;
+      if (expCode && (expCode === tok || expCode.includes(tok) || tok.includes(expCode))) scoreBoost += 45;
+      if (expName && (expName === tok || expName.includes(tok) || tok.includes(expName))) scoreBoost += 35;
+    });
+    if (scoreBoost > 0) push(exp, scoreBoost);
+  });
+
+  return out.sort((a, b) => b.scoreBoost - a.scoreBoost).map(x => x.exp);
+}
+
+async function ctTryLanguageVariantBlueprintPrice(card, preferredExpansion = null, preferredBpId = null, token = null, game = 'pokemon') {
+  const langCode = ctLanguageApiCode(searchLangFilter);
+  if (game !== 'pokemon' || (langCode !== 'ja' && langCode !== 'jp')) return null;
+
+  const expansions = await ctGetExpansions(token, game);
+  const candidates = ctPokemonAltExpansionCandidates(card, expansions, preferredExpansion).slice(0, 5);
+  if (!candidates.length) return null;
+
+  const triedBp = new Set(preferredBpId ? [String(preferredBpId)] : []);
+  const ranked = [];
+
+  for (const exp of candidates) {
+    const bps = await ctGetBlueprints(exp.id, token);
+    for (const bp of bps) {
+      const score = scoreBlueprintForCardVariant(card, bp, { allowNumberMismatch: true });
+      if (score <= 0) continue;
+      ranked.push({ bp, score, exp });
+    }
+  }
+
+  ranked.sort((a, b) => b.score - a.score);
+
+  for (const { bp, exp } of ranked.slice(0, 10)) {
+    const id = String(bp?.id || '');
+    if (!id || triedBp.has(id)) continue;
+    triedBp.add(id);
+    const probe = await ctGetPriceByBlueprintId(id);
+    if (probe && !probe.error && !probe.authError && !probe.corsError && Array.isArray(probe.conditions) && probe.conditions.length) {
+      return { bp: { ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }, probe };
+    }
+  }
+
   return null;
 }
 
@@ -6023,7 +6252,7 @@ function gradeScoreRegex(score) {
 }
 
 function ctListingMentionedGrades(listing) {
-  const text = ctListingNoteText(listing);
+  const text = ctListingNoteText(listing?.rawListing || listing);
   if (!text) return [];
 
   const cleaned = text
@@ -6093,6 +6322,50 @@ function ctExtractGradedHintsFromPriced(pricedRows = []) {
   }).sort((a, b) => Number(b.score) - Number(a.score));
 }
 
+function ctListingIsGraded(listing) {
+  const src = listing?.rawListing || listing;
+  if (src?.graded === true || src?.graded === 'true' || src?.graded === 1 || src?.graded === '1') return true;
+  return ctListingMentionedGrades(src).length > 0;
+}
+
+function ctVisibleListingRows(data, condKey, opts = {}) {
+  const gradedOnly = !!opts.gradedOnly;
+  const selectedCond = (data?.conditions || []).find(c => c.key === condKey);
+  const sourceConds = gradedOnly ? (data?.conditions || []) : (selectedCond ? [selectedCond] : []);
+  const rows = [];
+
+  sourceConds.forEach(cond => {
+    const sourceListings = gradedOnly ? (cond?.allListings || cond?.listings || []) : (cond?.listings || []);
+    sourceListings.forEach((listing, originalIndex) => {
+      rows.push({
+        listing,
+        originalIndex,
+        condKey: cond.key,
+        condLabel: cond.label,
+        grades: ctListingMentionedGrades(listing),
+        isGraded: ctListingIsGraded(listing),
+      });
+    });
+  });
+
+  if (!gradedOnly) return rows.slice(0, 50);
+
+  const targetScore = formatGradeScore(opts.gradeScore);
+  const gradedRows = rows
+    .filter(row => row.isGraded)
+    .sort((a, b) => {
+      const aMatch = targetScore && a.grades.includes(targetScore) ? 1 : 0;
+      const bMatch = targetScore && b.grades.includes(targetScore) ? 1 : 0;
+      if (aMatch !== bMatch) return bMatch - aMatch;
+      return a.listing.price - b.listing.price;
+    });
+
+  if (!targetScore) return gradedRows.slice(0, 50);
+
+  const exactRows = gradedRows.filter(row => row.grades.includes(targetScore));
+  return (exactRows.length ? exactRows : gradedRows).slice(0, 50);
+}
+
 function ctAverageConditions(listings, langFilter = searchLangFilter, editionFilter = searchEditionFilter) {
   const valid = listings
     .map(l => ({
@@ -6157,7 +6430,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
       foil: l.properties_hash?.foil ?? l.properties_hash?.pokemon_foil ?? false,
       firstEdition,
       quantity: l.quantity || 1,
-      url: l.url || l.card_url || ''
+      url: l.url || l.card_url || '',
+      rawListing: l,
     });
 
     if (x.price === row.minPrice) {
@@ -6170,7 +6444,8 @@ function ctAverageConditions(listings, langFilter = searchLangFilter, editionFil
 
   Object.values(byCondition).forEach(row => {
     row.listings.sort((a, b) => a.price - b.price);
-    row.listings = ctTrimListingOutliers(row.listings).slice(0, 12);
+    row.allListings = ctTrimListingOutliers([...row.listings]);
+    row.listings = row.allListings.slice(0, 50);
     row.count = row.listings.length;
     if (row.listings.length) {
       row.minPrice = row.listings[0].price;
@@ -6241,7 +6516,7 @@ function ctListingFilterError(listings) {
 async function ctGetPriceByBlueprintId(blueprintId) {
   if (!blueprintId) return { error: 'Blueprint mancante' };
   try {
-    const raw = await ctFetch(ctMarketplaceProductsPath(blueprintId));
+    const raw = await ctFetchMarketplaceProducts(blueprintId);
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
@@ -6284,6 +6559,8 @@ async function ctGetPriceByBlueprintId(blueprintId) {
     };
   } catch (e) {
     console.warn('CardTrader blueprint price error:', e);
+    if (isTimeoutError(e)) return { error: e.message || SEARCH_TIMEOUT_MSG };
+    if (isAbortError(e)) return { error: 'Richiesta interrotta.' };
     if (e.status === 401 || e.status === 403) return { authError: true };
     return { error: e.message || 'Errore prezzo CardTrader' };
   }
@@ -6332,12 +6609,22 @@ async function ctGetPrice(card, game = 'pokemon') {
       ctSearchUrl: `https://www.cardtrader.com/en/search?q=${encodeURIComponent(card.name + ' ' + (card.set?.name || ''))}`
     };
 
-    const raw = await ctFetch(ctMarketplaceProductsPath(bp.id));
+    const raw = await ctFetchMarketplaceProducts(bp.id);
     const listings = Array.isArray(raw)
       ? raw
       : Object.values(raw || {}).flat().filter(x => x && typeof x === 'object');
 
     if (!listings.length) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6357,6 +6644,16 @@ async function ctGetPrice(card, game = 'pokemon') {
 
     const filterErr = ctListingFilterError(listings);
     if (filterErr) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6378,6 +6675,16 @@ async function ctGetPrice(card, game = 'pokemon') {
     const nm = conditions.find(c => c.key === 'NM') || conditions[0];
 
     if (!nm) {
+      const langAlt = await ctTryLanguageVariantBlueprintPrice(card, matchedExpansion, bp.id, null, game);
+      if (langAlt?.probe) {
+        return {
+          ...langAlt.probe,
+          blueprintId: langAlt.bp.id,
+          expansionName: langAlt.bp.expansion?.name_en || expansionName,
+          setMatchWarning,
+          url: `https://www.cardtrader.com/en/cards/${langAlt.bp.id}`,
+        };
+      }
       const alt = await ctTryAlternateBlueprintPrice(card, matchedExpansion, bp.id, null);
       if (alt?.probe) {
         return {
@@ -6414,7 +6721,9 @@ async function ctGetPrice(card, game = 'pokemon') {
     };
   } catch (e) {
     console.warn('CardTrader error:', e);
-    if (e instanceof TypeError || String(e).includes('fetch') || e.name === 'AbortError') {
+    if (isTimeoutError(e)) return { error: e.message || SEARCH_TIMEOUT_MSG };
+    if (isAbortError(e)) return { error: 'Richiesta interrotta.' };
+    if (e instanceof TypeError || String(e).includes('fetch')) {
       return { corsError: true };
     }
     if (e.status === 401 || e.status === 403) return { authError: true };
@@ -6422,51 +6731,59 @@ async function ctGetPrice(card, game = 'pokemon') {
   }
 }
 
-function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false) {
+function renderCtMarketMenu(d, condKey, selectedListing = null, isOpen = false, opts = {}) {
   const cond = (d.conditions || []).find(c => c.key === condKey);
   const condLabel = QUALITY[qualityKeyFromCtCond(condKey)]?.label || condKey;
+  const gradedOnly = !!opts.gradedOnly;
+  const emptyText = gradedOnly
+    ? 'Nessun annuncio gradata per questa condizione.'
+    : 'Nessun annuncio per questa condizione.';
   if (!cond) {
     return `
       <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
         <div class="ct-market-title">
-          <span>Annunci caricati su CT · ${escHtml(condLabel)}</span>
+          <span>Annunci CT${gradedOnly ? ' · solo gradate' : ''} · ${escHtml(condLabel)} (max 50)</span>
           <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
             ${isOpen ? 'Chiudi menu' : 'Apri menu'} · 0
           </button>
         </div>
         <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
           <div class="ct-listing-list">
-            <p class="ct-msg info">Nessun annuncio per questa condizione.</p>
+            <p class="ct-msg info">${emptyText}</p>
           </div>
         </div>
       </div>`;
   }
-  const rows = (cond.listings || []).map((l, idx) => {
+  const listingRows = ctVisibleListingRows(d, condKey, opts);
+  const shownCount = listingRows.length;
+  const rows = listingRows.map(({ listing: l, originalIndex, condKey: rowCondKey, condLabel: rowCondLabel, grades, isGraded }) => {
     const lang = (l.language || '?').toUpperCase().slice(0, 3);
     const foil = l.foil ? ' · foil' : '';
     const edition = l.firstEdition ? ' · 1ª' : '';
     const qty = l.quantity > 1 ? ` · x${l.quantity}` : '';
-    const isSelected = selectedListing?.condKey === condKey && selectedListing?.index === idx;
+    const gradedMeta = grades.length ? ` · grad ${grades.join('/')}` : (isGraded ? ' · graded' : '');
+    const condMeta = gradedOnly && rowCondKey !== condKey ? ` · ${rowCondLabel}` : '';
+    const isSelected = selectedListing?.condKey === rowCondKey && selectedListing?.index === originalIndex;
     return `
       <button type="button" class="ct-listing-row${isSelected ? ' ct-listing-selected' : ''}"
-        data-listing-index="${idx}" data-cond-key="${escHtml(condKey)}" aria-pressed="${isSelected}">
+        data-listing-index="${originalIndex}" data-cond-key="${escHtml(rowCondKey)}" aria-pressed="${isSelected}">
         <span class="ct-listing-price">${fmt(l.price)}${isSelected ? ' ←' : ''}</span>
         <span class="ct-listing-seller" title="${escHtml(l.seller)}">${escHtml(l.seller)}</span>
-        <span class="ct-listing-meta">${lang}${edition}${foil}${qty}</span>
+        <span class="ct-listing-meta">${lang}${edition}${foil}${qty}${condMeta}${gradedMeta}</span>
       </button>`;
   }).join('');
 
   return `
     <div class="ct-market-menu${isOpen ? ' is-open' : ''}">
       <div class="ct-market-title">
-        <span>Annunci caricati su CT · ${escHtml(cond.label)}</span>
+        <span>Annunci CT${gradedOnly ? ' · solo gradate' : ''} · ${escHtml(cond.label)} (max 50)</span>
         <button type="button" class="btn btn-outline ct-market-toggle" aria-expanded="${isOpen}">
-          ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${cond.count || 0}
+          ${isOpen ? 'Chiudi menu' : 'Apri menu'} · ${shownCount}
         </button>
       </div>
       <div class="ct-market-overlay" ${isOpen ? '' : 'hidden'}>
         <div class="ct-listing-list">
-          ${rows || '<p class="ct-msg info">Nessun annuncio per questa condizione.</p>'}
+          ${rows || `<p class="ct-msg info">${emptyText}</p>`}
         </div>
       </div>
     </div>`;
@@ -6563,7 +6880,7 @@ function renderCtSection() {
       <div class="ct-cond-grid">
         ${condRows || '<p class="ct-msg warn">Nessuna condizione disponibile</p>'}
       </div>
-      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen)}
+      ${renderCtMarketMenu(d, selectedCtCond, selectedCtListing, pokemonCtMarketMenuOpen, { gradedOnly: pokemonGraded, gradeScore: pokemonGradeScore })}
       <div class="ct-footer-row">
         <span class="ct-chip">${d.total} listino${d.total > 1 ? 'i' : ''} totali</span>
         <a class="ct-link" href="${d.url}" target="_blank">↗ Vedi su CardTrader</a>
@@ -7052,7 +7369,7 @@ function ctCardFromBlueprint(bp) {
 }
 
 async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
-  if (signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+  throwIfAborted(signal);
 
   const setInput = $('cardSet')?.value?.trim() || '';
   const effectiveSetId = cardSet || inferPromoSetIdFromText(setInput);
@@ -7073,6 +7390,7 @@ async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
   try {
     const ctCode = effectiveSetId ? resolveCtCodeForPokemonSet(effectiveSetId, setName) : null;
     if (effectiveSetId && (isPromoSetId(effectiveSetId) || ctCode)) {
+      throwIfAborted(signal);
       const exp = await ctMatchExpansion(stubCard, null, 'pokemon');
       if (exp) {
         if (name && number) {
@@ -7094,15 +7412,28 @@ async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
         }
       }
     }
+    // Preferisci 1 sola chiamata API nome rispetto allo scan di più espansioni.
     if (!bps.length && name) {
+      throwIfAborted(signal);
+      try {
+        bps = await ctSearchBlueprintsByApi(name, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
+        if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
+      } catch (e) {
+        if (isAbortError(e) || isTimeoutError(e)) throw e;
+        console.warn('[CT] blueprints API search:', e);
+      }
+    }
+    if (!bps.length && name) {
+      throwIfAborted(signal);
       bps = await ctSearchBlueprintsByName(name, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
       if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
     }
     if (!bps.length && !effectiveSetId && (name || number)) {
+      throwIfAborted(signal);
       bps = await searchCtPromoBlueprints(stubCard, signal);
     }
   } catch (e) {
-    if (e.name === 'AbortError') throw e;
+    if (isAbortError(e) || isTimeoutError(e)) throw e;
     console.warn('[CT] searchPokemonViaCardTrader:', e);
     return [];
   }
@@ -7269,7 +7600,7 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   const quickFetchCards = async (query, pageSize) => {
     if (!query) return [];
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 4500);
+    const tid = setTimeout(() => ctrl.abort(), 3500);
     const onAbort = () => ctrl.abort();
     signal?.addEventListener('abort', onAbort, { once: true });
     try {
@@ -7306,35 +7637,34 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   });
   candidates.push(...localWide);
 
+  // Fetch API in parallelo (budget breve), non in sequenza.
+  const apiJobs = [];
   if (name) {
-    candidates.push(...await quickFetchCards(bfq('name', name, true), 30));
-
+    apiJobs.push(quickFetchCards(bfq('name', name, true), 24));
     const n = norm(name).replace(/[^a-z0-9\s]/g, '').trim();
     if (n.length >= 4) {
       const shortToken = n.slice(0, Math.max(3, Math.floor(n.length * 0.6)));
-      candidates.push(...await quickFetchCards(bfq('name', shortToken, true), 20));
+      apiJobs.push(quickFetchCards(bfq('name', shortToken, true), 16));
+    }
+  }
+  if (number) apiJobs.push(quickFetchCards(bnq(number), 20));
+  if (apiJobs.length) {
+    const settled = await Promise.allSettled(apiJobs);
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) candidates.push(...r.value);
     }
   }
 
-  if (number) {
-    candidates.push(...await quickFetchCards(bnq(number), 25));
-  }
-
-  // Per i numeri adiacenti usiamo CardTrader: evita timeout lunghi su query
-  // troppo specifiche e intercetta promo/non presenti nel catalogo PTCG.
-  if (name && nearNumbers.length) {
-    for (const near of nearNumbers) {
-      try {
-        candidates.push(...await searchPokemonViaCardTrader(name, near, cardSet, signal));
-      } catch {}
-    }
-  }
-
+  // Numeri adiacenti: solo catalogo locale/API già raccolto — niente CT sequenziale (lento).
+  // CT solo se non abbiamo ancora candidati e non è una ricerca esatta nome+numero.
   if (!skipCtFallback && !candidates.length && (name || number)) {
     try {
+      throwIfAborted(signal);
       const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
       candidates.push(...ctCards);
-    } catch {}
+    } catch (e) {
+      if (isAbortError(e) || isTimeoutError(e)) throw e;
+    }
   }
 
   const filtered = dedupeCards(candidates)
@@ -7469,6 +7799,12 @@ async function doSearch() {
   setSearchLoading(true);
   showMsg('Ricerca in corso…', 'loading');
 
+  let timedOut = false;
+  const deadlineTid = setTimeout(() => {
+    timedOut = true;
+    try { searchCtrl?.abort(); } catch {}
+  }, SEARCH_DEADLINE_MS);
+
   try {
     const cards = await runSearch(name, number, cardSet, lang, null, searchCtrl.signal);
     if (myGen !== searchGen) return;
@@ -7500,7 +7836,12 @@ async function doSearch() {
       renderChoices(cards);
     }
   } catch (e) {
-    if (e.name === 'AbortError' || myGen !== searchGen) return;
+    if (myGen !== searchGen) return;
+    if (isTimeoutError(e) || (isAbortError(e) && timedOut)) {
+      showMsg(SEARCH_TIMEOUT_MSG, 'error');
+      return;
+    }
+    if (isAbortError(e)) return;
     console.error(e);
     const msg = e.status === 404
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev in locale.'
@@ -7509,7 +7850,11 @@ async function doSearch() {
         : networkFetchErrorMessage(e, e.message || 'Errore durante la ricerca. Controlla la connessione.');
     showMsg(msg, 'error');
   } finally {
-    if (myGen === searchGen) setSearchLoading(false);
+    clearTimeout(deadlineTid);
+    if (myGen === searchGen) {
+      setSearchLoading(false);
+      if (searchCtrl?.signal?.aborted) searchCtrl = null;
+    }
   }
 }
 
@@ -7549,7 +7894,7 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   try {
     if (parts.length) cards = await fetchCards(parts.join(' '), apiKey, signal, pageSize);
   } catch (e) {
-    if (e.name === 'AbortError') throw e;
+    if (isAbortError(e) || isTimeoutError(e)) throw e;
     if (e instanceof Response) {
       if (e.status === 403) {
         blocked = true;
@@ -7661,10 +8006,12 @@ async function hydrateChoicePrices(cards) {
   if (!cards?.length) return;
   const gen = ++priceFetchGen;
   const batchSize = 2;
+  // Limita idratazione prezzi alle prime carte visibili (evita burst N+1 su CT).
+  const toHydrate = cards.slice(0, 8);
 
-  for (let i = 0; i < cards.length; i += batchSize) {
+  for (let i = 0; i < toHydrate.length; i += batchSize) {
     if (gen !== priceFetchGen) return;
-    const slice = cards.slice(i, i + batchSize);
+    const slice = toHydrate.slice(i, i + batchSize);
     await Promise.all(slice.map(async (card, offset) => {
       const idx = i + offset;
       const el = document.querySelector(`.choice-price[data-idx="${idx}"]`);
@@ -7680,7 +8027,17 @@ async function hydrateChoicePrices(cards) {
       el.classList.add('loading');
       el.title = 'Caricamento prezzo CardTrader…';
 
-      const result = await ctGetPrice(card);
+      let result;
+      try {
+        result = await ctGetPrice(card);
+      } catch (err) {
+        if (isAbortError(err) || isTimeoutError(err)) {
+          updateChoicePriceEl(el, { price: getPrice(card).price, src: getPrice(card).src, error: err.message });
+          return;
+        }
+        console.warn('hydrateChoicePrices:', err);
+        result = { error: err.message || 'Errore prezzo' };
+      }
       if (gen !== priceFetchGen) return;
       const data = result?.price && !result.error
         ? { price: result.price, src: 'CardTrader', ct: result }
@@ -9375,6 +9732,11 @@ async function tcgDoSearch(gameKey) {
     }
   } catch (e) {
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
+    if (isTimeoutError(e)) {
+      tcgShowMsg(gameKey, SEARCH_TIMEOUT_MSG, 'error');
+      return;
+    }
+    if (isAbortError(e)) return;
     const msg = e.status === 404
       ? 'Ricerca non disponibile offline. Apri l\'app su Netlify o usa netlify dev.'
       : e.status === 503
@@ -9478,7 +9840,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
 
   try {
     const lang = tcgGetLang(gameKey);
-    let data = await ctFetch(ctMarketplaceProductsPath(bp.id, lang));
+    let data = await ctFetchMarketplaceProducts(bp.id, { lang });
     if (searchGen !== ctTcgState[gameKey].searchGen) return;
     let listings = Object.values(data || {}).flat().filter(l => l && typeof l === 'object' && (l.price_cents != null || l.price));
     let usedLang = lang;
@@ -9486,7 +9848,7 @@ async function tcgSelectCard(gameKey, bp, searchGen = ctTcgState[gameKey].search
 
     // Se la lingua scelta non ha annunci, ripeti senza filtro (OP promo JP spesso senza EN/IT)
     if (!listings.length && lang) {
-      data = await ctFetch(ctMarketplaceProductsPath(bp.id, ''));
+      data = await ctFetchMarketplaceProducts(bp.id, { lang: '' });
       if (searchGen !== ctTcgState[gameKey].searchGen) return;
       listings = Object.values(data || {}).flat().filter(l => l && typeof l === 'object' && (l.price_cents != null || l.price));
       usedLang = '';
@@ -9719,7 +10081,7 @@ function tcgRenderResult(gameKey, bp, prices) {
           </button>`;
         }).join('')}
       </div>
-      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen)}
+      ${renderCtMarketMenu(prices, selectedCtCond, ctTcgState[gameKey].selectedListing, ctTcgState[gameKey].marketMenuOpen, { gradedOnly: !!ctTcgState[gameKey].graded, gradeScore: ctTcgState[gameKey].gradeScore })}
       <div class="ct-footer-row">
         <span class="ct-chip">${prices.total} annunci totali</span>
         <a class="ct-link" href="${prices.url}" target="_blank" rel="noopener noreferrer">↗ Vedi su CardTrader</a>
