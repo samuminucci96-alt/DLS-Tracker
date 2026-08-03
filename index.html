@@ -3645,6 +3645,7 @@ function bindPokemonCtMarketToggle() {
 
 // Mappa set PokéTCG → codici espansione CardTrader
 const CT_SET_CODE_MAP = {
+  m2a: 'm2a', megadream: 'm2a', megadreamex: 'm2a',
   me025: 'asc', me02pt5: 'asc', me02_5: 'asc', 'me02.5': 'asc',
   me02: 'pfl', me02p: 'pfl',
   me1: 'meg', me01: 'meg', megaevoluzione: 'meg', megaevolution: 'meg',
@@ -3684,6 +3685,8 @@ const POKEMON_API_SET_ID_MAP = {
   fossil: 'base3',
   rocket: 'base5',
   lc: 'base6',
+  // M2A (CardTrader JP code "MEGA Dream ex") corrisponde al set API me1.
+  m2a: 'me1',
   // Megaevoluzione local ids differiscono dagli id pubblicati da PokéTCG API.
   'me02.5': 'me2pt5',
   me02: 'me2',
@@ -3694,6 +3697,21 @@ function resolvePokemonApiSetId(setId) {
   if (!raw) return '';
   const key = raw.toLowerCase();
   return POKEMON_API_SET_ID_MAP[key] || raw;
+}
+
+function getKnownCtPokemonExpansionCodeSet() {
+  if (typeof POKEMON_SEALED_SETS === 'undefined' || !Array.isArray(POKEMON_SEALED_SETS)) return new Set();
+  return new Set(
+    POKEMON_SEALED_SETS
+      .map(s => normalizeTcgSetCode(s?.code || s?.id || ''))
+      .filter(Boolean)
+  );
+}
+
+function isKnownCtPokemonExpansionCode(codeToken) {
+  const token = normalizeTcgSetCode(codeToken);
+  if (!token) return false;
+  return getKnownCtPokemonExpansionCodeSet().has(token);
 }
 
 const CT_PROMO_EXPANSION_CODES = new Set(['mep', 'svpromo', 'swshbs', 'smbs', 'xybsp', 'bwbsp', 'nbsp']);
@@ -3817,6 +3835,8 @@ function resolveCtCodeForPokemonSet(setId, setName) {
   if (CT_SET_CODE_MAP[sid]) return CT_SET_CODE_MAP[sid];
   if (CT_SET_CODE_MAP[sname]) return CT_SET_CODE_MAP[sname];
   if (CT_SET_CODE_MAP[norm(setId)]) return CT_SET_CODE_MAP[norm(setId)];
+  // Permetti codici espansione CT nativi (es. sv8a, sv2a, s11) come set virtuali.
+  if (isKnownCtPokemonExpansionCode(sid)) return sid;
   return null;
 }
 
@@ -4997,6 +5017,10 @@ function resolvePokemonSetIdFromQuickCode(codeToken) {
   });
   if (byStrictCode?.id) return byStrictCode.id;
 
+  // Fallback strutturale: accetta qualunque codice espansione CardTrader noto
+  // anche se il set non esiste nel catalogo Pokémon TCG locale/API.
+  if (isKnownCtPokemonExpansionCode(token)) return token;
+
   // Nessun fuzzy fallback: in ricerca veloce sono ammessi solo codici/alias esatti.
   return '';
 }
@@ -5711,14 +5735,23 @@ async function ctSearchBlueprintsByApi(name, token, game = 'pokemon', card = nul
     .filter(bp => {
       if (!rawNum) return true;
       const bpNum = ctBpNumber(bp);
-      return bpNum === rawNum || promoNumberMatches(rawNum, bpNum);
+      return bpNum === rawNum
+        || promoNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(bpNum, rawNum);
     })
     .map(bp => {
       const exp = expById.get(String(bp.expansion_id));
       const scoreBase = card ? scoreBlueprintForCard(card, bp) : 1;
       const sameExpansion = targetExp && Number(bp.expansion_id) === Number(targetExp.id) ? 80 : 0;
       const codeBoost = setCode && exp && norm(exp.code || '') === norm(setCode) ? 40 : 0;
-      const numBoost = rawNum && (ctBpNumber(bp) === rawNum || promoNumberMatches(rawNum, ctBpNumber(bp))) ? 20 : 0;
+      const bpNum = ctBpNumber(bp);
+      const numBoost = rawNum && (
+        bpNum === rawNum
+        || promoNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(rawNum, bpNum)
+        || cardNumberMatches(bpNum, rawNum)
+      ) ? 20 : 0;
       const score = scoreBase + sameExpansion + codeBoost + numBoost;
       return {
         ...bp,
@@ -7161,6 +7194,10 @@ const POKEMON_QUICK_SET_ALIASES = {
   twm: 'sv6',
   twilightmasquerade: 'sv6',
   crepuscolomascherato: 'sv6',
+  // Alias set JP/CardTrader per ricerche veloci tipo "M2A 210".
+  m2a: 'm2a',
+  megadream: 'm2a',
+  megadreamex: 'm2a',
 };
 
 function looksItalianSetName(v) {
@@ -7404,7 +7441,12 @@ async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
             if (name && nn && !norm(bp.name).includes(nn)) continue;
             if (number && rawNum) {
               const bpNum = ctBpNumber(bp);
-              if (bpNum !== rawNum && !promoNumberMatches(rawNum, bpNum)) continue;
+              if (
+                bpNum !== rawNum
+                && !promoNumberMatches(rawNum, bpNum)
+                && !cardNumberMatches(rawNum, bpNum)
+                && !cardNumberMatches(bpNum, rawNum)
+              ) continue;
             }
             bps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
             if (bps.length >= 24) break;
@@ -7888,7 +7930,13 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   if (number)  parts.push(bnq(number));
   if (cardSet) {
     const apiSetId = resolvePokemonApiSetId(cardSet);
-    parts.push(`set.id:"${escQ(apiSetId)}"`);
+    const isVirtualCtOnlySet = !POKEMON_SETS.some(s => norm(s.id) === norm(cardSet))
+      && isKnownCtPokemonExpansionCode(cardSet)
+      && norm(apiSetId) === norm(cardSet);
+    // Per set JP/CT-only virtuali evita filtro set.id su PokéTCG API (porta solo rumore/errori).
+    if (!isVirtualCtOnlySet) {
+      parts.push(`set.id:"${escQ(apiSetId)}"`);
+    }
   }
 
   try {
@@ -7933,7 +7981,9 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   }
 
   // Set assente da Pokémon TCG API → CardTrader (anche senza set/espansione)
-  if (!cards.length && !maybeSeedCards.length && !(name && number) && (name || number) && shouldTryCtFallback(name, number, cardSet)) {
+  const forceCtSetFallback = !!(cardSet && resolveCtCodeForPokemonSet(cardSet, $('cardSet')?.value || ''));
+  if (!cards.length && !(name && number) && (name || number) && shouldTryCtFallback(name, number, cardSet)
+      && (!maybeSeedCards.length || forceCtSetFallback)) {
     const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
     if (ctCards.length) {
       showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
