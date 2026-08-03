@@ -3202,6 +3202,7 @@
               <label for="cardSet">Set / Espansione</label>
               <input id="cardSet" type="text" placeholder="Es. Ascesa Eroica, Chaos Rising, Ossidiana…" autocomplete="off">
               <input type="hidden" id="cardSetId" value="">
+              <input type="hidden" id="cardSetMarket" value="auto">
               <div id="setSuggestions" class="suggestions" hidden></div>
             </div>
           </div>
@@ -3830,13 +3831,30 @@ function pokemonSetEnglishName(setId, setName) {
 }
 
 function resolveCtCodeForPokemonSet(setId, setName) {
+  return resolveCtCodeForPokemonSetByMarket(setId, setName, 'auto');
+}
+
+function resolveCtCodeForPokemonSetByMarket(setId, setName, market = 'auto') {
+  const pickedMarket = normalizePokemonSetMarket(market);
   const sid = (setId || '').toLowerCase().replace(/[\.\-\s]/g, '');
   const sname = norm(setName).replace(/\s+/g, '');
+  const raw = String(setId || '').trim().toLowerCase();
+
+  if (pickedMarket === 'jp') {
+    if (isKnownCtPokemonExpansionCode(raw)) return raw;
+    if (isKnownCtPokemonExpansionCode(sid)) return sid;
+    if (CT_SET_CODE_MAP[sname] && isKnownCtPokemonExpansionCode(CT_SET_CODE_MAP[sname])) {
+      return CT_SET_CODE_MAP[sname];
+    }
+    return raw || sid || null;
+  }
+
   if (CT_SET_CODE_MAP[sid]) return CT_SET_CODE_MAP[sid];
   if (CT_SET_CODE_MAP[sname]) return CT_SET_CODE_MAP[sname];
   if (CT_SET_CODE_MAP[norm(setId)]) return CT_SET_CODE_MAP[norm(setId)];
   // Permetti codici espansione CT nativi (es. sv8a, sv2a, s11) come set virtuali.
   if (isKnownCtPokemonExpansionCode(sid)) return sid;
+  if (isKnownCtPokemonExpansionCode(raw)) return raw;
   return null;
 }
 
@@ -4010,6 +4028,10 @@ let maybeSeedCards = [];
 let pokemonCtMarketMenuOpen = false;
 let pokemonGraded = false;
 let pokemonGradeScore = 10;
+let pokemonVariantCards = [];
+let pokemonVariantLoading = false;
+let pokemonVariantError = '';
+let pokemonVariantFetchGen = 0;
 const POKEMON_FULL_SEARCH_OPEN_KEY = 'dls_pokemon_full_search_open';
 let pokemonFullSearchOpen = false;
 const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only';
@@ -4021,6 +4043,29 @@ function normalizeCollectionSortMode(v) {
   const mode = String(v || '').trim();
   if (mode === 'value_desc' || mode === 'value_asc' || mode === 'name_az' || mode === 'set_group') return mode;
   return 'value_desc';
+}
+
+function normalizePokemonSetMarket(v) {
+  const market = String(v || '').trim().toLowerCase();
+  if (market === 'eu' || market === 'jp' || market === 'auto') return market;
+  if (market === 'jap' || market === 'ja') return 'jp';
+  return 'auto';
+}
+
+function marketLabelShort(market) {
+  return normalizePokemonSetMarket(market) === 'jp' ? 'JP' : 'EU';
+}
+
+function inferSetMarketFromText(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (!t) return '';
+  if (/\b(jp|jap|jpn|giappon|japanese|nihon)\b/.test(t)) return 'jp';
+  if (/\b(eu|internazionale|international|global)\b/.test(t)) return 'eu';
+  return '';
+}
+
+function getSelectedSetMarket() {
+  return 'auto';
 }
 
 function updateCollectionSortControl() {
@@ -5007,7 +5052,7 @@ function resolvePokemonSetIdFromQuickCode(codeToken) {
     }
     const setCode = normalizeTcgSetCode(setRow.code || '');
     if (setCode) setCodes.add(setCode);
-    const ctCode = resolveCtCodeForPokemonSet(setId, setRow.text || '');
+    const ctCode = resolveCtCodeForPokemonSetByMarket(setId, setRow.text || '', 'auto');
     if (ctCode) setCodes.add(normalizeTcgSetCode(ctCode));
     const overrideCode = (typeof POKEMON_SET_CODE_OVERRIDES !== 'undefined')
       ? POKEMON_SET_CODE_OVERRIDES[String(setId).toLowerCase()]
@@ -5237,12 +5282,18 @@ function bindPokemonSearchModeToggle() {
 
 function getPokemonSearchParams() {
   const quickRaw = ($('pokemonQuickCode')?.value || '').trim();
-  // Se c'è un codice veloce, ha sempre priorità (anche con ricerca completa aperta).
-  if (quickRaw) {
+  const advName = ($('pokemonName')?.value || '').trim();
+  const advNumber = ($('cardNumber')?.value || '').trim();
+  const advSetText = ($('cardSet')?.value || '').trim();
+  const hasAdvancedInput = !!(advName || advNumber || advSetText);
+  const setMarket = 'auto';
+  // Il codice veloce ha priorita' solo quando i campi ricerca completa sono vuoti.
+  if (quickRaw && !hasAdvancedInput) {
     const parsed = parsePokemonQuickCodeInput(quickRaw);
     if (parsed.error) return { error: parsed.error };
 
     if ($('cardSetId')) $('cardSetId').value = parsed.cardSet || '';
+    if ($('cardSetMarket')) $('cardSetMarket').value = normalizePokemonSetMarket(setMarket);
     if ($('cardSet')) $('cardSet').value = parsed.setLabel || parsed.setToken;
     if ($('cardNumber')) $('cardNumber').value = parsed.number;
 
@@ -5250,16 +5301,19 @@ function getPokemonSearchParams() {
       name: '',
       number: parsed.number,
       cardSet: parsed.cardSet,
+      setMarket,
       lang: '',
     };
   }
 
   const cardSet = getSelectedSetId();
   if ($('cardSetId')) $('cardSetId').value = cardSet || '';
+  if ($('cardSetMarket')) $('cardSetMarket').value = normalizePokemonSetMarket(setMarket);
   return {
-    name: ($('pokemonName')?.value || '').trim(),
-    number: ($('cardNumber')?.value || '').trim(),
+    name: advName,
+    number: advNumber,
     cardSet,
+    setMarket,
     lang: '',
   };
 }
@@ -5280,6 +5334,7 @@ function resetPokemonSearchFields() {
   if ($('cardNumber')) $('cardNumber').value = '';
   if ($('cardSet')) $('cardSet').value = '';
   if ($('cardSetId')) $('cardSetId').value = '';
+  if ($('cardSetMarket')) $('cardSetMarket').value = 'auto';
   if ($('pokemonQuickCode')) $('pokemonQuickCode').value = '';
   selectedCard = null;
   selectedCtListing = null;
@@ -5728,7 +5783,11 @@ async function ctSearchBlueprintsByApi(name, token, game = 'pokemon', card = nul
   const expById = new Map(expansions.map(e => [String(e.id), e]));
   const targetExp = card?.set ? await ctMatchExpansion(card, token, game) : null;
   const rawNum = (card?.number || '').split('/')[0].replace(/^0+/, '');
-  const setCode = resolveCtCodeForPokemonSet(card?.set?.id, card?.set?.name) || '';
+  const setCode = resolveCtCodeForPokemonSetByMarket(
+    card?.set?.id,
+    card?.set?.name,
+    card?.set?.market || 'auto',
+  ) || '';
 
   const hits = rows
     .filter(bp => !gameId || !bp?.game_id || Number(bp.game_id) === Number(gameId))
@@ -5951,7 +6010,7 @@ function ctSimilarity(a, b) {
   return overlap / Math.max(tA.length, tB.length);
 }
 
-async function ctMatchExpansion(card, token, game = 'pokemon') {
+async function ctMatchExpansion(card, token, game = 'pokemon', opts = {}) {
   const expansions = await ctGetExpansions(token, game);
   if (!expansions?.length) return null;
 
@@ -5963,7 +6022,9 @@ async function ctMatchExpansion(card, token, game = 'pokemon') {
 
   ctLog(`[CT] Cerco espansione per set: id="${setId}" name="${setName}" en="${enName}"`);
 
-  const mappedCode = resolveCtCodeForPokemonSet(card.set?.id, setName)
+  const preferredMarket = normalizePokemonSetMarket(opts?.preferredMarket || card?.set?.market || getSelectedSetMarket());
+  const preferredCode = String(opts?.preferredCode || '').trim();
+  const mappedCode = preferredCode || resolveCtCodeForPokemonSetByMarket(card.set?.id, setName, preferredMarket)
     || CT_SET_CODE_MAP[setId] || CT_SET_CODE_MAP[setNorm.replace(/\s+/g, '')];
   if (mappedCode) {
     const m0 = expansions.find(e => norm(e.code) === norm(mappedCode));
@@ -6092,7 +6153,11 @@ async function ctTryAlternateBlueprintPrice(card, expansion, preferredBpId = nul
 function ctPokemonAltExpansionCandidates(card, expansions = [], preferredExpansion = null) {
   const setName = norm(card?.set?.name || '');
   const enName = norm(pokemonSetEnglishName(card?.set?.id, card?.set?.name || ''));
-  const mappedCode = norm(resolveCtCodeForPokemonSet(card?.set?.id, card?.set?.name || '') || '');
+  const mappedCode = norm(resolveCtCodeForPokemonSetByMarket(
+    card?.set?.id,
+    card?.set?.name || '',
+    card?.set?.market || 'auto',
+  ) || '');
   const seedTokens = [setName, enName, mappedCode].filter(Boolean);
   const seen = new Set();
   const out = [];
@@ -7077,28 +7142,29 @@ function getSelectedSetId() {
   if (hidden) return hidden;
   const text = $('cardSet')?.value?.trim();
   if (!text) return '';
+  const catalog = getPokemonSetCatalog();
 
   const euCode = text.match(/\bEU\s*[:=]\s*([a-z0-9.\-]+)/i)?.[1]?.trim();
   if (euCode) {
-    const byEu = POKEMON_SETS.find(s => norm(s.id) === norm(euCode));
+    const byEu = catalog.find(s => norm(s.id) === norm(euCode));
     if (byEu) return byEu.id;
   }
 
   const q = norm(text);
-  const exact = POKEMON_SETS.find(s => norm(s.id) === q || norm(s.id).replace(/[\.\-]/g, '') === q.replace(/[\.\-]/g, ''));
+  const exact = catalog.find(s => norm(s.id) === q || norm(s.id).replace(/[\.\-]/g, '') === q.replace(/[\.\-]/g, ''));
   if (exact) return exact.id;
 
   // Se l'utente incolla il nome completo set (es. "Megaevoluzione (me1) · set 2025")
   // prova prima un match testuale stretto o l'ID tra parentesi.
   const byBracketId = text.match(/\(([a-z0-9.\-]+)\)/i)?.[1]?.trim();
   if (byBracketId) {
-    const byId = POKEMON_SETS.find(s => norm(s.id) === norm(byBracketId));
+    const byId = catalog.find(s => norm(s.id) === norm(byBracketId));
     if (byId) return byId.id;
   }
 
   const qNorm = normalizeSetSearchText(text);
   const qCompact = qNorm.replace(/[^a-z0-9]/g, '');
-  const byText = POKEMON_SETS.find(s => {
+  const byText = catalog.find(s => {
     const sNorm = normalizeSetSearchText(`${s.text || ''} ${formatPokemonSetLabel(s)}`);
     if (!sNorm) return false;
     if (sNorm === qNorm) return true;
@@ -7149,6 +7215,13 @@ function getSelectedSetId() {
     if (best && best.score >= 55 && (!second || best.score - second.score >= 8)) return best.id;
   }
   return '';
+}
+
+function inferSetMarketForRow(setRow, preferred = 'auto') {
+  const picked = normalizePokemonSetMarket(preferred);
+  if (picked === 'eu' || picked === 'jp') return picked;
+  if (isKnownCtPokemonExpansionCode(setRow?.id || '')) return 'jp';
+  return 'eu';
 }
 
 function normalizeSetSearchText(v) {
@@ -7237,6 +7310,10 @@ function splitPokemonSetNames(setText) {
 function formatPokemonSetLabel(setRow) {
   if (!setRow) return '';
   const id = String(setRow.id || '').trim();
+  if (setRow._virtualJp) {
+    const virtualName = stripPokemonSetLabel(setRow.text || '') || id.toUpperCase();
+    return `${virtualName} [JP:${id.toUpperCase()}]`;
+  }
   const override = POKEMON_SET_NAME_OVERRIDES[id.toLowerCase()];
   const { en, it } = override || splitPokemonSetNames(setRow.text || id);
   const name = en && it && norm(en) !== norm(it)
@@ -7244,7 +7321,7 @@ function formatPokemonSetLabel(setRow) {
     : (en || it || id);
   const euCode = String(
     POKEMON_SET_CODE_OVERRIDES[id.toLowerCase()]
-    || resolveCtCodeForPokemonSet(id, setRow.text || '')
+    || resolveCtCodeForPokemonSetByMarket(id, setRow.text || '', 'eu')
     || resolvePokemonApiSetId(id)
     || id
   ).toUpperCase();
@@ -7252,27 +7329,113 @@ function formatPokemonSetLabel(setRow) {
   return `${name} [EU:${euCode} / JP:${jpCode}]`;
 }
 
+function formatPokemonSetLabelForMarket(setRow, market) {
+  if (!setRow) return '';
+  const id = String(setRow.id || '').trim();
+  const override = POKEMON_SET_NAME_OVERRIDES[id.toLowerCase()];
+  const { en, it } = override || splitPokemonSetNames(setRow.text || id);
+  const name = en && it && norm(en) !== norm(it)
+    ? `${en} / ${it}`
+    : (en || it || id);
+  const picked = inferSetMarketForRow(setRow, market);
+  const code = picked === 'jp'
+    ? (resolveCtCodeForPokemonSetByMarket(id, setRow.text || '', 'jp') || id)
+    : (POKEMON_SET_CODE_OVERRIDES[id.toLowerCase()]
+      || resolveCtCodeForPokemonSetByMarket(id, setRow.text || '', 'eu')
+      || resolvePokemonApiSetId(id)
+      || id);
+  const suffix = picked === 'jp' ? 'JAP' : 'EU';
+  return `${name} [${suffix}:${String(code).toUpperCase()}]`;
+}
+
+function getPokemonSetCatalog() {
+  const base = Array.isArray(POKEMON_SETS) ? POKEMON_SETS : [];
+  const out = [...base];
+  const seen = new Set(base.map(s => norm(s.id || '')));
+
+  const ctByCode = new Map();
+  if (Array.isArray(POKEMON_SEALED_SETS)) {
+    for (const row of POKEMON_SEALED_SETS) {
+      const code = normalizeTcgSetCode(row?.code || row?.id || '');
+      if (!code || ctByCode.has(code)) continue;
+      const name = stripPokemonSetLabel(row?.text || row?.id || '');
+      if (name) ctByCode.set(code, name);
+    }
+  }
+
+  // Include JP-only expansion codes not present in local POKEMON_SETS.
+  const knownCtCodes = [...getKnownCtPokemonExpansionCodeSet()];
+  knownCtCodes.forEach((code) => {
+    if (!code) return;
+    if (seen.has(norm(code))) return;
+    const displayName = ctByCode.get(code) || `JP Expansion ${code.toUpperCase()}`;
+    out.push({
+      id: code,
+      text: `${displayName} (${code})`,
+      _virtualJp: true,
+    });
+    seen.add(norm(code));
+  });
+
+  return out;
+}
+
+function pokemonSetSuggestionEntries(rows) {
+  return rows.map(row => ({
+    id: row.id,
+    market: 'auto',
+    label: formatPokemonSetLabel(row),
+    row,
+  }));
+}
+
 function filterSetSuggestions(query) {
   const q = normalizeSetSearchText(query);
   if (!q) return [];
   const qCompact = q.replace(/[^a-z0-9]/g, '');
   const tokens = q.split(/\s+/).filter(t => t.length > 1);
-  return POKEMON_SETS.filter(s => {
-    const display = formatPokemonSetLabel(s);
-    const hay = normalizeSetSearchText(`${s.id} ${s.text} ${display}`);
-    const hayCompact = hay.replace(/[^a-z0-9]/g, '');
-    if (hay.includes(q)) return true;
-    if (qCompact && hayCompact.includes(qCompact)) return true;
-    if (!tokens.length) return false;
+  return getPokemonSetCatalog()
+    .map((s) => {
+      const display = formatPokemonSetLabel(s);
+      const hay = normalizeSetSearchText(`${s.id} ${s.text} ${display}`);
+      const hayCompact = hay.replace(/[^a-z0-9]/g, '');
+      const idNorm = norm(String(s.id || ''));
+      const idCompact = idNorm.replace(/[^a-z0-9]/g, '');
 
-    const hayTokens = hay.split(/\s+/).filter(Boolean);
-    return tokens.every(t => {
-      if (hay.includes(t)) return true;
-      const tCompact = t.replace(/[^a-z0-9]/g, '');
-      if (tCompact && hayCompact.includes(tCompact)) return true;
-      return hayTokens.some(ht => nameSimilarityScore(t, ht) >= 88);
-    });
-  }).slice(0, 10);
+      let score = 0;
+      if (idNorm === q || idCompact === qCompact) score += 300;
+      else if (idNorm.startsWith(q) || idCompact.startsWith(qCompact)) score += 180;
+      if (hay.includes(q)) score += 120;
+      if (qCompact && hayCompact.includes(qCompact)) score += 90;
+
+      if (tokens.length) {
+        const hayTokens = hay.split(/\s+/).filter(Boolean);
+        let allTokensMatch = true;
+        let fuzzyBonus = 0;
+        for (const t of tokens) {
+          const tCompact = t.replace(/[^a-z0-9]/g, '');
+          if (hay.includes(t) || (tCompact && hayCompact.includes(tCompact))) {
+            fuzzyBonus += 10;
+            continue;
+          }
+          const fuzzyHit = hayTokens.some(ht => nameSimilarityScore(t, ht) >= 88);
+          if (fuzzyHit) {
+            fuzzyBonus += 4;
+            continue;
+          }
+          allTokensMatch = false;
+          break;
+        }
+        if (allTokensMatch) score += fuzzyBonus;
+        else if (score < 150) score = 0;
+      }
+
+      return { s, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score || String(a.s.id).localeCompare(String(b.s.id), 'it'))
+    .slice(0, 10)
+    .map(x => x.s);
 }
 
 function highlightMatch(text, query) {
@@ -7291,7 +7454,7 @@ function renderSetSuggestions(sets) {
   const query = $('cardSet').value.trim();
   box.innerHTML = sets.map(s => `
     <button type="button" class="sugg-item" data-set-id="${escHtml(s.id)}">
-      ${highlightMatch(formatPokemonSetLabel(s), query)}
+      ${highlightMatch(s.label || formatPokemonSetLabel(s), query)}
     </button>`).join('');
   box.hidden = false;
   if (!box.dataset.bound) {
@@ -7343,9 +7506,10 @@ async function preloadPokemonSetCards(setId, opts = {}) {
 }
 
 function selectSetOption(id) {
-  const setRow = POKEMON_SETS.find(s => norm(s.id) === norm(id));
+  const setRow = getPokemonSetCatalog().find(s => norm(s.id) === norm(id));
   $('cardSet').value = setRow ? formatPokemonSetLabel(setRow) : (id || '');
   $('cardSetId').value = setRow?.id || id;
+  $('cardSetMarket').value = 'auto';
   hideSetSuggestions();
   $('cardSet').focus();
   ctPreloadBlueprintsForSet(id);
@@ -7366,20 +7530,24 @@ function hideAllSuggestions() {
 
 document.getElementById('cardSet')?.addEventListener('input', () => {
   $('cardSetId').value = '';
+  $('cardSetMarket').value = 'auto';
   clearTimeout(setSuggTimer);
   const v = $('cardSet').value.trim();
   if (v.length < 1) { hideSetSuggestions(); return; }
   setSuggTimer = setTimeout(() => {
-    renderSetSuggestions(filterSetSuggestions(v));
+    renderSetSuggestions(pokemonSetSuggestionEntries(filterSetSuggestions(v)));
     const resolved = getSelectedSetId();
     $('cardSetId').value = resolved || '';
+    $('cardSetMarket').value = 'auto';
     if (resolved) preloadPokemonSetCards(resolved);
   }, 150);
 });
 
 document.getElementById('cardSet')?.addEventListener('focus', () => {
   const v = $('cardSet').value.trim();
-  if (v.length >= 1) renderSetSuggestions(filterSetSuggestions(v));
+  if (v.length >= 1) {
+    renderSetSuggestions(pokemonSetSuggestionEntries(filterSetSuggestions(v)));
+  }
 });
 
 document.getElementById('cardSet')?.addEventListener('keydown', e => {
@@ -7405,12 +7573,13 @@ function ctCardFromBlueprint(bp) {
   };
 }
 
-async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
+async function searchPokemonViaCardTrader(name, number, cardSet, setMarket = 'auto', signal) {
   throwIfAborted(signal);
 
   const setInput = $('cardSet')?.value?.trim() || '';
   const effectiveSetId = cardSet || inferPromoSetIdFromText(setInput);
-  const setRow = effectiveSetId ? POKEMON_SETS.find(s => norm(s.id) === norm(effectiveSetId)) : null;
+  const effectiveMarket = normalizePokemonSetMarket(setMarket || getSelectedSetMarket());
+  const setRow = effectiveSetId ? getPokemonSetCatalog().find(s => norm(s.id) === norm(effectiveSetId)) : null;
   let setName = setInput;
   if (setRow?.text) {
     const m = setRow.text.match(/–\s*([^()]+?)(?:\s*\(|$)/);
@@ -7420,15 +7589,17 @@ async function searchPokemonViaCardTrader(name, number, cardSet, signal) {
   const stubCard = {
     name: name || '',
     number: number || '',
-    set: { id: effectiveSetId || '', name: setName },
+    set: { id: effectiveSetId || '', name: setName, market: effectiveMarket },
   };
 
   let bps = [];
   try {
-    const ctCode = effectiveSetId ? resolveCtCodeForPokemonSet(effectiveSetId, setName) : null;
+    const ctCode = effectiveSetId
+      ? resolveCtCodeForPokemonSetByMarket(effectiveSetId, setName, effectiveMarket)
+      : null;
     if (effectiveSetId && (isPromoSetId(effectiveSetId) || ctCode)) {
       throwIfAborted(signal);
-      const exp = await ctMatchExpansion(stubCard, null, 'pokemon');
+      const exp = await ctMatchExpansion(stubCard, null, 'pokemon', { preferredMarket: effectiveMarket, preferredCode: ctCode });
       if (exp) {
         if (name && number) {
           const bp = await ctFindBlueprint(stubCard, exp.id, null);
@@ -7509,7 +7680,7 @@ function cardMatchesSelectedSet(card, cardSetId) {
   const wantedApi = norm(resolvePokemonApiSetId(cardSetId));
   if (cardSetIdNorm && wantedApi && cardSetIdNorm === wantedApi) return true;
 
-  const ctCode = resolveCtCodeForPokemonSet(cardSetId, card?.set?.name || '');
+  const ctCode = resolveCtCodeForPokemonSetByMarket(cardSetId, card?.set?.name || '', getSelectedSetMarket());
   if (ctCode && cardSetIdNorm && cardSetIdNorm === norm(ctCode)) return true;
 
   return false;
@@ -7702,7 +7873,7 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   if (!skipCtFallback && !candidates.length && (name || number)) {
     try {
       throwIfAborted(signal);
-      const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
+      const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, getSelectedSetMarket(), signal);
       candidates.push(...ctCards);
     } catch (e) {
       if (isAbortError(e) || isTimeoutError(e)) throw e;
@@ -7760,6 +7931,15 @@ document.getElementById('searchBtn')?.addEventListener('click', () => {
 document.getElementById('resetSearchBtn')?.addEventListener('click', resetPokemonSearchFields);
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('pokemonName')?.addEventListener('input', () => {
+  if ($('pokemonQuickCode')?.value) $('pokemonQuickCode').value = '';
+});
+document.getElementById('cardNumber')?.addEventListener('input', () => {
+  if ($('pokemonQuickCode')?.value) $('pokemonQuickCode').value = '';
+});
+document.getElementById('cardSet')?.addEventListener('input', () => {
+  if ($('pokemonQuickCode')?.value) $('pokemonQuickCode').value = '';
+});
 document.getElementById('pokemonQuickCode')?.addEventListener('blur', () => {
   const el = $('pokemonQuickCode');
   if (!el) return;
@@ -7809,7 +7989,10 @@ async function doSearch() {
   const name = params.name;
   const number = params.number;
   const cardSet = params.cardSet;
+  const setMarket = normalizePokemonSetMarket(params.setMarket || 'auto');
   const lang = params.lang;
+
+  if ($('cardSetMarket')) $('cardSetMarket').value = setMarket;
 
   if (cardSet) preloadPokemonSetCards(cardSet);
   if (!name && !number) {
@@ -7833,6 +8016,9 @@ async function doSearch() {
   manualPokemonPriceRaw = '';
   pokemonGraded = false;
   pokemonGradeScore = 10;
+  pokemonVariantCards = [];
+  pokemonVariantLoading = false;
+  pokemonVariantError = '';
   choicePriceCache.clear();
   ctPriceData = null;
   $('resultCard').hidden = true;
@@ -7848,7 +8034,7 @@ async function doSearch() {
   }, SEARCH_DEADLINE_MS);
 
   try {
-    const cards = await runSearch(name, number, cardSet, lang, null, searchCtrl.signal);
+    const cards = await runSearch(name, number, cardSet, setMarket, lang, null, searchCtrl.signal);
     if (myGen !== searchGen) return;
     if (cards.length === 0) {
       const maybe = await findMaybeYouMeantCards(name, number, cardSet, lang, searchCtrl.signal, {
@@ -7900,7 +8086,7 @@ async function doSearch() {
   }
 }
 
-async function runSearch(name, number, cardSet, lang, apiKey, signal) {
+async function runSearch(name, number, cardSet, setMarket, lang, apiKey, signal) {
   const nn = norm(name), nnum = norm(number);
   let cards = [], blocked = false;
 
@@ -7981,10 +8167,14 @@ async function runSearch(name, number, cardSet, lang, apiKey, signal) {
   }
 
   // Set assente da Pokémon TCG API → CardTrader (anche senza set/espansione)
-  const forceCtSetFallback = !!(cardSet && resolveCtCodeForPokemonSet(cardSet, $('cardSet')?.value || ''));
+  const forceCtSetFallback = !!(cardSet && resolveCtCodeForPokemonSetByMarket(cardSet, $('cardSet')?.value || '', setMarket));
+  const ctSetCode = cardSet
+    ? resolveCtCodeForPokemonSetByMarket(cardSet, $('cardSet')?.value || '', setMarket)
+    : '';
+  const forceCtSetFallbackByMarket = !!(cardSet && ctSetCode);
   if (!cards.length && !(name && number) && (name || number) && shouldTryCtFallback(name, number, cardSet)
-      && (!maybeSeedCards.length || forceCtSetFallback)) {
-    const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, signal);
+      && (!maybeSeedCards.length || forceCtSetFallback || forceCtSetFallbackByMarket)) {
+    const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, setMarket, signal);
     if (ctCards.length) {
       showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
       cards = ctCards;
@@ -8190,6 +8380,10 @@ function selectCard(card) {
   manualPokemonPriceRaw = '';
   pokemonGraded = false;
   pokemonGradeScore = 10;
+  pokemonVariantCards = [];
+  pokemonVariantLoading = true;
+  pokemonVariantError = '';
+  const variantGen = ++pokemonVariantFetchGen;
 
   const cached = choicePriceCache.get(choiceCacheKey(card));
   if (cached?.ct && cached.price != null && !cached.ct.error) {
@@ -8211,6 +8405,9 @@ function selectCard(card) {
   requestAnimationFrame(() => rc.classList.add('visible'));
   rc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+  // Carica varianti per stesso nome su tutti i set (EU/JP), indipendente dalla lingua filtro UI.
+  loadPokemonVariantsForSelectedCard(card, variantGen);
+
   if (cached?.ct && cached.price != null && !cached.ct.error) {
     return;
   }
@@ -8230,6 +8427,170 @@ function selectCard(card) {
     console.warn('ctGetPrice:', err);
     renderResult();
   });
+}
+
+function getQuickVariantPresetValue(gameKey, langValue = '', editionValue = '') {
+  const lang = String(langValue || '').trim();
+
+  if (gameKey === 'pokemon') return '';
+
+  if (lang === 'en') return 'en';
+  if (lang === 'it') return 'it';
+  if (lang === 'ja') return 'ja';
+  if (lang === 'fr') return 'fr';
+  if (lang === 'de') return 'de';
+  return 'default';
+}
+
+function pokemonVariantKey(card) {
+  if (!card) return '';
+  return String(
+    card.id
+    || `${card.bpId || ''}|${norm(card.name || '')}|${norm(card.set?.id || card.set?.name || '')}|${norm(card.number || '')}`
+  );
+}
+
+function pokemonVariantNameMatches(baseCard, candidate) {
+  const base = normCardName(baseCard?.name || '');
+  const cand = normCardName(candidate?.name || '');
+  if (!base || !cand) return false;
+  return cand === base || cand.startsWith(`${base} `) || base.startsWith(`${cand} `);
+}
+
+function formatPokemonVariantLabel(card) {
+  const setName = card?.set?.name || 'Set sconosciuto';
+  const number = card?.number ? `#${card.number}` : '#?';
+  const rarity = card?.rarity ? ` · ${card.rarity}` : '';
+  return `${setName} · ${number}${rarity}`;
+}
+
+function sortPokemonVariants(cards, selectedKey) {
+  return [...cards].sort((a, b) => {
+    const ka = pokemonVariantKey(a);
+    const kb = pokemonVariantKey(b);
+    const aSel = ka === selectedKey ? 1 : 0;
+    const bSel = kb === selectedKey ? 1 : 0;
+    if (aSel !== bSel) return bSel - aSel;
+    const aSet = String(a?.set?.name || '').toLowerCase();
+    const bSet = String(b?.set?.name || '').toLowerCase();
+    if (aSet !== bSet) return aSet.localeCompare(bSet, 'it');
+    const aNum = String(a?.number || '').toLowerCase();
+    const bNum = String(b?.number || '').toLowerCase();
+    return aNum.localeCompare(bNum, 'it');
+  });
+}
+
+function mergePokemonVariantCards(baseCard, ...groups) {
+  const selectedKey = pokemonVariantKey(baseCard);
+  const seen = new Set();
+  const out = [];
+
+  const push = (card) => {
+    if (!card || !pokemonVariantNameMatches(baseCard, card)) return;
+    const key = pokemonVariantKey(card);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(card);
+  };
+
+  push(baseCard);
+  groups.flat().forEach(push);
+  return sortPokemonVariants(out, selectedKey);
+}
+
+async function loadPokemonVariantsForSelectedCard(card, fetchGen) {
+  if (!card?.name) {
+    pokemonVariantLoading = false;
+    pokemonVariantCards = [];
+    pokemonVariantError = '';
+    if (fetchGen === pokemonVariantFetchGen) renderResult();
+    return;
+  }
+
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 12000);
+
+  try {
+    const query = bfq('name', card.name, true);
+    const apiHits = [];
+    for (let page = 1; page <= 4; page++) {
+      throwIfAborted(ctrl.signal);
+      const batch = await fetchCards(query, null, ctrl.signal, 50, { page, skipQueryCache: page > 1 });
+      if (!batch.length) break;
+      apiHits.push(...batch);
+      if (batch.length < 50) break;
+    }
+
+    let ctHits = [];
+    try {
+      throwIfAborted(ctrl.signal);
+      ctHits = await searchPokemonViaCardTrader(card.name, '', '', 'auto', ctrl.signal);
+    } catch (e) {
+      if (!isAbortError(e) && !isTimeoutError(e)) {
+        console.warn('pokemon variants ct search:', e);
+      }
+    }
+
+    if (fetchGen !== pokemonVariantFetchGen) return;
+
+    pokemonVariantCards = mergePokemonVariantCards(card, apiHits, ctHits).slice(0, 80);
+    pokemonVariantError = '';
+  } catch (e) {
+    if (fetchGen !== pokemonVariantFetchGen) return;
+    if (!isAbortError(e) && !isTimeoutError(e)) {
+      console.warn('pokemon variants load:', e);
+      pokemonVariantError = 'Ricerca versioni non disponibile al momento.';
+    }
+    pokemonVariantCards = mergePokemonVariantCards(card, []);
+  } finally {
+    clearTimeout(timeoutId);
+    if (fetchGen !== pokemonVariantFetchGen) return;
+    pokemonVariantLoading = false;
+    renderResult();
+  }
+}
+
+function applyQuickVariantPreset(gameKey, value) {
+  const preset = String(value || 'default');
+
+  if (gameKey === 'pokemon') {
+    if (!selectedCard || !preset) return;
+    const currentKey = pokemonVariantKey(selectedCard);
+    if (preset === currentKey) return;
+    const picked = pokemonVariantCards.find(c => pokemonVariantKey(c) === preset);
+    if (!picked) return;
+    selectCard(picked);
+    showMsg(`Versione selezionata: ${picked.name}${picked.set?.name ? ` · ${picked.set.name}` : ''}`, 'info');
+    return;
+  }
+
+  const cfg = CT_TCG_CONFIG[gameKey];
+  if (!cfg) return;
+  if (preset === 'default') {
+    ctTcgState[gameKey].selectedLang = '';
+    searchEditionFilter = '';
+  } else if (preset === 'en') {
+    ctTcgState[gameKey].selectedLang = 'en';
+    searchEditionFilter = '';
+  } else if (preset === 'it') {
+    ctTcgState[gameKey].selectedLang = 'it';
+    searchEditionFilter = '';
+  } else if (preset === 'ja') {
+    ctTcgState[gameKey].selectedLang = 'ja';
+    searchEditionFilter = '';
+  } else if (preset === 'fr') {
+    ctTcgState[gameKey].selectedLang = 'fr';
+    searchEditionFilter = '';
+  } else if (preset === 'de') {
+    ctTcgState[gameKey].selectedLang = 'de';
+    searchEditionFilter = '';
+  }
+
+  if ($(cfg.langField)) $(cfg.langField).value = ctTcgState[gameKey].selectedLang || '';
+  const refreshGen = ++ctTcgState[gameKey].searchGen;
+  if (ctTcgState[gameKey].selected) {
+    tcgSelectCard(gameKey, ctTcgState[gameKey].selected, refreshGen, { preservePrefs: true });
+  }
 }
 
 function renderResult() {
@@ -8265,6 +8626,26 @@ function renderResult() {
           ${card.hp          ? `<span class="pill pill-hp">❤ ${card.hp} HP</span>` : ''}
           ${(card.types||[]).length ? `<span class="pill pill-type">${card.types.join(' · ')}</span>` : ''}
           <span class="pill pill-set">Condizione: ${QUALITY[selectedQuality]?.label || selectedQuality}</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin:10px 0 8px;">
+          <div class="field" style="min-width:230px;">
+            <label for="cardVariantSelect">Versione carta (stesso nome, altri set)</label>
+            <select id="cardVariantSelect">
+              <option value="${escHtml(pokemonVariantKey(card))}" selected>${escHtml(formatPokemonVariantLabel(card))}</option>
+              ${pokemonVariantLoading
+                ? '<option value="" disabled>Caricamento versioni…</option>'
+                : pokemonVariantCards
+                  .filter(v => pokemonVariantKey(v) !== pokemonVariantKey(card))
+                  .map(v => `<option value="${escHtml(pokemonVariantKey(v))}">${escHtml(formatPokemonVariantLabel(v))}</option>`)
+                  .join('')}
+            </select>
+          </div>
+          ${!pokemonVariantLoading && pokemonVariantCards.length > 1
+            ? `<span style="font-size:.8rem;color:var(--text-muted);">Mostra le ${pokemonVariantCards.length} versioni trovate</span>`
+            : ''}
+          ${pokemonVariantError
+            ? `<span style="font-size:.8rem;color:var(--warning);">${escHtml(pokemonVariantError)}</span>`
+            : ''}
         </div>
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1.15fr 72px auto; margin: 10px 0 8px;">
           <div class="field">
@@ -8358,6 +8739,7 @@ function renderResult() {
 
   $('addBtn').addEventListener('click', addToCollection);
   $('addBtnQuick')?.addEventListener('click', addToCollection);
+  $('cardVariantSelect')?.addEventListener('change', (e) => applyQuickVariantPreset('pokemon', e.target.value));
   $('condSelect')?.addEventListener('change', e => {
     selectedQuality = e.target.value;
     selectedCtListing = null;
@@ -8423,6 +8805,7 @@ async function addToCollection() {
     return;
   }
   const lang  = searchLangFilter || 'Any';
+  const setMarket = getSelectedSetMarket();
   const listingPick = !effectivePrice.manual && selectedCtListing?.seller
     ? {
         condKey: selectedCtListing.condKey,
@@ -8443,6 +8826,7 @@ async function addToCollection() {
       name: selectedCard.name,
       set: selectedCard.set?.name || 'Set sconosciuto',
       setId: selectedCard.set?.id || '',
+      setMarket,
       number: selectedCard.number || '-',
       lang,
       quality: selectedQuality,
@@ -8454,7 +8838,7 @@ async function addToCollection() {
       card: {
         name: selectedCard.name,
         number: selectedCard.number,
-        set: selectedCard.set,
+        set: { ...(selectedCard.set || {}), market: setMarket },
         bpId: selectedCard.bpId || null,
       },
       lastPriceUpdate: new Date().toISOString(),
@@ -8482,6 +8866,7 @@ async function addToCollection() {
       name: selectedCard.name,
       set:  selectedCard.set?.name || 'Set sconosciuto',
       setId: selectedCard.set?.id || '',
+      setMarket,
       number: selectedCard.number || '-',
       lang,
       firstEdition,
@@ -8498,7 +8883,7 @@ async function addToCollection() {
       card: {
         name: selectedCard.name,
         number: selectedCard.number,
-        set: selectedCard.set,
+        set: { ...(selectedCard.set || {}), market: setMarket },
         bpId: selectedCard.bpId || null,
       },
       ...priceFields,
@@ -8544,12 +8929,13 @@ function removeItem(idx) {
 function cardFromCollectionItem(item) {
   const setId = item.setId || item.card?.set?.id || '';
   const setName = item.set || item.card?.set?.name || '';
+  const setMarket = normalizePokemonSetMarket(item.setMarket || item.card?.set?.market || 'auto');
   const img = ctResolveStoredImage(item.img || item.imgUrl || '');
   const bpId = item.card?.bpId;
   return {
     name: item.name,
     number: item.number,
-    set: { id: setId, name: setName },
+    set: { id: setId, name: setName, market: setMarket },
     bpId: bpId || undefined,
     id: bpId ? `ct-${bpId}` : `coll-${norm(item.name)}|${setId}|${item.number}`,
     images: img ? { small: img, large: img } : undefined,
@@ -8589,9 +8975,10 @@ function fillPokemonSearchFromItem(item) {
 
   const setId = item.setId || item.card?.set?.id || '';
   const setRow = setId && typeof POKEMON_SETS !== 'undefined'
-    ? POKEMON_SETS.find(s => norm(s.id) === norm(setId))
+    ? getPokemonSetCatalog().find(s => norm(s.id) === norm(setId))
     : null;
   if ($('cardSetId')) $('cardSetId').value = setId;
+  if ($('cardSetMarket')) $('cardSetMarket').value = 'auto';
   if ($('cardSet')) $('cardSet').value = setRow ? formatPokemonSetLabel(setRow) : (item.set || '');
 }
 
@@ -10154,6 +10541,19 @@ function tcgRenderResult(gameKey, bp, prices) {
           ${bp.collector_number && gameKey !== 'sealed' ? `<span class="badge-num">#${escHtml(bp.collector_number)}</span>` : ''}
           ${bp.category_name && !bp._sealedType ? `<span class="badge-rarity">${escHtml(bp.category_name)}</span>` : ''}
         </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin:10px 0 8px;">
+          <div class="field" style="min-width:220px;">
+            <label for="${cfg.prefix}VariantSelect">Variante rapida</label>
+            <select id="${cfg.prefix}VariantSelect">
+              <option value="default" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'default' ? 'selected' : ''}>Predefinita</option>
+              <option value="en" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'en' ? 'selected' : ''}>🇬🇧 English</option>
+              <option value="it" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'it' ? 'selected' : ''}>🇮🇹 Italiano</option>
+              <option value="ja" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'ja' ? 'selected' : ''}>🇯🇵 Giapponese</option>
+              <option value="fr" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'fr' ? 'selected' : ''}>🇫🇷 Français</option>
+              <option value="de" ${getQuickVariantPresetValue(gameKey, selectedLang, '') === 'de' ? 'selected' : ''}>🇩🇪 Deutsch</option>
+            </select>
+          </div>
+        </div>
         ${inlineControlsHtml}
         <div class="ct-section" style="margin-top:0">
           <div class="ct-header">CardTrader — Prezzi Mercato <span class="ct-badge live">● LIVE</span></div>
@@ -10189,6 +10589,7 @@ function tcgRenderResult(gameKey, bp, prices) {
         : `+ Aggiungi (${qKey}${selPrice ? ` · ${fmt(selPrice.unit)}` : ''})${selPrice?.manual ? ' · manuale' : ''}${gradedLabel(ctTcgState[gameKey].graded, ctTcgState[gameKey].gradeScore)} ×${qty}`}</button>
     </div>`;
   card.hidden = false;
+  $(`${cfg.prefix}VariantSelect`)?.addEventListener('change', (e) => applyQuickVariantPreset(gameKey, e.target.value));
   $(`${cfg.prefix}ManualPriceInput`)?.addEventListener('input', (e) => {
     ctTcgState[gameKey].manualPriceRaw = e.target.value;
   });
