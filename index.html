@@ -8595,6 +8595,7 @@ function applyQuickVariantPreset(gameKey, value) {
 
 function renderResult() {
   const card = selectedCard;
+  if (!card) return;
   const img  = getImg(card);
   const selectedPrice = getSelectedUnitPrice();
   const effectivePrice = pokemonEffectivePrice(selectedPrice);
