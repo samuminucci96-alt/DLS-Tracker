@@ -3188,8 +3188,11 @@
             <div id="pokemonStandardFields" class="adv-body" hidden>
 
           <div class="field">
-            <label for="pokemonName">Nome Pokémon</label>
-            <input id="pokemonName" type="text" placeholder="Es. Ninetales, Charizard, Pikachu…" autocomplete="off">
+            <label for="pokemonName">Nome Carta</label>
+            <div style="display:flex;gap:6px">
+              <input id="pokemonName" type="text" placeholder="Es. Ninetales, Charizard, Pikachu…" autocomplete="off" style="flex:1;min-width:0">
+              <button type="button" id="pokemonNameLangToggle" class="btn btn-outline" style="flex-shrink:0;padding:0 14px;font-size:13px;font-weight:700;white-space:nowrap;min-height:44px" title="Lingua ricerca nome: EN / IT">⚙️ EN</button>
+            </div>
             <div id="nameSuggestions" class="suggestions" hidden></div>
           </div>
 
@@ -4018,6 +4021,8 @@ let bgAnimPaused    = false;
 let suggTimer       = null;
 let suggLastNames   = [];
 let suggReqSeq      = 0;
+let pokemonNameLanguage = localStorage.getItem('dls_pokemon_name_lang') || 'en'; // 'en' | 'it'
+const pokemonItEnNameCache = new Map(); // lowercase italian name → canonical english name
 let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, sealed: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
@@ -6992,8 +6997,10 @@ document.getElementById('pokemonName')?.addEventListener('input', () => {
   clearTimeout(suggTimer);
   if (name.length < 1) { hideSuggestions(); return; }
 
-  const fast = getFastSuggestions(name);
-  if (fast.length) renderSugg(fast);
+  if (pokemonNameLanguage !== 'it') {
+    const fast = getFastSuggestions(name);
+    if (fast.length) renderSugg(fast);
+  }
 
   suggTimer = setTimeout(() => loadSuggestions(name), NAME_SUGG_DEBOUNCE_MS);
 });
@@ -7001,8 +7008,10 @@ document.getElementById('pokemonName')?.addEventListener('input', () => {
 document.getElementById('pokemonName')?.addEventListener('focus', () => {
   const name = $('pokemonName').value.trim();
   if (name.length >= 1) {
-    const fast = getFastSuggestions(name);
-    if (fast.length) renderSugg(fast);
+    if (pokemonNameLanguage !== 'it') {
+      const fast = getFastSuggestions(name);
+      if (fast.length) renderSugg(fast);
+    }
     loadSuggestions(name);
   }
 });
@@ -7036,6 +7045,7 @@ function getFastSuggestions(name) {
 }
 
 async function loadSuggestions(name) {
+  if (pokemonNameLanguage === 'it') { await loadItalianSuggestions(name); return; }
   const key = name.toLowerCase();
   const reqSeq = ++suggReqSeq;
   if (suggCache.has(key)) {
@@ -7067,6 +7077,79 @@ async function loadSuggestions(name) {
   }
 }
 
+async function tcgdexItalianSuggestions(query, signal) {
+  const url = `https://api.tcgdex.net/v2/it/cards?name=${encodeURIComponent(query)}`;
+  const resp = await fetch(url, signal ? { signal } : {});
+  if (!resp.ok) return [];
+  const cards = await resp.json();
+  if (!Array.isArray(cards)) return [];
+  const top = cards.slice(0, 6);
+  const results = await Promise.allSettled(
+    top.map(async c => {
+      const enResp = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(c.id)}`, signal ? { signal } : {});
+      if (!enResp.ok) return { itName: c.name, enName: null };
+      const enCard = await enResp.json();
+      return { itName: c.name, enName: enCard?.name || null };
+    })
+  );
+  return results.filter(r => r.status === 'fulfilled').map(r => r.value).filter(r => r.itName);
+}
+
+async function loadItalianSuggestions(name) {
+  const key = `it:${name.toLowerCase()}`;
+  const reqSeq = ++suggReqSeq;
+  if (suggCache.has(key)) {
+    const hit = suggCache.get(key);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === name.toLowerCase()) {
+      renderSuggIt(hit || []);
+    }
+    return;
+  }
+  if (suggCtrl) suggCtrl.abort();
+  suggCtrl = new AbortController();
+  try {
+    const raw = await tcgdexItalianSuggestions(name, suggCtrl.signal);
+    // Deduplicate by Italian name — variants are shown after search
+    const seen = new Set();
+    const items = raw.filter(({ itName }) => seen.has(itName) ? false : (seen.add(itName), true));
+    items.forEach(({ itName, enName }) => {
+      if (enName) pokemonItEnNameCache.set(itName.toLowerCase(), enName);
+    });
+    suggCache.set(key, items);
+    if (reqSeq === suggReqSeq && ($('pokemonName')?.value?.trim().toLowerCase() || '') === name.toLowerCase()) {
+      renderSuggIt(items);
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') console.warn('Suggerimenti IT non disponibili:', e.message);
+  }
+}
+
+function renderSuggIt(items) {
+  const box = $('nameSuggestions');
+  if (!items.length) { hideSuggestions(); return; }
+  const key = `it::${items.map(i => i.itName).join('|')}`;
+  if (box.dataset.suggKey === key) return;
+  box.dataset.suggKey = key;
+  box.innerHTML = items.map(({ itName, enName }) =>
+    `<button type="button" class="sugg-item" data-name="${escHtml(itName)}"${enName ? ` data-en-name="${escHtml(enName)}"` : ''}>${escHtml(itName)}${enName ? ` <span style="color:var(--text-muted);font-size:.85em">(${escHtml(enName)})</span>` : ''}</button>`
+  ).join('');
+  box.hidden = false;
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('mousedown', e => {
+      const btn = e.target.closest('.sugg-item[data-name]');
+      if (!btn) return;
+      e.preventDefault();
+      const displayName = btn.dataset.name;
+      const enName = btn.dataset.enName;
+      if (enName) pokemonItEnNameCache.set(displayName.toLowerCase(), enName);
+      $('pokemonName').value = displayName;
+      hideSuggestions();
+      $('pokemonName').focus();
+    });
+  }
+}
+
 function renderSugg(names) {
   const box = $('nameSuggestions');
   if (!names.length) { hideSuggestions(); return; }
@@ -7090,7 +7173,10 @@ function renderSugg(names) {
       const btn = e.target.closest('.sugg-item[data-name]');
       if (!btn) return;
       e.preventDefault();
-      $('pokemonName').value = btn.dataset.name;
+      const displayName = btn.dataset.name;
+      const enName = btn.dataset.enName;
+      if (enName) pokemonItEnNameCache.set(displayName.toLowerCase(), enName);
+      $('pokemonName').value = displayName;
       hideSuggestions();
       $('pokemonName').focus();
     });
@@ -7931,6 +8017,17 @@ document.getElementById('searchBtn')?.addEventListener('click', () => {
 document.getElementById('resetSearchBtn')?.addEventListener('click', resetPokemonSearchFields);
 document.getElementById('pokemonName')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.getElementById('cardNumber')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('pokemonNameLangToggle')?.addEventListener('click', () => {
+  pokemonNameLanguage = pokemonNameLanguage === 'en' ? 'it' : 'en';
+  localStorage.setItem('dls_pokemon_name_lang', pokemonNameLanguage);
+  const btn = $('pokemonNameLangToggle');
+  if (btn) btn.textContent = pokemonNameLanguage === 'it' ? '⚙️ IT' : '⚙️ EN';
+  const name = $('pokemonName')?.value?.trim();
+  hideSuggestions();
+  if (name) loadSuggestions(name);
+});
+// Sync button label to restored state
+(function() { const btn = $('pokemonNameLangToggle'); if (btn && pokemonNameLanguage === 'it') btn.textContent = '⚙️ IT'; })();
 document.getElementById('pokemonName')?.addEventListener('input', () => {
   if ($('pokemonQuickCode')?.value) $('pokemonQuickCode').value = '';
 });
@@ -8034,10 +8131,25 @@ async function doSearch() {
   }, SEARCH_DEADLINE_MS);
 
   try {
-    const cards = await runSearch(name, number, cardSet, setMarket, lang, null, searchCtrl.signal);
+    // In IT mode resolve Italian name → English for API calls
+    let effectiveName = name;
+    if (pokemonNameLanguage === 'it' && name) {
+      const cached = pokemonItEnNameCache.get(name.toLowerCase());
+      if (cached) {
+        effectiveName = cached;
+      } else {
+        const itCards = await tcgdexItalianSuggestions(name, searchCtrl.signal);
+        for (const { itName, enName } of itCards) {
+          if (enName) pokemonItEnNameCache.set(itName.toLowerCase(), enName);
+        }
+        effectiveName = pokemonItEnNameCache.get(name.toLowerCase()) || name;
+      }
+    }
+
+    const cards = await runSearch(effectiveName, number, cardSet, setMarket, lang, null, searchCtrl.signal);
     if (myGen !== searchGen) return;
     if (cards.length === 0) {
-      const maybe = await findMaybeYouMeantCards(name, number, cardSet, lang, searchCtrl.signal, {
+      const maybe = await findMaybeYouMeantCards(effectiveName, number, cardSet, lang, searchCtrl.signal, {
         seedCards: maybeSeedCards,
         fastOnly: maybeSeedCards.length > 0,
         skipCtFallback: !!(name && number),
