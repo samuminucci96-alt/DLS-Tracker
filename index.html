@@ -8942,6 +8942,8 @@ async function addToCollection() {
       setMarket,
       number: selectedCard.number || '-',
       lang,
+      firstEdition,
+      edition: firstEdition === true ? '1st' : firstEdition === false ? 'unlimited' : '',
       quality: selectedQuality,
       condition: selectedQuality,
       basePrice,
