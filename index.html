@@ -1705,8 +1705,6 @@
       .table-wrap th,
       .table-wrap td { padding: 8px 6px; }
 
-      .table-wrap th:nth-child(4),
-      .table-wrap td:nth-child(4) { display: none; }
       .community-grid { grid-template-columns: 1fr; }
       .profile-modal { max-height: 94dvh; padding: 18px 14px 16px; }
 
@@ -2885,8 +2883,6 @@
       .table-wrap table { font-size: 0.8rem; }
       .table-wrap th,
       .table-wrap td { padding: 8px 6px; }
-      .table-wrap th:nth-child(4),
-      .table-wrap td:nth-child(4) { display: none; }
 
       .community-grid { grid-template-columns: 1fr; }
       .profile-modal {
@@ -4992,6 +4988,15 @@ function pushCollectionItem(item) {
   return item;
 }
 
+function collectionEntryTimestamp(item) {
+  const raw = item?.updatedAt || item?.lastPriceUpdate || item?.addedAt;
+  if (!raw) return 0;
+  const fromNumber = Number(raw);
+  if (Number.isFinite(fromNumber) && fromNumber > 0) return fromNumber;
+  const fromDate = new Date(raw);
+  return Number.isFinite(fromDate.getTime()) ? fromDate.getTime() : 0;
+}
+
 function collectionItemKey(item) {
   if (item?._id) return item._id;
   return [
@@ -5002,8 +5007,41 @@ function collectionItemKey(item) {
     item.quality || item.condition || 'NM',
     item.lang || item.language || '',
     item.card?.bpId || '',
-    String(item.addedAt || ''),
+    String(item.sealedType || ''),
+    item.graded ? '1' : '0',
+    String(item.gradeScore || ''),
   ].join('|');
+}
+
+function mergeCollectionEntries(a = {}, b = {}) {
+  const aTime = collectionEntryTimestamp(a);
+  const bTime = collectionEntryTimestamp(b);
+  const newer = aTime >= bTime ? a : b;
+  const older = aTime >= bTime ? b : a;
+  const merged = { ...older, ...newer };
+
+  merged.price = newer.price ?? older.price ?? merged.price ?? null;
+  merged.ctPrice = newer.ctPrice ?? older.ctPrice ?? merged.ctPrice ?? null;
+  merged.priceMode = newer.priceMode || older.priceMode || merged.priceMode || 'estimate';
+  merged.manualPrice = !!(newer.manualPrice || older.manualPrice);
+  merged.lang = newer.lang || newer.language || older.lang || older.language || merged.lang || '';
+  merged.language = newer.language || newer.lang || older.language || older.lang || merged.language || '';
+  merged.edition = newer.edition || older.edition || merged.edition || '';
+  merged.firstEdition = typeof newer.firstEdition === 'boolean'
+    ? newer.firstEdition
+    : (typeof older.firstEdition === 'boolean' ? older.firstEdition : merged.firstEdition);
+  merged.img = newer.img || older.img || merged.img || '';
+  merged.imgUrl = newer.imgUrl || older.imgUrl || merged.imgUrl || '';
+  merged.updatedAt = newer.updatedAt || older.updatedAt || merged.updatedAt || new Date().toISOString();
+  merged.lastPriceUpdate = newer.lastPriceUpdate || older.lastPriceUpdate || merged.lastPriceUpdate || merged.updatedAt;
+  merged.addedAt = newer.addedAt || older.addedAt || merged.addedAt || merged.updatedAt;
+
+  if (typeof newer.quantity === 'number' || typeof older.quantity === 'number') {
+    const nextQty = Number(newer.quantity || 0) + Number(older.quantity || 0);
+    merged.quantity = nextQty > 0 ? nextQty : undefined;
+  }
+
+  return merged;
 }
 
 function mergeCollections(...lists) {
@@ -5012,7 +5050,7 @@ function mergeCollections(...lists) {
     if (!item?.name) return;
     const key = collectionItemKey(item);
     const prev = map.get(key);
-    if (!prev || String(item.addedAt || '') >= String(prev.addedAt || '')) map.set(key, item);
+    map.set(key, prev ? mergeCollectionEntries(prev, item) : { ...item });
   });
   return [...map.values()];
 }
