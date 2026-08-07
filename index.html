@@ -3184,10 +3184,12 @@
             <div id="pokemonStandardFields" class="adv-body" hidden>
 
           <div class="field">
-            <label for="pokemonName">Nome Carta</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+              <label for="pokemonName">Nome Carta</label>
+              <button type="button" id="pokemonNameLangToggle" class="btn btn-outline" style="flex-shrink:0;padding:0 14px;font-size:13px;font-weight:700;white-space:nowrap;min-height:44px" title="Lingua ricerca nome: EN / IT">⚙️ EN</button>
+            </div>
             <div style="display:flex;gap:6px">
               <input id="pokemonName" type="text" placeholder="Es. Ninetales, Charizard, Pikachu…" autocomplete="off" style="flex:1;min-width:0">
-              <button type="button" id="pokemonNameLangToggle" class="btn btn-outline" style="flex-shrink:0;padding:0 14px;font-size:13px;font-weight:700;white-space:nowrap;min-height:44px" title="Lingua ricerca nome: EN / IT">⚙️ EN</button>
             </div>
             <div id="nameSuggestions" class="suggestions" hidden></div>
           </div>
@@ -4938,6 +4940,26 @@ function normCardName(v) {
     .trim();
 }
 
+function cardNameMatchesQuery(cardName, queryName) {
+  const card = normCardName(cardName);
+  const query = normCardName(queryName);
+  if (!query) return true;
+  if (!card) return false;
+  if (card === query) return true;
+  if (card.includes(query) || query.includes(card)) return true;
+
+  const cardTokens = card.split(/\s+/).filter(Boolean);
+  const queryTokens = query.split(/\s+/).filter(Boolean);
+  if (!cardTokens.length || !queryTokens.length) return false;
+
+  const matchedTokens = queryTokens.filter(token => token.length > 1 && cardTokens.some(candidate =>
+    candidate === token || candidate.startsWith(token) || token.startsWith(candidate)
+  ));
+  if (matchedTokens.length >= Math.min(queryTokens.length, 2)) return true;
+
+  return nameSimilarityScore(query, card) >= 60;
+}
+
 function collectionEntryId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -5415,7 +5437,7 @@ function apiUrl(path) {
 }
 
 const SEARCH_REQUEST_TIMEOUT_MS = 10000;
-const SEARCH_DEADLINE_MS = 22000;
+const SEARCH_DEADLINE_MS = 30000;
 const CT_REQUEST_TIMEOUT_MS = 10000;
 const SEARCH_TIMEOUT_MSG = 'Tempo di ricerca scaduto, riprova.';
 
@@ -5940,12 +5962,7 @@ function ctBlueprintMatchesQuery(bp, query, cardNum) {
 
   const nameMatch = () => {
     if (q.length < 2) return true;
-    const bpName = normCardName(bp.name || '');
-    const qName = normCardName(query);
-    if (bpName.includes(qName) || qName.includes(bpName)) return true;
-    const tokens = qName.split(/\s+/).filter(t => t.length > 1);
-    if (tokens.length > 1 && tokens.every(t => bpName.includes(t))) return true;
-    return ctSimilarity(query, bp.name || '') >= 0.55;
+    return cardNameMatchesQuery(bp.name || '', query) || ctSimilarity(query, bp.name || '') >= 0.55;
   };
 
   if (num && q.length >= 2) return numMatch() && nameMatch();
@@ -7681,6 +7698,20 @@ document.getElementById('cardSet')?.addEventListener('keydown', e => {
   }
 });
 
+function buildPokemonNameSearchVariants(name) {
+  const base = String(name || '').trim();
+  const normalized = normCardName(base);
+  const variants = [];
+  if (normalized) variants.push(normalized);
+  if (normalized && !/\b(ex|gx|v|vv|sv|lv)\b/i.test(normalized)) {
+    variants.push(`${normalized} ex`);
+  }
+  if (normalized && /\s+ex$/i.test(normalized)) {
+    variants.push(normalized.replace(/\s+ex$/i, ''));
+  }
+  return [...new Set(variants.filter(Boolean))];
+}
+
 function ctCardFromBlueprint(bp) {
   const exp = bp.expansion || {};
   const img = ctBpImageUrl(bp) || ctBpImageUrl(bp, 'thumb');
@@ -7710,72 +7741,84 @@ async function searchPokemonViaCardTrader(name, number, cardSet, setMarket = 'au
     if (m) setName = m[1].trim();
   }
 
-  const stubCard = {
-    name: name || '',
-    number: number || '',
-    set: { id: effectiveSetId || '', name: setName, market: effectiveMarket },
-  };
+  const searchNames = buildPokemonNameSearchVariants(name);
+  const allBps = [];
 
-  let bps = [];
-  try {
-    const ctCode = effectiveSetId
-      ? resolveCtCodeForPokemonSetByMarket(effectiveSetId, setName, effectiveMarket)
-      : null;
-    if (effectiveSetId && (isPromoSetId(effectiveSetId) || ctCode)) {
-      throwIfAborted(signal);
-      const exp = await ctMatchExpansion(stubCard, null, 'pokemon', { preferredMarket: effectiveMarket, preferredCode: ctCode });
-      if (exp) {
-        if (name && number) {
-          const bp = await ctFindBlueprint(stubCard, exp.id, null);
-          if (bp) bps = [{ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } }];
-        } else {
-          const all = await ctGetBlueprints(exp.id);
-          const nn = norm(name);
-          const rawNum = (number || '').split('/')[0].replace(/^0+/, '');
-          for (const bp of all) {
-            if (name && nn && !norm(bp.name).includes(nn)) continue;
-            if (number && rawNum) {
-              const bpNum = ctBpNumber(bp);
-              if (
-                bpNum !== rawNum
-                && !promoNumberMatches(rawNum, bpNum)
-                && !cardNumberMatches(rawNum, bpNum)
-                && !cardNumberMatches(bpNum, rawNum)
-              ) continue;
+  for (const searchName of searchNames) {
+    const stubCard = {
+      name: searchName || '',
+      number: number || '',
+      set: { id: effectiveSetId || '', name: setName, market: effectiveMarket },
+    };
+
+    try {
+      const ctCode = effectiveSetId
+        ? resolveCtCodeForPokemonSetByMarket(effectiveSetId, setName, effectiveMarket)
+        : null;
+      if (effectiveSetId && (isPromoSetId(effectiveSetId) || ctCode)) {
+        throwIfAborted(signal);
+        const exp = await ctMatchExpansion(stubCard, null, 'pokemon', { preferredMarket: effectiveMarket, preferredCode: ctCode });
+        if (exp) {
+          if (searchName && number) {
+            const bp = await ctFindBlueprint(stubCard, exp.id, null);
+            if (bp) allBps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
+          } else {
+            const all = await ctGetBlueprints(exp.id);
+            const nn = norm(searchName);
+            const rawNum = (number || '').split('/')[0].replace(/^0+/, '');
+            for (const bp of all) {
+              if (searchName && nn && !norm(bp.name).includes(nn) && !cardNameMatchesQuery(bp.name || '', searchName)) continue;
+              if (number && rawNum) {
+                const bpNum = ctBpNumber(bp);
+                if (
+                  bpNum !== rawNum
+                  && !promoNumberMatches(rawNum, bpNum)
+                  && !cardNumberMatches(rawNum, bpNum)
+                  && !cardNumberMatches(bpNum, rawNum)
+                ) continue;
+              }
+              allBps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
+              if (allBps.length >= 24) break;
             }
-            bps.push({ ...bp, expansion: { id: exp.id, name_en: ctExpName(exp), code: exp.code } });
-            if (bps.length >= 24) break;
           }
         }
       }
-    }
-    // Preferisci 1 sola chiamata API nome rispetto allo scan di più espansioni.
-    if (!bps.length && name) {
-      throwIfAborted(signal);
-      try {
-        bps = await ctSearchBlueprintsByApi(name, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
-        if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
-      } catch (e) {
-        if (isAbortError(e) || isTimeoutError(e)) throw e;
-        console.warn('[CT] blueprints API search:', e);
+      // Preferisci 1 sola chiamata API nome rispetto allo scan di più espansioni.
+      if (!allBps.length && searchName) {
+        throwIfAborted(signal);
+        try {
+          const apiHits = await ctSearchBlueprintsByApi(searchName, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
+          if (ctCode) {
+            allBps.push(...apiHits.filter(bp => norm(bp.expansion?.code) === norm(ctCode)));
+          } else {
+            allBps.push(...apiHits);
+          }
+        } catch (e) {
+          if (isAbortError(e) || isTimeoutError(e)) throw e;
+          console.warn('[CT] blueprints API search:', e);
+        }
       }
+      if (!allBps.length && searchName) {
+        throwIfAborted(signal);
+        const nameHits = await ctSearchBlueprintsByName(searchName, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
+        if (ctCode) {
+          allBps.push(...nameHits.filter(bp => norm(bp.expansion?.code) === norm(ctCode)));
+        } else {
+          allBps.push(...nameHits);
+        }
+      }
+      if (!allBps.length && !effectiveSetId && (searchName || number)) {
+        throwIfAborted(signal);
+        const promoHits = await searchCtPromoBlueprints(stubCard, signal);
+        allBps.push(...promoHits);
+      }
+    } catch (e) {
+      if (isAbortError(e) || isTimeoutError(e)) throw e;
+      console.warn('[CT] searchPokemonViaCardTrader:', e);
     }
-    if (!bps.length && name) {
-      throwIfAborted(signal);
-      bps = await ctSearchBlueprintsByName(name, null, 'pokemon', (number || effectiveSetId || setName) ? stubCard : null);
-      if (ctCode) bps = bps.filter(bp => norm(bp.expansion?.code) === norm(ctCode));
-    }
-    if (!bps.length && !effectiveSetId && (name || number)) {
-      throwIfAborted(signal);
-      bps = await searchCtPromoBlueprints(stubCard, signal);
-    }
-  } catch (e) {
-    if (isAbortError(e) || isTimeoutError(e)) throw e;
-    console.warn('[CT] searchPokemonViaCardTrader:', e);
-    return [];
   }
 
-  return dedupeBlueprints(bps).map(ctCardFromBlueprint);
+  return dedupeBlueprints(allBps).map(ctCardFromBlueprint);
 }
 
 function shouldTryCtPromoSearch(cardSet) {
@@ -7790,6 +7833,7 @@ function shouldTryCtFallback(name, number, cardSet) {
   if (name && cardSet) return true;
   if (name && number) return true;
   if (number && cardSet) return true;
+  if (number && !cardSet) return true;
   return false;
 }
 
@@ -7816,8 +7860,7 @@ function filterCardsToQuery(cards, name, number, cardSet) {
   if (number) out = out.filter(c => cardNumberMatches(number, c.number));
   if (cardSet) out = out.filter(c => cardMatchesSelectedSet(c, cardSet));
   if (name) {
-    const qName = normCardName(name);
-    out = out.filter(c => normCardName(c.name || '').includes(qName));
+    out = out.filter(c => cardNameMatchesQuery(c.name || '', name));
   }
   return out;
 }
@@ -7993,8 +8036,8 @@ async function findMaybeYouMeantCards(name, number, cardSet, lang, signal, opts 
   }
 
   // Numeri adiacenti: solo catalogo locale/API già raccolto — niente CT sequenziale (lento).
-  // CT solo se non abbiamo ancora candidati e non è una ricerca esatta nome+numero.
-  if (!skipCtFallback && !candidates.length && (name || number)) {
+  // CT per arricchire i candidati anche quando siamo già partiti da risultati generici.
+  if (!skipCtFallback && (name || number)) {
     try {
       throwIfAborted(signal);
       const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, getSelectedSetMarket(), signal);
@@ -8035,7 +8078,7 @@ function renderMaybeYouMeant(cards, name, number) {
 function searchLocal(name, number, set, lang) {
   const nn = norm(name), nnum = norm(number), nset = norm(set), nl = norm(lang);
   return LOCAL_CATALOG.filter(c => {
-    const mn = !name   || norm(c.name).includes(nn);
+    const mn = !name || cardNameMatchesQuery(c.name, name);
     const mnum = !number || norm(c.number).includes(nnum);
     const keys = [c.set.name, c.set.id, ...(c.set.altNames || [])].map(norm);
     const ms = !set  || keys.some(k => k.includes(nset));
@@ -8163,6 +8206,8 @@ async function doSearch() {
   showMsg('Ricerca in corso…', 'loading');
 
   let timedOut = false;
+  let timeoutRetryDone = false;
+  let effectiveName = name;
   const deadlineTid = setTimeout(() => {
     timedOut = true;
     try { searchCtrl?.abort(); } catch {}
@@ -8170,7 +8215,6 @@ async function doSearch() {
 
   try {
     // In IT mode resolve Italian name → English for API calls
-    let effectiveName = name;
     if (pokemonNameLanguage === 'it' && name) {
       const cached = pokemonItEnNameCache.get(name.toLowerCase());
       if (cached) {
@@ -8190,7 +8234,7 @@ async function doSearch() {
       const maybe = await findMaybeYouMeantCards(effectiveName, number, cardSet, lang, searchCtrl.signal, {
         seedCards: maybeSeedCards,
         fastOnly: maybeSeedCards.length > 0,
-        skipCtFallback: !!(name && number),
+        skipCtFallback: false,
       });
       if (myGen !== searchGen) return;
       if (maybe.length) {
@@ -8216,6 +8260,46 @@ async function doSearch() {
   } catch (e) {
     if (myGen !== searchGen) return;
     if (isTimeoutError(e) || (isAbortError(e) && timedOut)) {
+      if (!timeoutRetryDone) {
+        timeoutRetryDone = true;
+        try {
+          showMsg('Ricerca lenta, secondo tentativo automatico…', 'warning');
+          const retryCtrl = new AbortController();
+          const retryCards = await runSearch(effectiveName, number, cardSet, setMarket, lang, null, retryCtrl.signal);
+          if (myGen !== searchGen) return;
+
+          if (retryCards.length) {
+            showMsg(
+              retryCards.length === 1
+                ? 'Carta trovata!'
+                : `Trovate ${retryCards.length} carte — seleziona quella corretta.`,
+              'success'
+            );
+            if (retryCards.length === 1) {
+              selectCard(retryCards[0]);
+            } else {
+              renderChoices(retryCards);
+            }
+            return;
+          }
+
+          const maybeRetry = await findMaybeYouMeantCards(effectiveName, number, cardSet, lang, retryCtrl.signal, {
+            seedCards: maybeSeedCards,
+            fastOnly: maybeSeedCards.length > 0,
+            skipCtFallback: false,
+          });
+          if (myGen !== searchGen) return;
+          if (maybeRetry.length) {
+            renderMaybeYouMeant(maybeRetry, name, number);
+            showMsg('Nessuna corrispondenza esatta. Forse cercavi una di queste carte?', 'warning');
+            return;
+          }
+        } catch (retryErr) {
+          if (!(isAbortError(retryErr) || isTimeoutError(retryErr))) {
+            console.warn('retrySearchOnTimeout:', retryErr);
+          }
+        }
+      }
       showMsg(SEARCH_TIMEOUT_MSG, 'error');
       return;
     }
@@ -8322,8 +8406,9 @@ async function runSearch(name, number, cardSet, setMarket, lang, apiKey, signal)
     ? resolveCtCodeForPokemonSetByMarket(cardSet, $('cardSet')?.value || '', setMarket)
     : '';
   const forceCtSetFallbackByMarket = !!(cardSet && ctSetCode);
-  if (!cards.length && !(name && number) && (name || number) && shouldTryCtFallback(name, number, cardSet)
-      && (!maybeSeedCards.length || forceCtSetFallback || forceCtSetFallbackByMarket)) {
+  const shouldUseCtFallback = shouldTryCtFallback(name, number, cardSet)
+    && (!maybeSeedCards.length || forceCtSetFallback || forceCtSetFallbackByMarket || (!cardSet && !!number));
+  if (!cards.length && (name || number) && shouldUseCtFallback) {
     const ctCards = await searchPokemonViaCardTrader(name, number, cardSet, setMarket, signal);
     if (ctCards.length) {
       showMsg('Risultati da CardTrader (promo o set non nel catalogo Pokémon TCG).', 'info');
@@ -8336,8 +8421,7 @@ async function runSearch(name, number, cardSet, setMarket, lang, apiKey, signal)
     cards = cards.filter(c => cardNumberMatches(number, c.number));
   }
   if (name && cards.length) {
-    const qName = normCardName(name);
-    cards = cards.filter(c => normCardName(c.name || '').includes(qName));
+    cards = cards.filter(c => cardNameMatchesQuery(c.name || '', name));
   }
   if (lang && cards.length) {
     const byLang = cards.filter(c => c._fromCt || cardMatchesSearchLanguage(c, lang));
