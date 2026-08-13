@@ -4935,9 +4935,18 @@ function normCardName(v) {
   return norm(v)
     .replace(/[♀♂]/g, '')
     .replace(/[’']/g, '')
+    .replace(/&/g, ' ')
     .replace(/[.\-_]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+const POKEMON_VARIANT_NAME_TOKENS = new Set(['ex', 'gx', 'v', 'vmax', 'vstar', 'lv', 'lvx', 'break']);
+
+function cardNameCoreTokens(value) {
+  return normCardName(value)
+    .split(/\s+/)
+    .filter(token => token && token !== 'and' && token !== '&' && !POKEMON_VARIANT_NAME_TOKENS.has(token));
 }
 
 function cardNameMatchesQuery(cardName, queryName) {
@@ -4956,6 +4965,16 @@ function cardNameMatchesQuery(cardName, queryName) {
     candidate === token || candidate.startsWith(token) || token.startsWith(candidate)
   ));
   if (matchedTokens.length >= Math.min(queryTokens.length, 2)) return true;
+
+  const cardCoreTokens = cardNameCoreTokens(cardName);
+  const queryCoreTokens = cardNameCoreTokens(queryName);
+  if (queryCoreTokens.length && queryCoreTokens.every(token => cardCoreTokens.some(candidate =>
+    candidate === token || candidate.startsWith(token) || token.startsWith(candidate)
+  ))) {
+    const queryHasVariantToken = queryTokens.some(token => POKEMON_VARIANT_NAME_TOKENS.has(token));
+    const cardHasVariantToken = cardTokens.some(token => POKEMON_VARIANT_NAME_TOKENS.has(token));
+    if (!queryHasVariantToken || cardHasVariantToken) return true;
+  }
 
   return nameSimilarityScore(query, card) >= 60;
 }
@@ -5187,6 +5206,7 @@ function escQ(v)   {
 function escNameQ(v) {
   return String(v || '')
     .replace(/[♀♂]/g, '')
+    .replace(/&/g, ' ')
     .trim()
     .replace(/[\[\]{}()+!^~"*?:/\\]/g, '');
 }
@@ -7705,9 +7725,15 @@ function buildPokemonNameSearchVariants(name) {
   if (normalized) variants.push(normalized);
   if (normalized && !/\b(ex|gx|v|vv|sv|lv)\b/i.test(normalized)) {
     variants.push(`${normalized} ex`);
+    variants.push(`${normalized} gx`);
   }
   if (normalized && /\s+ex$/i.test(normalized)) {
     variants.push(normalized.replace(/\s+ex$/i, ''));
+    variants.push(normalized.replace(/\s+ex$/i, ' gx'));
+  }
+  if (normalized && /\s+gx$/i.test(normalized)) {
+    variants.push(normalized.replace(/\s+gx$/i, ''));
+    variants.push(normalized.replace(/\s+gx$/i, ' ex'));
   }
   return [...new Set(variants.filter(Boolean))];
 }
