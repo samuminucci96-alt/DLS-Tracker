@@ -206,7 +206,7 @@ netlify deploy --prod
 
 ## 📊 Funzionalità Attuali
 
-✅ **Ricerca carte** (Pokémon, One Piece, Riftbound)  
+✅ **Ricerca carte** (Pokémon, One Piece, Riftbound, MTG)  
 ✅ **Prezzi in tempo reale** da CardTrader  
 ✅ **Override prezzo manuale** prima dell'aggiunta in collezione  
 ✅ **Valutazione condizioni** (NM, EX, GOOD, PLAYED, POOR)  
@@ -228,6 +228,25 @@ netlify deploy --prod
 ✅ **Mitigazione loop fallback** su ricerche nome+numero  
 ✅ **Preview immagini fullscreen** (risultato + suggerimenti, chiusura X/Esc/backdrop)  
 ✅ **Dark mode ready** (variabili CSS)  
+
+### MTG (Scryfall) - Setup rapido
+
+- Endpoint proxy: `GET /api/mtg`
+- Modalita supportate:
+    - `mode=exact&set={setCode}&number={collectorNumber}`
+    - `mode=autocomplete&q={query}`
+    - `mode=editions&exact={cardName}`
+    - `mode=id&id={scryfallUuid}`
+- Prezzi usati: `prices.eur` e `prices.eur_foil`
+
+### Batch giornaliero prezzi MTG
+
+- Endpoint batch: `POST /api/mtg-batch-refresh`
+- Auth: header `Authorization: Bearer <MTG_BATCH_SECRET>`
+- Workflow GitHub pronto: [.github/workflows/mtg-daily-refresh.yml](.github/workflows/mtg-daily-refresh.yml)
+- Secrets richiesti nel repository GitHub:
+    - `DLS_TRACKER_BASE_URL`
+    - `MTG_BATCH_SECRET`
 
 ---
 

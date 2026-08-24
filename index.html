@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG e Riftbound con prezzi CardTrader in tempo reale.">
+  <meta name="description" content="DLS Tracker — Traccia il valore delle tue carte Pokémon TCG, One Piece TCG, Riftbound e MTG con prezzi live.">
   <meta name="theme-color" content="#2454a9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#2454a9">
   <link rel="manifest" href="manifest.json?v=43">
@@ -517,6 +517,7 @@
     .game-tab[data-game="pokemon"].active { color: var(--poke); }
     .game-tab[data-game="onepiece"].active { color: var(--op); }
     .game-tab[data-game="riftbound"].active { color: var(--gold); }
+    .game-tab[data-game="mtg"].active { color: #7c3aed; }
 
     .tab-icon { font-size: 1rem; }
     .tab-icon-img {
@@ -1870,6 +1871,9 @@
     .game-tab[data-game="riftbound"].active {
       text-shadow: 0 0 12px rgba(201,146,10,0.45);
     }
+    .game-tab[data-game="mtg"].active {
+      text-shadow: 0 0 12px rgba(124,58,237,0.45);
+    }
 
     /* ─── Suggestions entrance ──────────────────────────────────── */
     .sugg-item {
@@ -3138,6 +3142,10 @@
           <span class="tab-icon">📦</span>
           Sealed
         </button>
+        <button type="button" class="game-tab" data-game="mtg">
+          <span class="tab-icon">🪄</span>
+          MTG
+        </button>
       </div>
     </nav>
 
@@ -3316,6 +3324,32 @@
         </div>
         </div>
 
+        <!-- Magic: The Gathering Form -->
+        <div id="mtgSearch" hidden>
+        <div id="mtgForm" class="form-grid">
+          <div class="field" style="position:relative">
+            <label for="mtgCardName">Nome Carta</label>
+            <input id="mtgCardName" type="text" placeholder="Es. Lightning Bolt, Black Lotus, Sol Ring..." autocomplete="off">
+            <div id="mtgNameSuggestions" class="suggestions" hidden></div>
+          </div>
+          <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="field">
+              <label for="mtgCardSet">Set code (exact)</label>
+              <input id="mtgCardSet" type="text" placeholder="Es. mh3, lea, dmu" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="mtgCardNumber">Collector # (exact)</label>
+              <input id="mtgCardNumber" type="text" placeholder="Es. 150" autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="mtgSearchBtn" style="width:100%;margin-top:4px" onclick="mtgDoSearch()">
+            <span id="mtgSearchBtnInner">🔍 &nbsp;Cerca Carta MTG</span>
+          </button>
+          <div id="mtgProgressBar" class="tcg-progress-bar" style="background:linear-gradient(90deg,#7c3aed,#1d4ed8,#7c3aed);"></div>
+          <div id="mtgMsgBox" hidden style="margin-top:8px"></div>
+        </div>
+        </div>
+
       </div>
 
       <div id="pokemonResults">
@@ -3374,6 +3408,17 @@
         <div class="choice-list" id="slChoicesList"></div>
       </div>
       <div class="card" id="slResultCard" hidden style="padding:18px 20px"></div>
+      </div>
+
+      <div id="mtgResults" hidden>
+      <div class="card" id="mtgChoicesCard" hidden>
+        <div class="choices-bar">
+          <h3>🪄 Scegli la carta MTG</h3>
+          <span class="badge-pill" id="mtgChoicesCount"></span>
+        </div>
+        <div class="choice-list" id="mtgChoicesList"></div>
+      </div>
+      <div class="card" id="mtgResultCard" hidden style="padding:18px 20px"></div>
       </div>
 
     </div>
@@ -4021,7 +4066,7 @@ let suggLastNames   = [];
 let suggReqSeq      = 0;
 let pokemonNameLanguage = localStorage.getItem('dls_pokemon_name_lang') || 'en'; // 'en' | 'it'
 const pokemonItEnNameCache = new Map(); // lowercase italian name → canonical english name
-let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, sealed: false };
+let ctPreloadDone   = { pokemon: false, onepiece: false, riftbound: false, sealed: false, mtg: false };
 let ctPreloadTimer  = null;
 let manualPokemonPrice = null;
 let manualPokemonPriceRaw = '';
@@ -4041,6 +4086,17 @@ const COLLECTION_GRADED_FILTER_STORAGE_KEY = 'dls_collection_filter_graded_only'
 const COLLECTION_SORT_STORAGE_KEY = 'dls_collection_sort_mode';
 let collectionOnlyGraded = false;
 let collectionSortMode = 'value_desc';
+
+const mtgState = {
+  selected: null,
+  choices: [],
+  manualPrice: null,
+  manualPriceRaw: '',
+  selectedQuality: 'NM',
+  selectedLang: 'EN',
+  selectedQty: 1,
+  isFoil: false,
+};
 
 function normalizeCollectionSortMode(v) {
   const mode = String(v || '').trim();
@@ -9321,6 +9377,53 @@ async function openCollectionItem(idx) {
     return;
   }
 
+  if (game === 'mtg') {
+    const fallbackCard = {
+      scryfall_id: item.scryfallId || item.card?.scryfallId || '',
+      card_name: item.name || '',
+      set_code: item.setId || '',
+      set_name: item.set || '',
+      collector_number: item.number || '',
+      lang: (item.lang || item.language || 'EN').toLowerCase(),
+      image: item.imgUrl || item.img || '',
+      price_eur: Number.isFinite(Number(item.mtgPriceEur)) ? Number(item.mtgPriceEur) : null,
+      price_eur_foil: Number.isFinite(Number(item.mtgPriceEurFoil)) ? Number(item.mtgPriceEurFoil) : null,
+      rarity: '',
+      released_at: '',
+    };
+
+    let card = fallbackCard;
+    if (fallbackCard.scryfall_id) {
+      try {
+        const hit = await mtgApi('id', { id: fallbackCard.scryfall_id });
+        if (hit?.data?.scryfall_id) {
+          card = hit.data;
+        }
+      } catch {}
+    }
+
+    if ($('mtgCardName')) $('mtgCardName').value = card.card_name || item.name || '';
+    if ($('mtgCardSet')) $('mtgCardSet').value = card.set_code || item.setId || '';
+    if ($('mtgCardNumber')) $('mtgCardNumber').value = card.collector_number || item.number || '';
+
+    mtgState.selectedLang = (item.lang || item.language || card.lang || 'EN').toUpperCase();
+    mtgState.selectedQuality = item.quality || item.condition || 'NM';
+    mtgState.selectedQty = 1;
+    mtgState.isFoil = !!item.isFoil;
+    if (item.manualPrice || item.priceMode === 'manual') {
+      mtgState.manualPrice = Number(item.price) || null;
+      mtgState.manualPriceRaw = mtgState.manualPrice != null ? String(mtgState.manualPrice).replace('.', ',') : '';
+    } else {
+      mtgState.manualPrice = null;
+      mtgState.manualPriceRaw = '';
+    }
+
+    mtgRenderChoices([card]);
+    mtgRenderResult(card);
+    scrollToSearchPanel();
+    return;
+  }
+
   const gameKey = game === 'onepiece' ? 'onepiece'
     : game === 'riftbound' ? 'riftbound'
     : game === 'sealed' ? 'sealed'
@@ -11096,6 +11199,476 @@ function initCtTcgGame(gameKey) {
 
 Object.keys(CT_TCG_CONFIG).forEach(initCtTcgGame);
 
+let mtgSuggTimer = null;
+
+function mtgShowMsg(msg, type = 'info') {
+  const box = $('mtgMsgBox');
+  if (!box) return;
+  if (!msg) {
+    box.hidden = true;
+    box.textContent = '';
+    box.className = '';
+    return;
+  }
+  box.hidden = false;
+  box.className = `msg-box ${type}`;
+  box.textContent = msg;
+  if (type === 'success' || type === 'info') {
+    setTimeout(() => {
+      if (box.textContent === msg) {
+        box.hidden = true;
+      }
+    }, 3500);
+  }
+}
+
+function mtgSetLoading(on) {
+  const btn = $('mtgSearchBtn');
+  const inner = $('mtgSearchBtnInner');
+  const bar = $('mtgProgressBar');
+  if (btn) btn.disabled = !!on;
+  if (inner) inner.textContent = on ? '⌛ Ricerca MTG in corso...' : '🔍 Cerca Carta MTG';
+  if (bar) bar.classList.toggle('active', !!on);
+}
+
+function mtgClearSuggestions() {
+  const box = $('mtgNameSuggestions');
+  if (!box) return;
+  box.hidden = true;
+  box.innerHTML = '';
+}
+
+function mtgQualityOptions(selected) {
+  const options = ['NM', 'EX', 'GOOD', 'PLAYED', 'POOR'];
+  return options.map((q) => `<option value="${q}" ${selected === q ? 'selected' : ''}>${escHtml(QUALITY[q]?.label || q)} (${q})</option>`).join('');
+}
+
+function mtgCurrentUnitPrice() {
+  if (mtgState.manualPrice != null) return mtgState.manualPrice;
+  const card = mtgState.selected;
+  if (!card) return null;
+  const base = mtgState.isFoil
+    ? (card.price_eur_foil ?? card.price_eur)
+    : (card.price_eur ?? card.price_eur_foil);
+  if (!Number.isFinite(Number(base)) || Number(base) <= 0) return null;
+  return parseFloat(Number(base).toFixed(2));
+}
+
+async function mtgApi(mode, params = {}) {
+  const url = new URL(API_MTG, location.origin);
+  url.searchParams.set('mode', mode);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v != null && String(v).trim() !== '') {
+      url.searchParams.set(k, String(v).trim());
+    }
+  });
+  const res = await fetchWithTimeout(url.href, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    credentials: 'same-origin',
+  }, SEARCH_REQUEST_TIMEOUT_MS).catch(err => {
+    rethrowNetworkError(err, 'Connessione non disponibile. Verifica internet e riprova.');
+  });
+  if (!res.ok) {
+    await apiFetchError(res, `Errore MTG API (${res.status})`);
+  }
+  return res.json();
+}
+
+function mtgRenderSuggestions(names) {
+  const box = $('mtgNameSuggestions');
+  if (!box) return;
+  if (!Array.isArray(names) || !names.length) {
+    mtgClearSuggestions();
+    return;
+  }
+  box.innerHTML = names.slice(0, 10).map((name) => (
+    `<button type="button" class="sugg-item" data-name="${escHtml(name)}">${escHtml(name)}</button>`
+  )).join('');
+  box.hidden = false;
+
+  box.querySelectorAll('button.sugg-item').forEach((btn) => {
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const picked = btn.dataset.name || '';
+      if (!picked) return;
+      $('mtgCardName').value = picked;
+      mtgClearSuggestions();
+      mtgSearchByName(picked);
+    });
+  });
+}
+
+function mtgChoiceCardHtml(card) {
+  const img = card.image || '';
+  const eur = Number.isFinite(Number(card.price_eur)) ? fmt(Number(card.price_eur)) : '—';
+  const eurFoil = Number.isFinite(Number(card.price_eur_foil)) ? fmt(Number(card.price_eur_foil)) : '—';
+  const lang = String(card.lang || '').toUpperCase() || 'N/A';
+  return `
+    <button type="button" class="choice-card" data-mtg-id="${escHtml(card.scryfall_id)}">
+      <div class="choice-main">
+        <div class="choice-title">${escHtml(card.card_name)}</div>
+        <div class="choice-meta">${escHtml(card.set_name || card.set_code || '?')} · #${escHtml(card.collector_number || '?')} · ${escHtml(lang)}</div>
+        <div class="choice-sub">EUR ${eur} · Foil ${eurFoil}</div>
+      </div>
+      ${img ? `<img src="${escHtml(img)}" alt="${escHtml(card.card_name)}" loading="lazy" style="width:54px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : ''}
+    </button>
+  `;
+}
+
+function mtgRenderChoices(cards) {
+  const list = $('mtgChoicesList');
+  const cardWrap = $('mtgChoicesCard');
+  const count = $('mtgChoicesCount');
+  const resultCard = $('mtgResultCard');
+  if (!list || !cardWrap || !count || !resultCard) return;
+
+  mtgState.choices = Array.isArray(cards) ? cards : [];
+  if (!mtgState.choices.length) {
+    cardWrap.hidden = true;
+    list.innerHTML = '';
+    count.textContent = '';
+    return;
+  }
+
+  list.innerHTML = mtgState.choices.map(mtgChoiceCardHtml).join('');
+  count.textContent = `${mtgState.choices.length} risultati`;
+  cardWrap.hidden = false;
+  resultCard.hidden = true;
+
+  list.querySelectorAll('button.choice-card[data-mtg-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.mtgId || '';
+      const card = mtgState.choices.find((row) => row.scryfall_id === id);
+      if (card) mtgRenderResult(card);
+    });
+  });
+}
+
+function mtgRenderResult(card) {
+  const result = $('mtgResultCard');
+  if (!result) return;
+  mtgState.selected = card;
+  const img = card.image || '';
+  const cardLang = String(card.lang || 'en').toUpperCase();
+  if (!mtgState.selectedLang) mtgState.selectedLang = cardLang;
+  const eur = Number.isFinite(Number(card.price_eur)) ? Number(card.price_eur) : null;
+  const eurFoil = Number.isFinite(Number(card.price_eur_foil)) ? Number(card.price_eur_foil) : null;
+  const unit = mtgCurrentUnitPrice();
+
+  result.innerHTML = `
+    <div class="result-header" style="margin-bottom:12px;font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Carta selezionata</div>
+    <div class="tcg-result-layout">
+      <div class="tcg-result-img">
+        ${img
+          ? `<img class="previewable-img" src="${escHtml(img)}" alt="${escHtml(card.card_name)}" loading="lazy">`
+          : `<div class="tcg-result-img-ph">🪄</div>`}
+      </div>
+      <div class="tcg-result-body">
+        <div class="tcg-result-name">${escHtml(card.card_name)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
+          <span class="badge-set">${escHtml(card.set_name || card.set_code || '?')}</span>
+          <span class="badge-num">#${escHtml(card.collector_number || '?')}</span>
+          <span class="badge-rarity">${escHtml((card.lang || '').toUpperCase())}</span>
+          ${card.rarity ? `<span class="badge-rarity">${escHtml(card.rarity)}</span>` : ''}
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 90px; margin: 8px 0 10px;">
+          <div class="field">
+            <label for="mtgLang">Lingua</label>
+            <select id="mtgLang">
+              <option value="EN" ${mtgState.selectedLang === 'EN' ? 'selected' : ''}>EN</option>
+              <option value="IT" ${mtgState.selectedLang === 'IT' ? 'selected' : ''}>IT</option>
+              <option value="JP" ${mtgState.selectedLang === 'JP' ? 'selected' : ''}>JP</option>
+              <option value="FR" ${mtgState.selectedLang === 'FR' ? 'selected' : ''}>FR</option>
+              <option value="DE" ${mtgState.selectedLang === 'DE' ? 'selected' : ''}>DE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mtgCond">Condizione</label>
+            <select id="mtgCond">${mtgQualityOptions(mtgState.selectedQuality)}</select>
+          </div>
+          <div class="field">
+            <label for="mtgQty">Quantita</label>
+            <input id="mtgQty" type="number" min="1" max="99" value="${mtgState.selectedQty}">
+          </div>
+        </div>
+
+        <div class="price-box" style="margin-top:10px;">
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Prezzo Scryfall</span>
+            <span class="price-val">Non-Foil: ${eur != null ? fmt(eur) : '—'} · Foil: ${eurFoil != null ? fmt(eurFoil) : '—'}</span>
+          </div>
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label for="mtgFoil" style="display:flex;align-items:center;gap:6px;font-size:0.86rem;">
+              <input id="mtgFoil" type="checkbox" ${mtgState.isFoil ? 'checked' : ''}>
+              Foil
+            </label>
+            <span style="font-size:0.82rem;color:var(--text-muted);">Prezzo usato: ${unit != null ? fmt(unit) : 'N/D'}</span>
+          </div>
+          <div class="price-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="price-lbl" style="min-width:140px;">Prezzo manuale (€)</span>
+            <input id="mtgManualPriceInput" type="text" inputmode="decimal" placeholder="Es. 7,90" value="${escHtml(mtgState.manualPriceRaw || '')}" style="flex:1;min-width:120px;max-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);">
+            <button id="mtgApplyManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;">Applica</button>
+            <button id="mtgClearManualPriceBtn" type="button" class="btn btn-outline" style="padding:7px 10px;font-size:.78rem;" ${mtgState.manualPrice == null && !mtgState.manualPriceRaw ? 'disabled' : ''}>Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill pill-set">Sorgente: Scryfall (EUR)</span>
+      <button class="btn btn-primary" id="mtgAddBtn">+ Aggiungi (${unit != null ? fmt(unit) : 'N/D'} ×${mtgState.selectedQty})</button>
+    </div>
+  `;
+
+  result.hidden = false;
+  bindPreviewImage(result.querySelector('img.previewable-img'));
+
+  $('mtgLang')?.addEventListener('change', (e) => {
+    mtgState.selectedLang = String(e.target.value || 'EN').toUpperCase();
+  });
+  $('mtgCond')?.addEventListener('change', (e) => {
+    mtgState.selectedQuality = e.target.value || 'NM';
+  });
+  $('mtgQty')?.addEventListener('input', (e) => {
+    mtgState.selectedQty = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1));
+    if (String(mtgState.selectedQty) !== String(e.target.value)) {
+      e.target.value = String(mtgState.selectedQty);
+    }
+    mtgRenderResult(card);
+  });
+  $('mtgFoil')?.addEventListener('change', (e) => {
+    mtgState.isFoil = !!e.target.checked;
+    mtgRenderResult(card);
+  });
+  $('mtgManualPriceInput')?.addEventListener('input', (e) => {
+    mtgState.manualPriceRaw = e.target.value;
+  });
+  $('mtgManualPriceInput')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const parsed = parseManualPrice(mtgState.manualPriceRaw || '');
+    if (parsed == null) {
+      mtgShowMsg('Prezzo manuale non valido. Usa un numero maggiore di 0.', 'warn');
+      return;
+    }
+    mtgState.manualPrice = parsed;
+    mtgState.manualPriceRaw = String(parsed).replace('.', ',');
+    mtgRenderResult(card);
+    mtgShowMsg(`Prezzo manuale applicato: ${fmt(parsed)}.`, 'info');
+  });
+  $('mtgApplyManualPriceBtn')?.addEventListener('click', () => {
+    const parsed = parseManualPrice(mtgState.manualPriceRaw || '');
+    if (parsed == null) {
+      mtgShowMsg('Prezzo manuale non valido. Usa un numero maggiore di 0.', 'warn');
+      return;
+    }
+    mtgState.manualPrice = parsed;
+    mtgState.manualPriceRaw = String(parsed).replace('.', ',');
+    mtgRenderResult(card);
+    mtgShowMsg(`Prezzo manuale applicato: ${fmt(parsed)}.`, 'info');
+  });
+  $('mtgClearManualPriceBtn')?.addEventListener('click', () => {
+    mtgState.manualPrice = null;
+    mtgState.manualPriceRaw = '';
+    mtgRenderResult(card);
+  });
+  $('mtgAddBtn')?.addEventListener('click', () => mtgAddToCollection());
+}
+
+async function mtgSearchByName(name) {
+  const normalized = String(name || '').trim();
+  if (!normalized) {
+    mtgShowMsg('Inserisci almeno il nome della carta.', 'warn');
+    return;
+  }
+
+  mtgSetLoading(true);
+  mtgShowMsg('', 'info');
+  try {
+    const editions = await mtgApi('editions', { exact: normalized });
+    const cards = Array.isArray(editions?.data) ? editions.data.filter(Boolean) : [];
+    if (cards.length) {
+      mtgRenderChoices(cards);
+      mtgShowMsg(`Trovate ${cards.length} edizioni per ${normalized}.`, 'success');
+      return;
+    }
+
+    const sugg = await mtgApi('autocomplete', { q: normalized });
+    const names = Array.isArray(sugg?.data) ? sugg.data : [];
+    if (!names.length) {
+      mtgRenderChoices([]);
+      mtgShowMsg('Nessuna carta trovata con questa ricerca.', 'warn');
+      return;
+    }
+
+    mtgRenderSuggestions(names);
+    mtgShowMsg('Nessun exact match. Scegli un suggerimento.', 'info');
+  } catch (e) {
+    mtgShowMsg(e?.message || 'Errore ricerca MTG.', 'warn');
+  } finally {
+    mtgSetLoading(false);
+  }
+}
+
+window.mtgDoSearch = async function() {
+  const name = $('mtgCardName')?.value?.trim() || '';
+  const setCode = $('mtgCardSet')?.value?.trim().toLowerCase() || '';
+  const number = $('mtgCardNumber')?.value?.trim() || '';
+
+  mtgClearSuggestions();
+  mtgState.selected = null;
+  $('mtgResultCard').hidden = true;
+
+  if (setCode && number) {
+    mtgSetLoading(true);
+    mtgShowMsg('', 'info');
+    try {
+      const exact = await mtgApi('exact', { set: setCode, number });
+      if (!exact?.data?.scryfall_id) {
+        mtgRenderChoices([]);
+        mtgShowMsg('Nessuna carta trovata per set+collector number.', 'warn');
+        return;
+      }
+      mtgRenderChoices([exact.data]);
+      mtgRenderResult(exact.data);
+      mtgShowMsg('Carta trovata!', 'success');
+    } catch (e) {
+      mtgShowMsg(e?.message || 'Errore ricerca exact MTG.', 'warn');
+    } finally {
+      mtgSetLoading(false);
+    }
+    return;
+  }
+
+  await mtgSearchByName(name);
+};
+
+window.mtgAddToCollection = async function() {
+  const card = mtgState.selected;
+  if (!card) {
+    mtgShowMsg('Seleziona prima una carta MTG.', 'warn');
+    return;
+  }
+  const unit = mtgCurrentUnitPrice();
+  if (!Number.isFinite(Number(unit)) || Number(unit) <= 0) {
+    mtgShowMsg('Prezzo non disponibile. Scegli un altra stampa o inserisci un prezzo manuale.', 'warn');
+    return;
+  }
+
+  const qty = Math.max(1, Math.min(99, parseInt(mtgState.selectedQty, 10) || 1));
+  const editIdx = resolveCollectionEditIndex();
+  const isEditMode = editIdx >= 0 && (collection[editIdx]?.game || 'pokemon') === 'mtg';
+  const isManual = mtgState.manualPrice != null;
+  const priceFields = buildCollectionPriceFields(
+    Number(unit),
+    { fromCt: true, condition: null, source: isManual ? 'Prezzo manuale' : 'Scryfall EUR' },
+    { manual: isManual, source: isManual ? 'Prezzo manuale' : 'Scryfall EUR' },
+    null,
+  );
+
+  const baseItem = {
+      name: card.card_name,
+      set: card.set_name || card.set_code || '?',
+      setId: card.set_code || '',
+      number: card.collector_number || '?',
+      lang: mtgState.selectedLang || card.lang?.toUpperCase() || 'EN',
+      language: mtgState.selectedLang || card.lang?.toUpperCase() || 'EN',
+      quality: mtgState.selectedQuality || 'NM',
+      condition: mtgState.selectedQuality || 'NM',
+      isFoil: !!mtgState.isFoil,
+      mtgPriceEur: card.price_eur,
+      mtgPriceEurFoil: card.price_eur_foil,
+      scryfallId: card.scryfall_id,
+      basePrice: Number(card.price_eur || card.price_eur_foil || unit),
+      img: card.image || '',
+      imgUrl: card.image || '',
+      addedAt: new Date().toISOString(),
+      game: 'mtg',
+      card: {
+        name: card.card_name,
+        number: card.collector_number,
+        scryfallId: card.scryfall_id,
+        game: 'mtg',
+      },
+      ...priceFields,
+  };
+
+  if (isEditMode) {
+    const prevPrice = collection[editIdx]?.price;
+    const prevMode = canonicalPriceMode(collection[editIdx]);
+    collection[editIdx] = {
+      ...collection[editIdx],
+      ...baseItem,
+      lastPriceUpdate: new Date().toISOString(),
+    };
+    appendPriceHistory(collection[editIdx], {
+      reason: 'edit_card',
+      prevPrice,
+      nextPrice: collection[editIdx].price,
+      prevMode,
+      nextMode: canonicalPriceMode(collection[editIdx]),
+    });
+    ensureItemPriceTracking(collection[editIdx]);
+    persistLocalCollection();
+    onCollectionChanged({ scroll: true });
+    if (dlsUser) await saveCloudCollection();
+    clearCollectionEdit();
+    mtgShowMsg(`${card.card_name} aggiornata in collezione (${fmt(unit)}).`, 'success');
+    return;
+  }
+
+  for (let i = 0; i < qty; i++) {
+    pushCollectionItem({ ...baseItem });
+  }
+
+  persistLocalCollection();
+  onCollectionChanged({ scroll: true });
+  if (dlsUser) {
+    await saveCloudCollection();
+  } else {
+    const pending = JSON.parse(localStorage.getItem('dls_collection_pending') || '[]');
+    collection.slice(-qty).forEach((it) => pending.push(it));
+    localStorage.setItem('dls_collection_pending', JSON.stringify(pending));
+  }
+
+  mtgShowMsg(`${qty > 1 ? `${qty}x ` : ''}${card.card_name} aggiunta in collezione (${fmt(unit)}).`, 'success');
+};
+
+function initMtgSearch() {
+  $('mtgSearchBtn')?.addEventListener('click', () => mtgDoSearch());
+  $('mtgCardName')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') mtgDoSearch();
+  });
+  $('mtgCardSet')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') mtgDoSearch();
+  });
+  $('mtgCardNumber')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') mtgDoSearch();
+  });
+
+  $('mtgCardName')?.addEventListener('input', () => {
+    const value = $('mtgCardName')?.value?.trim() || '';
+    clearTimeout(mtgSuggTimer);
+    if (value.length < 2) {
+      mtgClearSuggestions();
+      return;
+    }
+    mtgSuggTimer = setTimeout(async () => {
+      try {
+        const res = await mtgApi('autocomplete', { q: value });
+        mtgRenderSuggestions(Array.isArray(res?.data) ? res.data : []);
+      } catch {}
+    }, 150);
+  });
+
+  $('mtgCardName')?.addEventListener('blur', () => {
+    setTimeout(() => mtgClearSuggestions(), 200);
+  });
+}
+
+initMtgSearch();
+
 document.addEventListener('mousedown', (e) => {
   if (e.target.closest('.ct-market-menu')) return;
   Object.keys(CT_TCG_CONFIG).forEach((gameKey) => {
@@ -11113,6 +11686,7 @@ function getCollectionStatsByGame() {
     { key: 'sealed', label: 'Sealed', icon: '📦' },
     { key: 'onepiece', label: 'One Piece', icon: '☠️' },
     { key: 'riftbound', label: 'Riftbound', icon: '⚔️' },
+    { key: 'mtg', label: 'MTG', icon: '🪄' },
   ];
   let grandTotal = 0;
   let grandCount = 0;
@@ -11183,6 +11757,8 @@ function renderCollection() {
         ? 'Nessun prodotto Sealed aggiunto ancora.'
       : activeGame === 'onepiece'
         ? 'Nessuna carta One Piece aggiunta ancora.'
+      : activeGame === 'mtg'
+        ? 'Nessuna carta MTG aggiunta ancora.'
         : 'Nessuna carta Riftbound aggiunta ancora.';
     const emptyMsg = collectionOnlyGraded
       ? 'Nessuna carta gradata per questo gioco con il filtro attivo.'
@@ -11237,6 +11813,7 @@ const GAME_UI = {
   sealed:    { label: 'Sealed Pokémon BETA', tagBg: 'rgba(100,116,139,0.18)',  tagColor: '#94a3b8' },
   onepiece:  { label: 'One Piece TCG', tagBg: 'rgba(192,57,43,0.12)',    tagColor: '#c0392b' },
   riftbound: { label: 'Riftbound',     tagBg: 'rgba(201,146,10,0.15)',    tagColor: '#c9920a' },
+  mtg:       { label: 'Magic: The Gathering', tagBg: 'rgba(124,58,237,0.14)', tagColor: '#7c3aed' },
 };
 
 function resetModalLocks() {
@@ -11290,10 +11867,12 @@ function switchActiveGame(game, opts = {}) {
       ['sealedSearch', game === 'sealed'],
       ['onepieceSearch', game === 'onepiece'],
       ['riftboundSearch', game === 'riftbound'],
+      ['mtgSearch', game === 'mtg'],
       ['pokemonResults', game === 'pokemon'],
       ['sealedResults', game === 'sealed'],
       ['onepieceResults', game === 'onepiece'],
       ['riftboundResults', game === 'riftbound'],
+      ['mtgResults', game === 'mtg'],
     ];
     panels.forEach(([id, show]) => {
       const el = $(id);
@@ -11596,6 +12175,7 @@ document.addEventListener('click', e => {
 const API_AUTH       = apiUrl('/api/auth');
 const API_COLLECTION = apiUrl('/api/collection');
 const API_PROFILE    = apiUrl('/api/profile');
+const API_MTG        = apiUrl('/api/mtg');
 
 function authFetch(url, opts = {}) {
   const token = opts.sessionToken ?? getToken();
@@ -12441,7 +13021,7 @@ bindOverlayBackdropClose(manualPriceOverlayEl, closeManualPriceModal);
 function scheduleCtPreload(game = activeGame) {
   clearTimeout(ctPreloadTimer);
   // Sealed cerca solo sul catalogo locale: nessun preload CT dedicato
-  if (game === 'sealed') return;
+  if (game === 'sealed' || game === 'mtg') return;
   ctPreloadTimer = setTimeout(() => ctPreloadExpansions(game), 400);
 }
 
@@ -12490,6 +13070,7 @@ async function refreshAllPrices() {
 
   let updated = 0;
   let skippedManual = 0;
+  let mtgUpdated = 0;
   for (let i = 0; i < collection.length; i++) {
     const item = collection[i];
     const cell = document.querySelector(`[data-ct-price="${i}"]`);
@@ -12506,7 +13087,33 @@ async function refreshAllPrices() {
     if (cell) cell.className = 'ct-price-cell refreshing';
     try {
       let result;
-      if (item.card?.bpId) {
+      if ((item.game || 'pokemon') === 'mtg' && item.scryfallId) {
+        const mtgData = await mtgApi('id', { id: item.scryfallId });
+        const card = mtgData?.data;
+        const eur = Number.isFinite(Number(card?.price_eur)) ? Number(card.price_eur) : null;
+        const eurFoil = Number.isFinite(Number(card?.price_eur_foil)) ? Number(card.price_eur_foil) : null;
+        const unit = item.isFoil ? (eurFoil ?? eur) : (eur ?? eurFoil);
+        if (unit != null && unit > 0) {
+          trackPricePatch(collection[i], {
+            price: parseFloat(Number(unit).toFixed(2)),
+            ctPrice: parseFloat(Number(unit).toFixed(2)),
+            priceMode: 'live',
+            priceSrc: 'Scryfall EUR',
+            mtgPriceEur: eur,
+            mtgPriceEurFoil: eurFoil,
+            lastPriceUpdate: new Date().toISOString(),
+            lastPriceSyncAt: new Date().toISOString(),
+          }, 'refresh_scryfall');
+          persistLocalCollection();
+          if (cell) { cell.textContent = fmt(collection[i].price); cell.className = 'ct-price-cell updated'; }
+          updated++;
+          mtgUpdated++;
+        } else {
+          if (cell) { cell.textContent = '—'; cell.className = 'ct-price-cell no-data'; }
+        }
+        await new Promise(r => setTimeout(r, 120));
+        continue;
+      } else if (item.card?.bpId) {
         result = await ctGetPriceByBlueprintId(item.card.bpId);
       } else if (item.card) {
         result = await ctGetPrice(item.card, item.game || 'pokemon');
@@ -12539,7 +13146,7 @@ async function refreshAllPrices() {
 
   priceRefreshing = false;
   const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  $('priceStatus').textContent = `Aggiornato alle ${now} · ${updated} prezzi CT · ${skippedManual} manuali invariati`;
+  $('priceStatus').textContent = `Aggiornato alle ${now} · ${updated} prezzi live (${mtgUpdated} MTG) · ${skippedManual} manuali invariati`;
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Aggiorna prezzi'; }
   if (dlsUser) saveCloudCollection();
   renderCollection();

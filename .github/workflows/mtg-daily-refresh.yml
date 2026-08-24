@@ -1,0 +1,39 @@
+name: MTG Daily Price Refresh
+
+on:
+  schedule:
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh-mtg-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger MTG batch refresh endpoint
+        env:
+          DLS_TRACKER_BASE_URL: ${{ secrets.DLS_TRACKER_BASE_URL }}
+          MTG_BATCH_SECRET: ${{ secrets.MTG_BATCH_SECRET }}
+        run: |
+          if [ -z "$DLS_TRACKER_BASE_URL" ]; then
+            echo "Missing secret DLS_TRACKER_BASE_URL"
+            exit 1
+          fi
+          if [ -z "$MTG_BATCH_SECRET" ]; then
+            echo "Missing secret MTG_BATCH_SECRET"
+            exit 1
+          fi
+
+          URL="${DLS_TRACKER_BASE_URL%/}/api/mtg-batch-refresh?userLimit=500&cardLimit=6000&delayMs=80"
+          echo "Calling $URL"
+
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $MTG_BATCH_SECRET" \
+            -H "Content-Type: application/json" \
+            "$URL")
+
+          cat response.json
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Batch refresh failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
