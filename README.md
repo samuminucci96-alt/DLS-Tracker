@@ -239,6 +239,20 @@ netlify deploy --prod
     - `mode=id&id={scryfallUuid}`
 - Prezzi usati: `prices.eur` e `prices.eur_foil`
 
+### ScanTrader → CSV CardTrader (MTG seller import)
+
+Converte un inventario ScanTrader (con Scryfall ID) in CSV per `POST /api/v2/product_imports` (game Magic = `1`). Usa `scryfall_id` per evitare errori **No item found** sui nomi italiani.
+
+```bash
+node tools/scantrader-to-cardtrader-csv.mjs "ScanTrader Inventario.csv"
+node tools/scantrader-to-cardtrader-csv.mjs input.csv -o out.csv --default-price-cents 5
+```
+
+Upload CardTrader / Postman:
+- `game_id=1`
+- `replace_stock_or_add_to_stock=add_to_stock`
+- `column_names=scryfall_id|name|expansion_code|collector_number|quantity|language|condition|foil|price_cents`
+
 ### Batch giornaliero prezzi MTG
 
 - Endpoint batch: `POST /api/mtg-batch-refresh`
